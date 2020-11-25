@@ -4,7 +4,7 @@ from lcode2dPy.config.config import Config
 default_config = Config()
 
 default_config.set('window-xy-steps', 769)
-default_config.set('xy-step-size', 0.02)
+default_config.set('window-xy-step-size', 0.02)
 
 default_config.set('window-length', 3000.0)
 default_config.set('xi-step', 0.02)
