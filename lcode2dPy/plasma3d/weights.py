@@ -86,16 +86,13 @@ def deposit_kernel(grid_steps, grid_step_size,
         deposit9(out_jz, i, j, djz, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
 
 
-# @nb.njit
-def deposit(config, ro_initial,
-            x_init, y_init, x_offt, y_offt, m, q, px, py, pz):
+@nb.njit
+def deposit(grid_steps, grid_step_size,
+            x_init, y_init, x_offt, y_offt, px, py, pz, q, m):
     """
     Deposit plasma particles onto the charge density and current grids.
     This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
-    """
-    grid_steps            = config.getint('window-xy-steps')
-    grid_step_size        = config.getfloat('window-xy-step-size')
-    
+    """   
     ro = np.zeros((grid_steps, grid_steps))
     jx = np.zeros((grid_steps, grid_steps))
     jy = np.zeros((grid_steps, grid_steps))
@@ -108,17 +105,16 @@ def deposit(config, ro_initial,
                    px.ravel(), py.ravel(), pz.ravel(),
                    ro, jx, jy, jz)
 
-    # Also add the background ion charge density.
-    ro += ro_initial  # Do it last to preserve more float precision
     return ro, jx, jy, jz
 
 
-def initial_deposition(config, x_init, y_init, x_offt, y_offt, px, py, pz, m, q):
+def initial_deposition(grid_steps, grid_step_size,
+                       x_init, y_init, x_offt, y_offt, px, py, pz, m, q):
     """
     Determine the background ion charge density by depositing the electrons
     with their initial parameters and negating the result.
     """
-    ro_electrons_initial, _, _, _ = deposit(config, 0,
+    ro_electrons_initial, _, _, _ = deposit(grid_steps, grid_step_size,
                                             x_init, y_init, x_offt, y_offt,
-                                            m, q, px, py, pz)
+                                            px, py, pz, q, m)
     return -ro_electrons_initial

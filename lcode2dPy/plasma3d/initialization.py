@@ -123,7 +123,8 @@ def init_plasma(config):
                     grid_step_size,
                     fineness=plasma_fineness)
 
-    ro_initial = initial_deposition(config, x_init, y_init, x_offt, y_offt,
+    ro_initial = initial_deposition(grid_steps, grid_step_size,
+                                    x_init, y_init, x_offt, y_offt,
                                     px, py, pz, m, q)
     dir_matrix = dirichlet_matrix(grid_steps, grid_step_size)
     mix_matrix = mixed_matrix(grid_steps, grid_step_size, solver_trick)
