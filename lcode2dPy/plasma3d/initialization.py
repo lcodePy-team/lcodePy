@@ -8,6 +8,8 @@ ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
 
 
+# Solving Laplace equation with Dirichlet boundary conditions (Ez) #
+
 def dirichlet_matrix(grid_steps, grid_step_size):
     """
     Calculate a magical matrix that solves the Laplace equation
@@ -22,6 +24,8 @@ def dirichlet_matrix(grid_steps, grid_step_size):
     mul = 1 / (lambda_i + lambda_j)
     return mul / (2 * (grid_steps - 1))**2  # additional 2xDST normalization
 
+
+# Solving Laplace or Helmholtz equation with mixed boundary conditions #
 
 def mixed_matrix(grid_steps, grid_step_size, subtraction_trick):
     """
@@ -40,6 +44,25 @@ def mixed_matrix(grid_steps, grid_step_size, subtraction_trick):
     mul = 1 / (lambda_i + lambda_j + (1 if subtraction_trick else 0))
     return mul / (2 * (grid_steps - 1))**2  
     # return additional 2xDST normalization
+
+
+# Solving Laplace equation with Neumann boundary conditions (Bz) #
+
+def neumann_matrix(grid_steps, grid_step_size):
+    """
+    Calculate a magical matrix that solves the Laplace equation
+    if you elementwise-multiply the RHS by it "in DST-space".
+    See Samarskiy-Nikolaev, p. 187.
+    """
+    # mul[i, j] = 1 / (lam[i] + lam[j])
+    # lam[k] = 4 / h**2 * sin(k * pi * h / (2 * L))**2, where L = h * (N - 1)
+
+    k = np.arange(0, grid_steps)
+    lam = 4 / grid_step_size**2 * np.sin(k * np.pi / (2 * (grid_steps - 1)))**2
+    lambda_i, lambda_j = lam[:, None], lam[None, :]
+    mul = 1 / (lambda_i + lambda_j)  # WARNING: zero division in mul[0, 0]!
+    mul[0, 0] = 0  # doesn't matter anyway, just defines constant shift
+    return mul / (2 * (grid_steps - 1))**2  # additional 2xDST normalization
 
 
 # Plasma particles initialization #
@@ -128,9 +151,10 @@ def init_plasma(config):
                                     px, py, pz, m, q)
     dir_matrix = dirichlet_matrix(grid_steps, grid_step_size)
     mix_matrix = mixed_matrix(grid_steps, grid_step_size, solver_trick)
-    
+    neu_matrix = neumann_matrix(grid_steps, grid_step_size)
+
     fields = Fields(grid_steps)
     particles = Particles(x_init, y_init, x_offt, y_offt, px, py, pz, q, m)
-    const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix)
+    const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix, neu_matrix)
 
     return fields, particles, const_arrays
