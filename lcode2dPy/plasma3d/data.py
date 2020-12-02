@@ -96,7 +96,9 @@ _const_arr_spec = [
 
 @jitclass(spec=_const_arr_spec)
 class Const_Arrays(object):
-    def __init__(self, ro_initial, dirichlet_matrix, field_mixed_matrix):
+    def __init__(self, ro_initial, dirichlet_matrix,
+                 field_mixed_matrix, neumann_matrix):
         self.ro_initial = np.copy(ro_initial)
         self.dirichlet_matrix = np.copy(dirichlet_matrix)
         self.field_mixed_matrix = np.copy(field_mixed_matrix)
+        self.neumann_matrix = np.copy(neumann_matrix)
