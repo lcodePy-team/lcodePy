@@ -2,6 +2,7 @@
 import numpy as np
 
 from lcode2dPy.plasma3d.data import Fields, Particles, Const_Arrays
+from lcode2dPy.plasma3d.weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -96,23 +97,12 @@ def make_plasma(steps, cell_size, fineness=2):
 
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
-# TODO: add deposit process
-# def initial_deposition(config, x_init, y_init, x_offt, y_offt, px, py, pz, m, q):
-#     """
-#     Determine the background ion charge density by depositing the electrons
-#     with their initial parameters and negating the result.
-#     """
-#     ro_electrons_initial, _, _, _ = deposit(config, 0,
-#                                             x_init, y_init, x_offt, y_offt,
-#                                             m, q, px, py, pz)
-#     return -ro_electrons_initial
-
 
 def init_plasma(config):
     """
     Initialize all the arrays needed (for what?).
     """
-    grid_steps            = config.getint('window_xy_steps')
+    grid_steps            = config.getint('window-xy-steps')
     grid_step_size        = config.getfloat('window-xy-step-size')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
@@ -133,10 +123,8 @@ def init_plasma(config):
                     grid_step_size,
                     fineness=plasma_fineness)
 
-    ro_initial = np.ones((grid_steps, grid_steps))
-    # doesn't work correctly right here
-    # ro_initial = initial_deposition(config, x_init, y_init, x_offt, y_offt,
-    #                                 px, py, pz, m, q)
+    ro_initial = initial_deposition(config, x_init, y_init, x_offt, y_offt,
+                                    px, py, pz, m, q)
     dir_matrix = dirichlet_matrix(grid_steps, grid_step_size)
     mix_matrix = mixed_matrix(grid_steps, grid_step_size, solver_trick)
     
