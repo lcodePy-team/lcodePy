@@ -163,7 +163,7 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
     Move coarse plasma particles as if there were no fields.
     Also reflect the particles from `+-reflect_boundary`.
     """
-    m = particles.m
+    m, q = particles.m, particles.q
     x_init, y_init = particles.x_init, particles.y_init
     prev_x_offt, prev_y_offt = particles.x_offt, particles.y_offt
     px, py, pz = particles.p_x, particles.p_y, particles.p_z
@@ -180,9 +180,10 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
     y[y >= +reflect] = +2 * reflect - y[y >= +reflect]
     y[y <= -reflect] = -2 * reflect - y[y <= -reflect]
 
-    particles.x_offt, particles.y_offt = x - x_init, y - y_init
+    x_offt, y_offt = x - x_init, y - y_init
 
-    return particles
+    return Particles(x_init, y_init, x_offt, y_offt,
+                     px, py, pz, q, m)
 
 
 class ParticleMover:
