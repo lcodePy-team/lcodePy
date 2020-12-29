@@ -91,6 +91,7 @@ _const_arr_spec = [
     ('ro_initial', _float_array),
     ('dirichlet_matrix', _float_array),
     ('field_mixed_matrix', _float_array),
+    ('neumann_matrix', _float_array)
 ]
 
 
