@@ -32,18 +32,6 @@ def weights(x, y, grid_steps, grid_step_size):
 
 
 @nb.njit(cache=True)
-def interp9(a, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM):
-    """
-    Collect value from a cell and 8 surrounding cells (using `weights` output).
-    """
-    return (
-        a[i - 1, j + 1] * wMP + a[i + 0, j + 1] * w0P + a[i + 1, j + 1] * wPP +
-        a[i - 1, j + 0] * wM0 + a[i + 0, j + 0] * w00 + a[i + 1, j + 0] * wP0 +
-        a[i - 1, j - 1] * wMM + a[i + 0, j - 1] * w0M + a[i + 1, j - 1] * wPM
-    )
-
-
-@nb.njit(cache=True)
 def deposit9(a, i, j, val, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM):
     """
     Deposit value into a cell and 8 surrounding cells (using `weights` output).
