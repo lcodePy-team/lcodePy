@@ -127,9 +127,9 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
     x_prev_offt = particles.x_offt
     y_prev_offt = particles.y_offt
 
-    px_prev = particles.px
-    py_prev = particles.py
-    pz_prev = particles.pz
+    px_prev = particles.p_x
+    py_prev = particles.p_y
+    pz_prev = particles.p_z
 
     estimated_x_offt = estimated_particles.x_offt
     estimated_y_offt = estimated_particles.y_offt
@@ -158,6 +158,33 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
     # or somehow use Particles.copy().
 
 
+def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
+    """
+    Move coarse plasma particles as if there were no fields.
+    Also reflect the particles from `+-reflect_boundary`.
+    """
+    m = particles.m
+    x_init, y_init = particles.x_init, particles.y_init
+    prev_x_offt, prev_y_offt = particles.x_offt, particles.y_offt
+    px, py, pz = particles.p_x, particles.p_y, particles.p_z
+
+    x, y = x_init + prev_x_offt, y_init + prev_y_offt
+    gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)
+
+    x += px / (gamma_m - pz) * xi_step
+    y += py / (gamma_m - pz) * xi_step
+
+    reflect = reflect_boundary
+    x[x >= +reflect] = +2 * reflect - x[x >= +reflect]
+    x[x <= -reflect] = -2 * reflect - x[x <= -reflect]
+    y[y >= +reflect] = +2 * reflect - y[y >= +reflect]
+    y[y <= -reflect] = -2 * reflect - y[y <= -reflect]
+
+    particles.x_offt, particles.y_offt = x - x_init, y - y_init
+
+    return particles
+
+
 class ParticleMover:
     def __init__(self, config):
         self.xi_step          = config.getfloat('xi-step')
@@ -169,3 +196,7 @@ class ParticleMover:
         return move_smart(self.xi_step, self.reflect_boundary,
                           self.grid_step_size, self.grid_steps,
                           particles, estimated_particles, fields)
+    
+    def move_particles_wo_fields(self, particles):
+        return move_estimate_wo_fields(self.xi_step, self.reflect_boundary,
+                                       particles)
