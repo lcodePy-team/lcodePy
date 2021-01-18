@@ -11,8 +11,8 @@ def weights(x, y, grid_steps, grid_step_size):
     """
     Calculate the indices of a cell corresponding to the coordinates,
     and the coefficients of interpolation and deposition for this cell
-    and 8 surrounding cells.
-    The weights correspond to 2D triangluar shaped cloud (TSC2D).
+    and 24 surrounding cells.
+    The weights correspond to ...
     """
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
@@ -20,31 +20,72 @@ def weights(x, y, grid_steps, grid_step_size):
     # centered to -.5 to 5, not 0 to 1, as formulas use offset from cell center
     # TODO: get rid of this deoffsetting/reoffsetting festival
 
-    wx0, wy0 = .75 - x_loc**2, .75 - y_loc**2  # fx1, fy1
-    wxP, wyP = (.5 + x_loc)**2 / 2, (.5 + y_loc)**2 / 2  # fx2**2/2, fy2**2/2
-    wxM, wyM = (.5 - x_loc)**2 / 2, (.5 - y_loc)**2 / 2  # fx3**2/2, fy3**2/2
+    wx0, wy0 = 115/192 - 5 / 8 * x_loc**2 + 1 / 4 * x_loc**4, 115/192 - 5 / 8 * y_loc**2 + 1 / 4 * y_loc**4
+    wx1P = (55 + 20 * ( 1 - x_loc) - 120 * ( 1 - x_loc)**2 + 80 * ( 1 - x_loc)**3 - 16 * ( 1 - x_loc)**4) / 96
+    wy1P = (55 + 20 * ( 1 - y_loc) - 120 * ( 1 - y_loc)**2 + 80 * ( 1 - y_loc)**3 - 16 * ( 1 - y_loc)**4) / 96
+    wx1M = (55 - 20 * (-1 - x_loc) - 120 * (-1 - x_loc)**2 - 80 * (-1 - x_loc)**3 - 16 * (-1 - x_loc)**4) / 96
+    wy1M = (55 - 20 * (-1 - y_loc) - 120 * (-1 - y_loc)**2 - 80 * (-1 - y_loc)**3 - 16 * (-1 - y_loc)**4) / 96
+    wx2P = (5 / 2 - ( 2 * 1 - x_loc))**4 / 24
+    wy2P = (5 / 2 - ( 2 * 1 - y_loc))**4 / 24
+    wx2M = (5 / 2 + (-2 * 1 - x_loc))**4 / 24
+    wy2M = (5 / 2 + (-2 * 1 - y_loc))**4 / 24
 
-    wMP, w0P, wPP = wxM * wyP, wx0 * wyP, wxP * wyP
-    wM0, w00, wP0 = wxM * wy0, wx0 * wy0, wxP * wy0
-    wMM, w0M, wPM = wxM * wyM, wx0 * wyM, wxP * wyM
-
-    return i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM
+    w2M2P, w1M2P, w02P, w1P2P, w2P2P = (wx2M * wy2P, wx1M * wy2P, wx0 * wy2P,
+                                        wx1P * wy2P, wx2P * wy2P)
+    w2M1P, w1M1P, w01P, w1P1P, w2P1P = (wx2M * wy1P, wx1M * wy1P, wx0 * wy1P,
+                                        wx1P * wy1P, wx2P * wy1P)
+    w2M0,  w1M0,  w00,  w1P0,  w2P0  = (wx2M * wy0 , wx1M * wy0 , wx0 * wy0 ,
+                                        wx1P * wy0 , wx2P * wy0 ) 
+    w2M1M, w1M1M, w01M, w1P1M, w2P1M = (wx2M * wy1M, wx1M * wy1M, wx0 * wy1M,
+                                        wx1P * wy1M, wx2P * wy1M)
+    w2M2M, w1M2M, w02M, w1P2M, w2P2M = (wx2M * wy2M, wx1M * wy2M, wx0 * wy2M,
+                                        wx1P * wy2M, wx2P * wy2M)
+                                            
+    return (
+        i, j,
+        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+        w2M0,  w1M0,  w00,  w1P0,  w2P0,
+        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+        w2M2M, w1M2M, w02M, w1P2M, w2P2M
+    )
 
 
 @nb.njit(cache=True)
-def deposit9(a, i, j, val, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM):
+def deposit25(a, i, j, val, 
+        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+        w2M0,  w1M0,  w00,  w1P0,  w2P0,
+        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+        w2M2M, w1M2M, w02M, w1P2M, w2P2M):
     """
-    Deposit value into a cell and 8 surrounding cells (using `weights` output).
+    Deposit value into a cell and 24 surrounding cells (using `weights` output).
     """
-    a[i - 1, j + 1] += val * wMP
-    a[i + 0, j + 1] += val * w0P
-    a[i + 1, j + 1] += val * wPP
-    a[i - 1, j + 0] += val * wM0
+    a[i - 2, j + 2] += val * w2M2P
+    a[i - 1, j + 2] += val * w1M2P
+    a[i + 0, j + 2] += val * w02P
+    a[i + 1, j + 2] += val * w1P2P
+    a[i + 2, j + 2] += val * w2P2P
+    a[i - 2, j + 1] += val * w2M1P
+    a[i - 1, j + 1] += val * w1M1P
+    a[i + 0, j + 1] += val * w01P
+    a[i + 1, j + 1] += val * w1P1P
+    a[i + 2, j + 1] += val * w2P1P
+    a[i - 2, j + 0] += val * w2M0
+    a[i - 1, j + 0] += val * w1M0
     a[i + 0, j + 0] += val * w00
-    a[i + 1, j + 0] += val * wP0
-    a[i - 1, j - 1] += val * wMM
-    a[i + 0, j - 1] += val * w0M
-    a[i + 1, j - 1] += val * wPM
+    a[i + 1, j + 0] += val * w1P0
+    a[i + 2, j + 0] += val * w2P0
+    a[i - 2, j - 1] += val * w2M1M
+    a[i - 1, j - 1] += val * w1M1M
+    a[i + 0, j - 1] += val * w01M
+    a[i + 1, j - 1] += val * w1P1M
+    a[i + 2, j - 1] += val * w2P1M
+    a[i - 2, j - 2] += val * w2M2M
+    a[i - 1, j - 2] += val * w1M2M
+    a[i + 0, j - 2] += val * w02M
+    a[i + 1, j - 2] += val * w1P2M
+    a[i + 2, j - 2] += val * w2P2M
 
 
 # Deposition #
@@ -65,13 +106,41 @@ def deposit_kernel(grid_steps, grid_step_size,
         djz = pz[k] * (dro / gamma_m)
 
         x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
-        i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM = weights(
+        (i, j, 
+         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+         w2M0,  w1M0,  w00,  w1P0,  w2P0,
+         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+         w2M2M, w1M2M, w02M, w1P2M, w2P2M
+        ) = weights(
             x, y, grid_steps, grid_step_size
         )
-        deposit9(out_ro, i, j, dro, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        deposit9(out_jx, i, j, djx, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        deposit9(out_jy, i, j, djy, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        deposit9(out_jz, i, j, djz, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
+        
+        deposit25(out_ro, i, j, dro,
+                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        deposit25(out_jx, i, j, djx,
+                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        deposit25(out_jy, i, j, djy,
+                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        deposit25(out_jz, i, j, djz, 
+                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+
 
 
 @nb.njit

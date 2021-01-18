@@ -10,14 +10,29 @@ from lcode2dPy.plasma3d.data import Particles
 # Field interpolation and particle movement (fused) #
 
 @nb.njit(cache=True)
-def interp9(a, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM):
+def interp25(a, i, j,
+             w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+             w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+             w2M0,  w1M0,  w00,  w1P0,  w2P0,
+             w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+             w2M2M, w1M2M, w02M, w1P2M, w2P2M):
     """
     Collect value from a cell and 8 surrounding cells (using `weights` output).
     """
     return (
-        a[i - 1, j + 1] * wMP + a[i + 0, j + 1] * w0P + a[i + 1, j + 1] * wPP +
-        a[i - 1, j + 0] * wM0 + a[i + 0, j + 0] * w00 + a[i + 1, j + 0] * wP0 +
-        a[i - 1, j - 1] * wMM + a[i + 0, j - 1] * w0M + a[i + 1, j - 1] * wPM
+        a[i - 2, j + 2] * w2M2P + a[i - 1, j + 2] * w1M2P +
+        a[i + 0, j + 2] * w02P  + a[i + 1, j + 2] * w1P2P +
+        a[i + 2, j + 2] * w2P2P + a[i - 2, j + 1] * w2M1P +
+        a[i - 1, j + 1] * w1M1P + a[i + 0, j + 1] * w01P  +
+        a[i + 1, j + 1] * w1P1P + a[i + 2, j + 1] * w2P1P +
+        a[i - 2, j + 0] * w2M0  + a[i - 1, j + 0] * w1M0  +
+        a[i + 0, j + 0] * w00   + a[i + 1, j + 0] * w1P0  +
+        a[i + 2, j + 0] * w2P0  + a[i - 2, j - 1] * w2M1M +
+        a[i - 1, j - 1] * w1M1M + a[i + 0, j - 1] * w01M  +
+        a[i + 1, j - 1] * w1P1M + a[i + 2, j - 1] * w2P1M +
+        a[i - 2, j - 2] * w2M2M + a[i - 1, j - 2] * w1M2M +
+        a[i + 0, j - 2] * w02M  + a[i + 1, j - 2] * w1P2M +
+        a[i + 2, j - 2] * w2P2M
     )
 
 
@@ -47,15 +62,53 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
         # Calculate midstep positions and fields in them.
         x_halfstep = x_init[k] + (prev_x_offt[k] + estimated_x_offt[k]) / 2
         y_halfstep = y_init[k] + (prev_y_offt[k] + estimated_y_offt[k]) / 2
-        i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM = weights(
+
+        (i, j, 
+         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+         w2M0,  w1M0,  w00,  w1P0,  w2P0,
+         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+         w2M2M, w1M2M, w02M, w1P2M, w2P2M
+        ) = weights(
             x_halfstep, y_halfstep, grid_steps, grid_step_size
         )
-        Ex = interp9(Ex_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        Ey = interp9(Ey_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        Ez = interp9(Ez_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        Bx = interp9(Bx_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        By = interp9(By_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
-        Bz = interp9(Bz_avg, i, j, wMP, w0P, wPP, wM0, w00, wP0, wMM, w0M, wPM)
+
+        Ex = interp25(Ex_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        Ey = interp25(Ey_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        Ez = interp25(Ez_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        Bx = interp25(Bx_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        By = interp25(By_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        Bz = interp25(Bz_avg, i, j,
+                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
 
         # Move the particles according the the fields
         gamma_m = sqrt(m**2 + pz**2 + px**2 + py**2)
