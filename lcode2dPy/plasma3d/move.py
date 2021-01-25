@@ -200,8 +200,8 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
                       x_prev_offt.ravel(), y_prev_offt.ravel(),
                       estimated_x_offt.ravel(), estimated_y_offt.ravel(),
                       px_prev.ravel(), py_prev.ravel(), pz_prev.ravel(),
-                      fields.Ex, fields.Ey, fields.Ez,
-                      fields.Bx, fields.By, fields.Bz,
+                      fields.E_x, fields.E_y, fields.E_z,
+                      fields.B_x, fields.B_y, fields.B_z,
                       x_offt_new.ravel(), y_offt_new.ravel(),
                       px_new.ravel(), py_new.ravel(), pz_new.ravel())
 
@@ -242,9 +242,11 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
 class ParticleMover:
     def __init__(self, config):
         self.xi_step          = config.getfloat('xi-step')
-        self.reflect_boundary = config.getfloat('reflect-boundary')
+        reflect_padding_steps = config.getint('reflect-padding-steps')
         self.grid_step_size   = config.getfloat('window-xy-step-size')
         self.grid_steps       = config.getint('window-xy-steps')
+        self.reflect_boundary = self.grid_step_size * (
+                                self.grid_steps / 2 - reflect_padding_steps)
 
     def move_particles(self, fields, particles, estimated_particles):
         return move_smart(self.xi_step, self.reflect_boundary,

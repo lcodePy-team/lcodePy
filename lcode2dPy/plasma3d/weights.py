@@ -6,7 +6,7 @@ from math import sqrt, floor
 
 # Deposition and interpolation helper functions #
 
-@nb.njit(parallel=True)
+@nb.njit#(parallel=True)
 def weights(x, y, grid_steps, grid_step_size):
     """
     Calculate the indices of a cell corresponding to the coordinates,
@@ -90,7 +90,7 @@ def deposit25(a, i, j, val,
 
 # Deposition #
 
-@nb.njit(parallel=True)
+@nb.njit# (parallel=True)
 def deposit_kernel(grid_steps, grid_step_size,
                    x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
                    out_ro, out_jx, out_jy, out_jz):

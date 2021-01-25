@@ -15,7 +15,7 @@ def calculate_Ez(grid_step_size, const, currents):
     """
     # 0. Calculate RHS (NOTE: it is smaller by 1 on each side).
     # NOTE: use gradient instead if available (cupy doesn't have gradient yet).
-    jx, jy = currents.jx, currents.jy
+    jx, jy = currents.j_x, currents.j_y
 
     djx_dx = jx[2:, 1:-1] - jx[:-2, 1:-1]
     djy_dy = jy[1:-1, 2:] - jy[1:-1, :-2]
@@ -124,7 +124,7 @@ def calculate_Bz(grid_step_size, const, currents):
     """
     # 0. Calculate RHS.
     # NOTE: use gradient instead if available (cupy doesn't have gradient yet).    
-    jx, jy = currents.jx, currents.jy
+    jx, jy = currents.j_x, currents.j_y
 
     djx_dy = jx[1:-1, 2:] - jx[1:-1, :-2]
     djy_dx = jy[2:, 1:-1] - jy[:-2, 1:-1]
@@ -173,23 +173,23 @@ class FieldComputer(object):
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')
 
-    def compute_fields(self, fields, const,
+    def compute_fields(self, fields, fields_prev, const,
                        rho_beam, currents_prev, currents):
         # Looks terrible! TODO: rewrite this function entirely
         new_fields = Fields((fields.E_x).shape[0])
         
-        (new_fields.Ex, new_fields.Ey,
-         new_fields.Bx, new_fields.By) = calculate_Ex_Ey_Bx_By(self.grid_step_size, self.xi_step_size,
+        (new_fields.E_x, new_fields.E_y,
+         new_fields.B_x, new_fields.B_y) = calculate_Ex_Ey_Bx_By(self.grid_step_size, self.xi_step_size,
                                                                self.trick, self.variant_A, const,
                                                                fields, rho_beam, currents, currents_prev)
                                                                
         if self.variant_A:
-            new_fields.E_x = 2 * new_fields.E_x - fields.E_x
-            new_fields.E_y = 2 * new_fields.E_y - fields.E_y
-            new_fields.B_x = 2 * new_fields.B_x - fields.B_x
-            new_fields.B_y = 2 * new_fields.B_y - fields.B_y
+            new_fields.E_x = 2 * new_fields.E_x - fields_prev.E_x
+            new_fields.E_y = 2 * new_fields.E_y - fields_prev.E_y
+            new_fields.B_x = 2 * new_fields.B_x - fields_prev.B_x
+            new_fields.B_y = 2 * new_fields.B_y - fields_prev.B_y
 
-        new_fields.Ez = calculate_Ez(self.grid_step_size, const, currents)
-        new_fields.Bz = calculate_Bz(self.grid_step_size, const, currents)
+        new_fields.E_z = calculate_Ez(self.grid_step_size, const, currents)
+        new_fields.B_z = calculate_Bz(self.grid_step_size, const, currents)
         
-        return new_fields.average(fields)
+        return new_fields, new_fields.average(fields_prev)

@@ -1,7 +1,7 @@
 """Module for plasma (3d solver) initialization routines."""
 import numpy as np
 
-from lcode2dPy.plasma3d.data import Fields, Particles, Const_Arrays
+from lcode2dPy.plasma3d.data import Fields, Particles, Currents, Const_Arrays
 from lcode2dPy.plasma3d.weights import initial_deposition
 
 ELECTRON_CHARGE = -1
@@ -138,13 +138,13 @@ def init_plasma(config):
     # particles should not reach the window pre-boundary cells
     assert reflect_padding_steps > 2
     
-    reflect_boundary = grid_step_size * (grid_steps/2 - reflect_padding_steps)
-    config.set('reflect-boundary', reflect_boundary)
-
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,
                     grid_step_size,
                     fineness=plasma_fineness)
+
+    def zeros():
+        return np.zeros((grid_steps, grid_steps), dtype=np.float64)
 
     ro_initial = initial_deposition(grid_steps, grid_step_size,
                                     x_init, y_init, x_offt, y_offt,
@@ -155,6 +155,7 @@ def init_plasma(config):
 
     fields = Fields(grid_steps)
     particles = Particles(x_init, y_init, x_offt, y_offt, px, py, pz, q, m)
+    currents = Currents(zeros(), zeros(), zeros(), zeros())
     const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix, neu_matrix)
 
-    return fields, particles, const_arrays
+    return fields, particles, currents, const_arrays
