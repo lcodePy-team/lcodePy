@@ -20,15 +20,16 @@ def weights(x, y, grid_steps, grid_step_size):
     # centered to -.5 to 5, not 0 to 1, as formulas use offset from cell center
     # TODO: get rid of this deoffsetting/reoffsetting festival
 
-    wx0, wy0 = 115/192 - 5 / 8 * x_loc**2 + 1 / 4 * x_loc**4, 115/192 - 5 / 8 * y_loc**2 + 1 / 4 * y_loc**4
-    wx1P = (55 + 20 * ( 1 - x_loc) - 120 * ( 1 - x_loc)**2 + 80 * ( 1 - x_loc)**3 - 16 * ( 1 - x_loc)**4) / 96
-    wy1P = (55 + 20 * ( 1 - y_loc) - 120 * ( 1 - y_loc)**2 + 80 * ( 1 - y_loc)**3 - 16 * ( 1 - y_loc)**4) / 96
-    wx1M = (55 - 20 * (-1 - x_loc) - 120 * (-1 - x_loc)**2 - 80 * (-1 - x_loc)**3 - 16 * (-1 - x_loc)**4) / 96
-    wy1M = (55 - 20 * (-1 - y_loc) - 120 * (-1 - y_loc)**2 - 80 * (-1 - y_loc)**3 - 16 * (-1 - y_loc)**4) / 96
-    wx2P = (5 / 2 - ( 2 * 1 - x_loc))**4 / 24
-    wy2P = (5 / 2 - ( 2 * 1 - y_loc))**4 / 24
-    wx2M = (5 / 2 + (-2 * 1 - x_loc))**4 / 24
-    wy2M = (5 / 2 + (-2 * 1 - y_loc))**4 / 24
+    wx0 = 115/192 - x_loc**2 * 5/8 + x_loc**4 / 4
+    wy0 = 115/192 - y_loc**2 * 5/8 + y_loc**4 / 4
+    wx1P = 19/96 + 11/24 * x_loc + x_loc**2 / 4 - x_loc**3 / 6 - x_loc**4 / 6
+    wy1P = 19/96 + 11/24 * y_loc + y_loc**2 / 4 - y_loc**3 / 6 - y_loc**4 / 6
+    wx1M = 19/96 - 11/24 * x_loc + x_loc**2 / 4 + x_loc**3 / 6 - x_loc**4 / 6
+    wy1M = 19/96 - 11/24 * y_loc + y_loc**2 / 4 + y_loc**3 / 6 - y_loc**4 / 6
+    wx2P = (1 / 2 + x_loc)**4 / 24
+    wy2P = (1 / 2 + y_loc)**4 / 24
+    wx2M = (1 / 2 - x_loc)**4 / 24
+    wy2M = (1 / 2 - y_loc)**4 / 24
 
     w2M2P, w1M2P, w02P, w1P2P, w2P2P = (wx2M * wy2P, wx1M * wy2P, wx0 * wy2P,
                                         wx1P * wy2P, wx2P * wy2P)
