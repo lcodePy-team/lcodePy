@@ -36,6 +36,16 @@ class Fields(object):
         fields.B_z = (self.B_z + other.B_z) / 2
         return fields
 
+    def copy(self):
+        new_fields = Fields((self.E_x).shape[0])
+        new_fields.E_x = np.copy(self.E_x)
+        new_fields.E_y = np.copy(self.E_y)
+        new_fields.E_z = np.copy(self.E_z)
+        new_fields.B_x = np.copy(self.B_x)
+        new_fields.B_y = np.copy(self.B_y)
+        new_fields.B_z = np.copy(self.B_z)
+        return new_fields
+
 
 _currents_spec = [
     ('rho', _float_array),
