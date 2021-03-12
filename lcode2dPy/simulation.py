@@ -49,9 +49,14 @@ class Simulation():
         t_end = self.cur_t+N*self.time_step
         
         for t in range(t_start, t_end):
-
+            
             particles, fields = self.PAS.step_dt(particles, fields, beam_source, beam_drain, t, diag)
 
-
+            # Я бы убрал dump внуть Pusher&Solver
+            if time_for_diag:
+                for diag in self.list_t:
+                    diag.dump()
+                for diag in self.list_xi:
+                    diag.dump()
 
 
