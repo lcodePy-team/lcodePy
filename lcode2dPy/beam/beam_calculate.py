@@ -62,7 +62,7 @@ def vec_to_beam(beam, idx, r_vec, p_vec, steps_left, lost, magnetic_field):
 
 
 def configure_move_beam_slice(config):
-    r_step = float(config.get('r-step'))
+    r_step = float(config.get('window-width-step-size'))
     xi_step_p = float(config.get('xi-step'))
     max_radius = float(config.get('window-width'))
     lost_boundary = max(0.9 * max_radius, max_radius - 1)

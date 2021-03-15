@@ -168,7 +168,7 @@ class FieldComputer(object):
 
     """
     def __init__(self, config):
-        self.grid_step_size = config.getfloat('window-xy-step-size')
+        self.grid_step_size = config.getfloat('window-width-step-size')
         self.xi_step_size = config.getfloat('xi-step')
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')

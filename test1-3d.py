@@ -6,13 +6,13 @@ import time
 from lcode2dPy.plasma3d.initialization import init_plasma
 from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver 
 
-from lcode2dPy.config.default_config_3d import default_config
+from lcode2dPy.config.default_config import default_config
 
 start_time = time.time()
 config = copy(default_config)
 
-config.set('window-xy-steps', 769)
-config.set('window-xy-step-size', 0.02)
+config.set('window-width-steps', 769)
+config.set('window-width-step-size', 0.02)
 config.set('window-length', 10)
 config.set('xi-step', 0.02)
 
@@ -23,8 +23,8 @@ config.set('plasma_fineness', 2)
 
 solver = Plane2d3vPlasmaSolver(config)
 
-grid_steps     = config.getint('window-xy-steps')
-grid_step_size = config.getfloat('window-xy-step-size')
+grid_steps     = config.getint('window-width-steps')
+grid_step_size = config.getfloat('window-width-step-size')
 xi_step_size   = config.getfloat('xi-step')
 
 grid = ((np.arange(grid_steps) - grid_steps // 2)

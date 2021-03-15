@@ -243,8 +243,8 @@ class ParticleMover:
     def __init__(self, config):
         self.xi_step          = config.getfloat('xi-step')
         reflect_padding_steps = config.getint('reflect-padding-steps')
-        self.grid_step_size   = config.getfloat('window-xy-step-size')
-        self.grid_steps       = config.getint('window-xy-steps')
+        self.grid_step_size   = config.getfloat('window-width-step-size')
+        self.grid_steps       = config.getint('window-width-steps')
         self.reflect_boundary = self.grid_step_size * (
                                 self.grid_steps / 2 - reflect_padding_steps)
 

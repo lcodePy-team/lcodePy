@@ -125,8 +125,8 @@ def init_plasma(config):
     """
     Initialize all the arrays needed (for what?).
     """
-    grid_steps            = config.getint('window-xy-steps')
-    grid_step_size        = config.getfloat('window-xy-step-size')
+    grid_steps            = config.getint('window-width-steps')
+    grid_step_size        = config.getfloat('window-width-step-size')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getint('plasma-fineness')

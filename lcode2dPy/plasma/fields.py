@@ -210,7 +210,7 @@ class FieldComputer(object):
     """
 
     def __init__(self, config):
-        self.r_step = float(config.get('r-step'))
+        self.r_step = float(config.get('window-width-step-size'))
 
     def compute_fields(self, fields, rho_beam, currents_previous, currents,
                        xi_step_p):

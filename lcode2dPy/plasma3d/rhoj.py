@@ -7,8 +7,8 @@ from lcode2dPy.plasma3d.weights import deposit
 
 class RhoJComputer(object):
     def __init__(self, config):
-        self.grid_step_size = config.getfloat('window-xy-step-size')
-        self.grid_steps = config.getint('window-xy-steps')
+        self.grid_step_size = config.getfloat('window-width-step-size')
+        self.grid_steps = config.getint('window-width-steps')
 
     def compute_rhoj(self, particles, const_arrays):
         rho, j_x, j_y, j_z = deposit(self.grid_steps, self.grid_step_size,

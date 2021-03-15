@@ -48,7 +48,7 @@ class PusherAndSolver:
         self.layout_beam_slice = configure_layout_beam_slice(config)
         self.move_beam_slice = beam_slice_mover(config)
         self.solver = CylindricalPlasmaSolver(config)
-        self.r_step = float(config.get('r-step'))
+        self.r_step = float(config.get('window-width-step-size'))
         max_radius = float(config.get('window-width'))
         self.n_cells = int(max_radius / self.r_step) + 1
         self.xi_step_p = config.get('xi-step')

@@ -17,7 +17,7 @@ class PushAndSolver3d:
         self.xi_max = config.getfloat('window-length')
         self.xi_step_size   = config.getfloat('xi-step')
         self.xi_steps = int(self.xi_max / self.xi_step_size)
-        self.grid_steps = config.getint('window-xy-steps')
+        self.grid_steps = config.getint('window-width-steps')
 
     def step_dt(self, pl_fields, pl_particles, pl_currents, pl_const_arrays,
                 beam_source, beam_calculator):

@@ -8,13 +8,13 @@ from lcode2dPy.push_solver_3d import PushAndSolver3d
 
 from lcode2dPy.beam3d import beam, beam_generator
 
-from lcode2dPy.config.default_config_3d import default_config
+from lcode2dPy.config.default_config import default_config
 
 start_time = time.time()
 config = copy(default_config)
 
-config.set('window-xy-steps', 769)
-config.set('window-xy-step-size', 0.02)
+config.set('window-width-steps', 769)
+config.set('window-width-step-size', 0.02)
 config.set('window-length', 15)
 config.set('xi-step', 0.02)
 

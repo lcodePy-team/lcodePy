@@ -7,7 +7,7 @@ from lcode2dPy.plasma.profiles import get_plasma_profile
 
 def init_plasma(config):
     window_width = config.getfloat('window-width')
-    r_step = config.getfloat('r-step')
+    r_step = config.getfloat('window-width-step-size')
     part_per_cell = config.getint('plasma-particles-per-cell')
     path_lim = config.getfloat('trapped-path-limit')
     grid_length = int(window_width / r_step) + 1
