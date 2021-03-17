@@ -4,7 +4,7 @@ from numba import njit
 from lcode2dPy.beam import (
     BeamSlice,
     beam_slice_mover,
-    configure_layout_beam_slice,
+    #layout_beam_slice,
 )
 from lcode2dPy.beam.beam_calculate import layout_beam_slice
 from lcode2dPy.plasma.solver import CylindricalPlasmaSolver
@@ -45,16 +45,17 @@ def split_beam_slice(beam_slice, xi_end):
 class PusherAndSolver:
     def __init__(self, config):
         self.config = config
-        self.layout_beam_slice = configure_layout_beam_slice(config)
+        #self.layout_beam_slice = configure_layout_beam_slice(config)
         self.move_beam_slice = beam_slice_mover(config)
         self.solver = CylindricalPlasmaSolver(config)
         self.r_step = float(config.get('r-step'))
         max_radius = float(config.get('window-width'))
         self.n_cells = int(max_radius / self.r_step) + 1
-        self.xi_step_p = config.get('xi-step')
-        self.window_length = config.get('window-length')
+        self.xi_step_p = config.getfloat('xi-step')
+        self.window_length = config.getfloat('window-length')
         self.xi_layers_num = int(self.window_length / self.xi_step_p)
 
+        
     def step_dt(self, plasma_particles, plasma_fields, beam_source, beam_drain, t):
         beam_slice_to_move = BeamSlice(0)
         rho_layout = np.zeros(self.n_cells)
@@ -72,7 +73,7 @@ class PusherAndSolver:
                 self.xi_step_p,
             )
             # Now we can compute plasma layer `layer_idx` reaction
-            plasma_particles_new, plasma_fields_new = self.solver.step_dxi(
+            plasma_particles_new, plasma_fields_new, steps = self.solver.step_dxi(
                 plasma_particles, plasma_fields, rho_beam,
             )
             # Now we can move beam layer `layer_idx - 1`
@@ -82,14 +83,15 @@ class PusherAndSolver:
                 plasma_fields_new,
                 plasma_fields,
             )
+            
             lost_slice, stable_slice, moving_slice = split_beam_slice(
                 beam_slice_to_move, (layer_idx - 1) * -self.xi_step_p,
             )
             beam_drain.push_beam_slice(stable_slice)
             beam_drain.finish_layer((layer_idx - 1) * -self.xi_step_p)
-
             beam_slice_to_move = beam_slice_to_layout.concatenate(moving_slice)
-
             plasma_particles = plasma_particles_new
             plasma_fields = plasma_fields_new
+            if layer_idx % 100 == 0:
+                print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
         return plasma_particles, plasma_fields

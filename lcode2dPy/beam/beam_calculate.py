@@ -96,7 +96,7 @@ def configure_move_beam_slice(config):
                     break
                 if is_lost(r_vec_half_step, lost_boundary):
                     # Particle hit the wall and is now lost
-                    beam_slice.mark_lost(idx)
+                    #beam_slice.mark_lost(idx)
                     break
 
                 # Interpolate fields and compute new impulse
@@ -121,7 +121,7 @@ def configure_move_beam_slice(config):
 
                 if is_lost(r_vec, lost_boundary):
                     # Particle hit the wall and is now lost
-                    beam_slice.mark_lost(idx)
+                    #beam_slice.mark_lost(idx)
                     break
             vec_to_beam(beam_slice, idx, r_vec, p_vec, steps, lost, magnetic_field)
 
@@ -159,7 +159,7 @@ def init_substepping(beam_slice, time_step, substepping_energy):
 
 def beam_slice_mover(config):
     time_step = float(config.get('time-step'))
-    substepping_energy = config.get('beam-substepping-energy')
+    substepping_energy = config.getfloat('beam-substepping-energy')
     move_particles = configure_move_beam_slice(config)
 
     @nb.njit

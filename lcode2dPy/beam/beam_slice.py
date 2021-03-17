@@ -19,7 +19,9 @@ _beamParticlesSliceSpec = [
 
     ('dt', nb.float64[:]),
     ('remaining_steps', nb.int64[:]),
-    ('status', nb.int64[:])
+    ('status', nb.int64[:]),
+    ('nlost', nb.int64),
+    ('lost', nb.int64[:])
 ]
 
 
@@ -80,3 +82,4 @@ class BeamSlice:
             self.remaining_steps, other_slice.remaining_steps,
         ))
         self.status = np.concatenate((self.status, other_slice.status))
+        return self
