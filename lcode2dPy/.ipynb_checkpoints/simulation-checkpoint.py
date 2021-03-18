@@ -39,7 +39,8 @@ class Simulation:
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
             self.beam_source = MemoryBeamSource(beam_slice) #TODO mpi_beam_source
             self.beam_drain = MemoryBeamDrain()
-        
+        if self.diagnostics:
+            self.diagnostics.config = self.config
         # Time loop
         for t_i in range(N_steps):
             fields, plasma_particles = init_plasma(self.config)
@@ -52,39 +53,16 @@ class Simulation:
 
 
 class Diagnostics2d:
-    def __init__(self, config, dt_diag, dxi_diag):
-        self.config = config
+    def __init__(self, dt_diag, dxi_diag):
+        self.config = None
         self.dt_diag = dt_diag
         self.dxi_diag = dxi_diag
 
     def every_dt(self):
         pass # TODO
 
-    def every_dxi(self, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice):
+    def every_dxi(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice):
         for diag_name in self.dxi_diag.keys():
             diag, pars = self.dxi_diag[diag_name]
-            diag(self, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice, **pars)
+            diag(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice, **pars)
         return None
-
-# # Example
-# def E_z_diag(simulation, buffer, plasma_particles, plasma_fields, beam_slice, rho_beam, t_start, t_end, r_selected):
-#     if simulation.current_time < t_start or simulation.current_time > t_end:
-#         return
-#     r_grid_steps = simulation.config.getfloat('window-width') // simulation.config.getfloat('r-step')
-#     rs = np.linspace(0, simulation.config.getfloat('window-width'), r_grid_steps)
-#     E_z_selected = plasma_fields.E_z[rs == r_selected]
-#     buffer.append(E_z_selected)
-#     return E_z_selected
-
-# E_z_diag_pars = dict(
-# t_start = 0,
-# t_end = 10,
-# r_selected = 0
-# )
-
-# dxi_diag = dict(
-# E_z=[E_z_diag,
-# E_z_diag_pars]
-# )
-
-# diagnostics = Diagnostics2d(dt_diag=None, dxi_diag=dxi_diag)
