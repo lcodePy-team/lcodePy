@@ -56,7 +56,7 @@ class PusherAndSolver:
         self.xi_layers_num = int(self.window_length / self.xi_step_p)
 
         
-    def step_dt(self, plasma_particles, plasma_fields, beam_source, beam_drain, t):
+    def step_dt(self, plasma_particles, plasma_fields, beam_source, beam_drain, t, diagnostics=None):
         beam_slice_to_move = BeamSlice(0)
         rho_layout = np.zeros(self.n_cells)
         for layer_idx in np.arange(self.xi_layers_num):
@@ -92,6 +92,11 @@ class PusherAndSolver:
             beam_slice_to_move = beam_slice_to_layout.concatenate(moving_slice)
             plasma_particles = plasma_particles_new
             plasma_fields = plasma_fields_new
-            if layer_idx % 100 == 0:
-                print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
+            
+            # Every xi step diagnostics
+            if diagnostics:
+                diagnostics.every_dxi(layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice_to_move)
+            else:
+                if layer_idx % 100 == 0:
+                    print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
         return plasma_particles, plasma_fields
