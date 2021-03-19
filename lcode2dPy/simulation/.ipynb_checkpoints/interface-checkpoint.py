@@ -44,13 +44,16 @@ class Simulation:
         # Time loop
         for t_i in range(N_steps):
             fields, plasma_particles = init_plasma(self.config)
-            new_plasma_particles, new_fields = self.push_solver.step_dt(plasma_particles, fields, self.beam_source, self.beam_drain, self.current_time, self.diagnostics)
+            plasma_particles_new, fields_new = self.push_solver.step_dt(plasma_particles, fields, self.beam_source, self.beam_drain, self.current_time, self.diagnostics)
+            beam_particles = self.beam_drain.beam_slice()
+            beam_slice = BeamSlice(beam_particles.size, beam_particles)
+            self.beam_source = MemoryBeamSource(beam_slice)
+            self.beam_drain = MemoryBeamDrain()
+            self.current_time = self.current_time + self.config.getfloat('time-step')
             # Every t step diagnostics
             if self.diagnostics:
                 self.diagnostics.every_dt()
-            self.current_time = self.current_time + (t_i + 1) * self.config.getfloat('time-step')
-
-
+            
 
 class Diagnostics2d:
     def __init__(self, dt_diag, dxi_diag):

@@ -95,7 +95,7 @@ class PusherAndSolver:
             
             # Every xi step diagnostics
             if diagnostics:
-                diagnostics.every_dxi(t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice_to_move)
+                diagnostics.every_dxi(t + self.config.getfloat('time-step'), layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice_to_move)
             else:
                 if layer_idx % 100 == 0:
                     print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
