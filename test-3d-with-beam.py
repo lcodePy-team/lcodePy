@@ -24,11 +24,9 @@ config.set('plasma_fineness', 2)
 
 pusher_solver = PushAndSolver3d(config)
 
-time_limit = config.getfloat('time_limit')
-time_step_size  = config.getfloat('time_step')
+time_limit = config.getfloat('time-limit')
+time_step_size  = config.getfloat('time-step')
 time_steps = int(time_limit / time_step_size)
-
-beam_generator.main()
 
 time.sleep(5.)
 

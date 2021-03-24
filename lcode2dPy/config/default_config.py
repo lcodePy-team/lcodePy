@@ -27,26 +27,28 @@ default_config.set('focusing', 'n')
 default_config.set('foc-period', 100)
 default_config.set('foc-strength', 0.1)
 
-# Parameters of plasma model in 2d simulations:
+# Useless parameters:
 default_config.set('plasma-model', 'P')
 default_config.set('magnetic-field', 0)
 default_config.set('magnetic-field-type', 'c')
 default_config.set('magnetic-field-period', 200)
 default_config.set('plasma-zshape', '')
 
-default_config.set('plasma-particles-per-cell', 10)
+default_config.set('plasma-temperature', 0)
+default_config.set('ion-model', 'y')
+default_config.set('ion-mass', 1836)
+
+# Parameters of plasma model in 2d simulations:
+default_config.set('trapped-path-limit', 0)
+default_config.set('noise-reductor-enabled', False)
+
 default_config.set('plasma-profile', '1')
 default_config.set('plasma-width', 2)
 default_config.set('plasma-width-2', 1)
 default_config.set('plasma-density-2', 0.5)
-default_config.set('plasma-temperature', 0)
-default_config.set('ion-model', 'y')
-default_config.set('ion-mass', 1836)
+
 default_config.set('substepping-depth', 3)
 default_config.set('substepping-sensitivity', 0.2)
-default_config.set('trapped-path-limit', 0)
-default_config.set('noise-reductor-enabled', False)
-default_config.set('corrector-steps', 2)
 
 # Parameters of plasma model in 3d simulations:
 # TODO: add other parameters to 3d simulations
@@ -55,4 +57,9 @@ default_config.set('field-solver-variant-A', True)
 
 default_config.set('reflect-padding-steps', 5)
 default_config.set('plasma-padding-steps', 10)
+
+# Conflicts:
+default_config.set('plasma-particles-per-cell', 10)
 default_config.set('plasma-fineness', 2) # Similar to 'plasma-particles-per-cell'
+
+default_config.set('corrector-steps', 2) # Can we even change this???
