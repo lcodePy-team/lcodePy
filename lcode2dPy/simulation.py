@@ -51,7 +51,7 @@ class Diagnostics2d:
 def E_z_diag(simulation, buffer, plasma_particles, plasma_fields, beam_slice, rho_beam, t_start, t_end, r_selected):
     if simulation.current_time < t_start or simulation.current_time > t_end:
         return
-    r_grid_steps = simulation.config.getfloat('window-width') // simulation.config.getfloat('r-step')
+    r_grid_steps = simulation.config.getfloat('window-width') // simulation.config.getfloat('window-width-step-size')
     rs = np.linspace(0, simulation.config.getfloat('window-width'), r_grid_steps)
     E_z_selected = plasma_fields.E_z[rs == r_selected]
     buffer.append(E_z_selected)
