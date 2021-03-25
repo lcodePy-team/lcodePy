@@ -54,7 +54,7 @@ def _cell_volume(r_step, particles_per_cell, n_cells):
 
 class RhoJComputer(object):
     def __init__(self, config):
-        self.r_step = config.getfloat('r-step')
+        self.r_step = config.getfloat('window-width-step-size')
         max_radius = config.getfloat('window-width')
         self.n_cells = int(max_radius / self.r_step) + 1
         particles_per_cell = config.getint('plasma-particles-per-cell')
