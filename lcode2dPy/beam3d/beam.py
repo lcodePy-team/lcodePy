@@ -300,9 +300,9 @@ class BeamCalculator:
         self.beam = beam
         # Get used configuration
         self.xi_step_size = config.getfloat('xi-step')
-        self.max_radius = config.getfloat('window-width-step-size')
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.grid_steps = config.getint('window-width-steps')
+        self.max_radius = self.grid_step_size * self.grid_steps / 2
         self.time_step = config.getfloat('time_step')
         self.substepping_energy = 2 #config.get("beam-substepping-energy")
 
