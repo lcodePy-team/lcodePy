@@ -200,7 +200,7 @@ def _move_particles_with_substepping(fields, particles, noise_amplitude, r_step,
 class ParticleMover:
     def __init__(self, config):
         self.config = config
-        self.r_step = config.getfloat('r-step')
+        self.r_step = config.getfloat('window-width-step-size')
         self.max_radius = config.getfloat('window-width')
 
     # Move particles one D_XIP step forward
