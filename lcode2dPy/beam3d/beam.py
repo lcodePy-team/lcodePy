@@ -303,7 +303,7 @@ class BeamCalculator:
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.grid_steps = config.getint('window-width-steps')
         self.max_radius = self.grid_step_size * self.grid_steps / 2
-        self.time_step = config.getfloat('time_step')
+        self.time_step = config.getfloat('time-step')
         self.substepping_energy = 2 #config.get("beam-substepping-energy")
 
         self.rho_layout = np.zeros((self.grid_steps, self.grid_steps),
