@@ -7,6 +7,7 @@ default_config.set('geometry', 'circ') # or 3d or 2d_plane
 
 # Parameters of simulation window:
 default_config.set('window-width', 5.0) # Has different meanings in 2d and 3d!
+default_config.set('r-step', 5.0) 
 default_config.set('window-width-step-size', 0.05)
 default_config.set('window-width-steps', 101) # Only needed in 3d
 # TODO: get rid of this parameter in 3d

@@ -1,6 +1,6 @@
 from copy import copy
 from typing import Dict, Any, Optional
-
+from lcode2dPy.config.template import lcode_template
 
 class Config:
     config_values: Dict[str, str]
@@ -41,3 +41,7 @@ class Config:
         ret = Config()
         ret.config_values = copy(self.config_values)
         return ret
+
+    def generate_config(self, path: str) -> None:
+        with open(path, 'w') as cfg:
+            cfg.write(lcode_template.format(**self.config_values))
