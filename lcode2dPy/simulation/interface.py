@@ -6,7 +6,7 @@ import numpy as np
 from lcode2dPy.config.default_config import default_config
 from lcode2dPy.beam.beam_generator import make_beam, Gauss, rGauss
 from lcode2dPy.plasma.initialization import init_plasma
-
+from lcode2dPy.diagnostics.targets import MyDiagnostics
 class Simulation:
     def __init__(self, config=default_config, beam_generator=make_beam, beam_pars=None, diagnostics=None):
         self.config = config
@@ -25,11 +25,12 @@ class Simulation:
         self.beam_source = None
         self.beam_drain = None
         
-        self.diagnostics = diagnostics
+        self.diagnostics = MyDiagnostics(config, diagnostics)
 
     def step(self, N_steps):
         # t step function, makes N_steps time steps.
         # Beam generation
+        self.diagnostics.config()
         if self.beam_source is None:
             beam_particles = self.beam_generator(self.config, **self.beam_pars)
             beam_particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
@@ -50,9 +51,9 @@ class Simulation:
             self.beam_source = MemoryBeamSource(beam_slice)
             self.beam_drain = MemoryBeamDrain()
             self.current_time = self.current_time + self.config.getfloat('time-step')
-            # Every t step diagnostics
-            if self.diagnostics:
-                self.diagnostics.every_dt()
+            # Every t step diagnostics 
+            # if self.diagnostics:
+            #     self.diagnostics.every_dt()
             
 
 class Diagnostics2d:
