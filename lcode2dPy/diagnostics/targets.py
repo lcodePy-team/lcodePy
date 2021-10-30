@@ -127,7 +127,7 @@ class FieldDiagnostics:
     #             writer.append_data(image)
     #     shutil.rmtree(path)
         
-class BunchDiagnostics:
+class BeamDiagnostics:
     def __init__(self, t_start=0, t_end=None, period=100, 
                  cl_mem = False, 
                  output_type = 'i f', img_format = 'png',
@@ -152,16 +152,16 @@ class BunchDiagnostics:
             beam):
         if t<self.t_start or t>self.t_end:
             return
-        beam_slice = beam[0]
-        lost_slice = beam[1]
+        beam_slice = beam
+        #lost_slice = beam[1]
         if layer_idx == 0:
             particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
                            ('q_norm', 'f8'), ('id', 'i8')])
             self.data[t] = np.array([],dtype=particle_dtype)
-            self.lost[t] = np.array([],dtype=particle_dtype)
+            #self.lost[t] = np.array([],dtype=particle_dtype)
         if (t-self.t_start)%self.period == 0:
             self.data[t] = np.append(self.data[t], beam_slice.particles)
-            self.lost[t] = np.append(self.data[t], lost_slice.particles)
+            #self.lost[t] = np.append(self.data[t], lost_slice.particles)
             #self.test[t].append(rho_beam.tolist())
             
 class PlasmaDiagnostics:
