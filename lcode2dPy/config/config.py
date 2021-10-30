@@ -42,6 +42,13 @@ class Config:
         ret.config_values = copy(self.config_values)
         return ret
 
-    def generate_config(self, path: str) -> None:
-        with open(path, 'w') as cfg:
-            cfg.write(lcode_template.format(**self.config_values))
+    def c_config(self, path:str = None) -> str:
+        cfg = lcode_template.format(**self.config_values)
+        if path is not None:
+            with open(path, 'w') as cfg_f:
+                cfg_f.write(cfg)
+            return None
+        else:
+            return cfg
+        
+        
