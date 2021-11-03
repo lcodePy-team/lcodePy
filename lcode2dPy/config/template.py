@@ -2,7 +2,7 @@
 lcode_template = '''
 # Simulation area:
 geometry = c
-window-width = {window-width};          r-step = {r-step}
+window-width = {window-width};          r-step = {window-width-step-size}
 window-length = {window-length};        xi-step = {xi-step}
 time-limit = {time-limit};         time-step = {time-step}
 continuation = n # Plasma continuation (no/beam/longplasma, n/y/Y)
@@ -22,6 +22,8 @@ plasma-particles-per-cell = {plasma-particles-per-cell} #???????
 plasma-profile = {plasma-profile} 
 plasma-zshape = {plasma-zshape}                 
 plasma-width = {plasma-width} 
+plasma-width-2 = {plasma-width-2}
+plasma-density-2 = {plasma-density-2}
 plasma-temperature = {plasma-temperature}
 ion-model = {ion-model}
 ion-mass = 157000
