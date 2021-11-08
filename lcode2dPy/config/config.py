@@ -11,11 +11,7 @@ class Config:
         self.config_values = {}
 
     def get(self, option_name: str, fallback: str = '') -> str:
-        if (option_name == 'window-width-steps' and
-            self.get('geometry') == '3d'):
-            # Goes here every time Config.get('window-width-steps') is
-            # called in 3d to update window-width and window-width-steps.
-            self.update_window_width_and_steps_3d()
+        self.update_config_values(option_name)
 
         if option_name in self.config_values:
             return self.config_values.get(option_name)
@@ -56,9 +52,26 @@ class Config:
         if path:
             with open(path, 'w') as cfg_f:
                 cfg_f.write(cfg)
-        
+
         return cfg
-        
+
+    def update_config_values(self, option_name: str):
+        """
+        Updates config values in 3d.
+        Required for compatibility of 2d and 3d codes.
+        """
+        if (option_name == 'window-width-steps' and
+            self.get('geometry') == '3d'):
+            # Goes here every time Config.get('window-width-steps') is
+            # called in 3d to update window-width and window-width-steps.
+            self.update_window_width_and_steps_3d()
+
+        if (option_name == 'plasma-fineness' and
+            self.get('geometry') == '3d'):
+            # Goes here every time Config.get('plasma-fineness') is called
+            # in 3d to update it according to 'plasma-particles-per-cell'.
+            self.update_plasma_fineness()
+
     def update_window_width_and_steps_3d(self):
         """
         Calculates the optimal number for window-width-steps and uses
@@ -81,6 +94,15 @@ class Config:
         self.set('window-width', (optimal_steps *
                                   self.getfloat('window-width-step-size')))
         self.set('window-width-steps', optimal_steps)
+        # TODO: Add a message for the user.
+
+    def update_plasma_fineness(self):
+        """
+        Calculates and updates 'plasma-fineness' using
+        'plasma-particles-per-cell'.
+        """
+        sqrt_per_cell = np.sqrt(self.getfloat('plasma-particles-per-cell'))
+        self.set('plasma-fineness', round(sqrt_per_cell))
         # TODO: Add a message for the user.
 
 
