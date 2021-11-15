@@ -44,11 +44,10 @@ class Config:
 
     def c_config(self, path:str = None) -> str:
         cfg = lcode_template.format(**self.config_values)
-        if path is not None:
+        if path:
             with open(path, 'w') as cfg_f:
                 cfg_f.write(cfg)
-            return None
-        else:
-            return cfg
+        
+        return cfg
         
         
