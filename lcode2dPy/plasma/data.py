@@ -1,6 +1,6 @@
 import numpy as np
 from numba import float64 
-from numba import jitclass
+from numba.experimental import jitclass
 from lcode2dPy.plasma.weights import (
     interpolate_antisymmetric,
     interpolate_symmetric,

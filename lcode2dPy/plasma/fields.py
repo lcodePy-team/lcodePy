@@ -10,7 +10,7 @@ from lcode2dPy.plasma.ode import (
 )
 
 
-@njit
+#NJIT@nb.njit @njit
 def compute_e_r(total_rho, j_r, j_r_previous, e_r_previous, previous_factor,
                 r_step, xi_step_p):
     """
@@ -52,7 +52,7 @@ def compute_e_r(total_rho, j_r, j_r_previous, e_r_previous, previous_factor,
     return tridiagonal_solve_neumann_like(right_part, previous_factor, r_step)
 
 
-@njit
+#NJIT@nb.njit @njit
 def compute_e_phi(j_phi, j_phi_previous, e_phi_previous, previous_factor,
                   r_step, xi_step_p):
     r"""
@@ -89,7 +89,7 @@ def compute_e_phi(j_phi, j_phi_previous, e_phi_previous, previous_factor,
     return tridiagonal_solve_dirichlet(right_part, previous_factor, r_step)
 
 
-@njit
+#NJIT@nb.njit @njit
 def compute_e_z(j_r, r_step):
     """
     Compute :math:`E_z` field on the next xi step.
@@ -112,7 +112,7 @@ def compute_e_z(j_r, r_step):
     return new_e_z_field
 
 
-@njit
+#NJIT@nb.njit @njit
 def compute_b_phi(rho, j_z, e_r, r_step):
     r"""
     Compute :math:`B_\phi` field on the next xi step.
@@ -145,7 +145,7 @@ def compute_b_phi(rho, j_z, e_r, r_step):
     return e_r - temporary_b_phi
 
 
-@njit
+#NJIT@nb.njit @njit
 def compute_b_z(j_phi, r_step):
     """
     Compute :math:`B_z` field on the next xi step.
@@ -179,7 +179,7 @@ _prev_factor_multiplier = 3
 _prev_factor_threshold = 5
 
 
-@njit
+#NJIT@nb.njit @njit
 def _compute_e_r_previous_factor(rho, j_r, j_phi, j_z):
     prev_factor = np.zeros_like(rho)
     electron_density = rho - 1.0  # TODO: Use correct electron density

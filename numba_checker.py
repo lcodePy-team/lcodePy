@@ -1,15 +1,21 @@
+from numpy.lib.twodim_base import diag
 from lcode2dPy.simulation.interface import Simulation
-from lcode2dPy.diagnostics.targets import BeamDiagnostics, PlasmaDiagnostics
+from lcode2dPy.diagnostics.targets import BeamDiagnostics, FieldDiagnostics, PlasmaDiagnostics
 from lcode2dPy.config.default_config import default_config
 from lcode2dPy.beam.beam_generator import make_beam, Gauss, rGauss
 import numpy as np
-import matplotlib.pyplot as plt
+import pickle
 import subprocess
+import os
+try:
+    os.remove('beamfile.bin')
+except:
+    pass
 
 
 time_step       = 200
 time_limit      = 200.5
-window_length   = 0.2
+window_length   = 20
 window_width    = 2
 r_step          = 0.01
 xi_step         = 0.01
@@ -36,8 +42,9 @@ beam_pars = dict(xi_distr=Gauss(sigma=100, vmin=-window_length, vmax=0),
                 saveto=".")
 
 diagnostics = [
-    BeamDiagnostics(period=time_limit//time_step * time_step),
-    PlasmaDiagnostics(period=time_limit//time_step * time_step)
+    # BeamDiagnostics(period=time_limit//time_step * time_step),
+    # PlasmaDiagnostics(period=time_limit//time_step * time_step)
+    FieldDiagnostics(name="E_z", period=time_limit//time_step * time_step)
 ]
 
 sim = Simulation(beam_pars=beam_pars, diagnostics=diagnostics, config=config)
@@ -45,3 +52,6 @@ sim = Simulation(beam_pars=beam_pars, diagnostics=diagnostics, config=config)
 sim.step(int(time_limit//time_step))
 
 print("end")
+
+with open("diagnostics.pickle", "wb") as f:
+    pickle.dump(diagnostics, f)

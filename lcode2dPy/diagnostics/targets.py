@@ -49,7 +49,7 @@ class FieldDiagnostics:
             self.t_start = 0
         if self.t_end is None:
             self.t_end = self.tlim
-        r_step = config.getfloat('r-step')
+        r_step = config.getfloat('window-width-step-size')
         xi_step = config.getfloat('xi-step')
         self.w = int(config.getfloat('window-length')/xi_step)
         self.h = int(config.getfloat('window-width')/r_step)+1

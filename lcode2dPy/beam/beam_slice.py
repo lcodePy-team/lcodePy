@@ -21,12 +21,12 @@ _beamParticlesSliceSpec = [
     ('remaining_steps', nb.int64[:]),
     ('status', nb.int64[:]),
     ('nlost', nb.int64),
-    ('lost', nb.int64[:])
+    ('lost', nb.boolean[:])
 ]
 
 
 # jitclass is necessary to pass objects to jit-compiled functions
-@nb.jitclass(spec=_beamParticlesSliceSpec)
+#NJIT @nb.experimental.jitclass(spec=_beamParticlesSliceSpec)
 class BeamSlice:
     def __init__(self, size, particles=None):
         self.size = size
@@ -48,19 +48,21 @@ class BeamSlice:
         self.remaining_steps = np.full(size, 1, dtype=np.int64)
 
         self.nlost = 0
-        self.lost = np.zeros(10, dtype=np.int64)
+        self.lost = np.zeros(size, dtype=np.bool8)
 
     def swap_particles(self, i, j):
         self.particles[i], self.particles[j] = self.particles[j], self.particles[i]
         self.dt[i], self.dt[j] = self.dt[j], self.dt[i]
         self.remaining_steps[i], self.remaining_steps[j] = self.remaining_steps[j], self.remaining_steps[i]
         self.status[i], self.status[j] = self.status[j], self.status[i]
+        self.lost[i], self.lost[j] = self.lost[j], self.lost[i]
 
     def get_subslice(self, begin, end):
         temp_particles = self.particles[begin:end]
         sub_slice = BeamSlice(len(temp_particles), temp_particles)
         sub_slice.dt[:] = self.dt[begin:end]
         sub_slice.remaining_steps[:] = self.remaining_steps[begin:end]
+        sub_slice.lost[:] = self.lost[begin:end]
         return sub_slice
 
     def concatenate(self, other_slice):
@@ -82,4 +84,8 @@ class BeamSlice:
             self.remaining_steps, other_slice.remaining_steps,
         ))
         self.status = np.concatenate((self.status, other_slice.status))
+        self.lost = np.concatenate((self.lost), other_slice.lost)
         return self
+
+    def mark_lost(self, idx):
+        self.lost[idx] = True

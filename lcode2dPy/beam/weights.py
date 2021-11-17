@@ -2,13 +2,13 @@ import numba as nb
 import numpy as np
 
 
-@nb.njit(cache=True)
+#NJIT@nb.njit @nb.njit(cache=True)
 def add_at(out, idx, value):
     for i in np.arange(len(idx)):
         out[idx[i]] += value[i]
 
 
-@nb.njit(parallel=True)
+#NJIT@nb.njit @nb.njit(parallel=True)
 def particles_weights(r, xi, xi_end, r_step, xi_step_p):
     j = np.floor(r / r_step).astype(np.int_)
     dxi = (xi_end - xi) / xi_step_p + 1
@@ -24,7 +24,7 @@ def particles_weights(r, xi, xi_end, r_step, xi_step_p):
     return j, a00, a01, a10, a11
 
 
-@nb.njit(cache=True)
+#NJIT@nb.njit @nb.njit(cache=True)
 def single_particle_weights(r, xi, xi_end, r_step, xi_step_p):
     j = int(np.floor(r / r_step))
     dxi = (xi_end - xi) / xi_step_p + 1
@@ -40,7 +40,7 @@ def single_particle_weights(r, xi, xi_end, r_step, xi_step_p):
     return j, a00, a01, a10, a11
 
 
-@nb.njit(cache=True)
+#NJIT@nb.njit nb.njit(cache=True)
 def deposit_particles(value, out0, out1, j, a00, a01, a10, a11):
     add_at(out0, j + 0, a00 * value)
     add_at(out0, j + 1, a01 * value)
@@ -48,7 +48,7 @@ def deposit_particles(value, out0, out1, j, a00, a01, a10, a11):
     add_at(out1, j + 1, a11 * value)
 
 
-@nb.njit(cache=True)
+#NJIT@nb.njit @nb.njit(cache=True)
 def interpolate_particle(value0, value1, j, a00, a01, a10, a11):
     return a00 * value0[j + 0] \
            + a01 * value0[j + 1] \
@@ -56,7 +56,7 @@ def interpolate_particle(value0, value1, j, a00, a01, a10, a11):
            + a11 * value1[j + 1]
 
 
-@nb.njit
+#NJIT@nb.njit @nb.njit
 def particle_fields(r_vec, fields_k_1, fields_k, xi_k_1, r_step, xi_step_p):
     r = np.sqrt(r_vec[0] ** 2 + r_vec[1] ** 2)
     j, a00, a01, a10, a11 = single_particle_weights(r, r_vec[2], xi_k_1, r_step, xi_step_p)
