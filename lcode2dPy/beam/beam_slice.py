@@ -26,7 +26,7 @@ _beamParticlesSliceSpec = [
 
 
 # jitclass is necessary to pass objects to jit-compiled functions
-#NJIT @nb.experimental.jitclass(spec=_beamParticlesSliceSpec)
+@nb.experimental.jitclass(spec=_beamParticlesSliceSpec)
 class BeamSlice:
     def __init__(self, size, particles=None):
         self.size = size

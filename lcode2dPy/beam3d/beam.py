@@ -103,14 +103,14 @@ class BeamParticles:
 # Functions like in weights.py in lcode2dPy
 
 
-#NJIT@nb.njit @nb.njit(cache=True)
+@nb.njit(cache=True)
 def add_at_numba(out, idx_x, idx_y, value):
     for i in np.arange(len(idx_x)):
         out[idx_x[i], idx_y[i]] += value[i]
 
 # TODO: get rid of these two quite simple functions
 
-#NJIT@nb.njit @nb.njit(parallel=True)
+@nb.njit(parallel=True)
 def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev - xi)/D_XIP
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i = (np.floor(x_h) + grid_steps // 2).astype(np.int_)
@@ -136,7 +136,7 @@ def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev 
     return i, j, a000, a001, a010, a011, a100, a101, a110, a111
 
 
-#NJIT@nb.njit @nb.njit(cache=True)
+@nb.njit(cache=True)
 def single_particle_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev - xi)/D_XIP
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i = int(np.floor(x_h) + grid_steps // 2)
@@ -163,7 +163,7 @@ def single_particle_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi
 
 # TODO: we have similar functions for GPU in lcode3d code
 
-#NJIT@nb.njit @nb.njit(cache=True)
+@nb.njit(cache=True)
 def deposit_particles(value, out0, out1, i, j, a000, a001, a010, a011,
                                                a100, a101, a110, a111):
     add_at_numba(out0, i + 0, j + 0, a000 * value)
@@ -176,7 +176,7 @@ def deposit_particles(value, out0, out1, i, j, a000, a001, a010, a011,
     add_at_numba(out1, i + 1, j + 1, a111 * value)
 
 
-#NJIT@nb.njit @nb.njit(cache=True)
+@nb.njit(cache=True)
 def interpolate_particle(value0, value1, i, j, a000, a001, a010, a011,
                                                a100, a101, a110, a111):
     return a000 * value0[i + 0, j + 0] \
@@ -189,7 +189,7 @@ def interpolate_particle(value0, value1, i, j, a000, a001, a010, a011,
          + a111 * value1[i + 1, j + 1]
 
 
-#@nb.njit
+@nb.njit
 def particle_fields(r_vec, grid_steps, grid_step_size, xi_step_size, xi_k,
                     fields_k_1, fields_k):
     dxi = (xi_k - r_vec[2]) / xi_step_size
@@ -227,7 +227,7 @@ def beam_substepping_step(q_m, p_z, substepping_energy):
     return dt
 
 
-#NJIT@nb.njit @nb.njit
+@nb.njit
 def cross_nb(a, b):
     c = np.zeros_like(a)
     c[0] = a[1] * b[2] - a[2] * b[1]
@@ -236,19 +236,19 @@ def cross_nb(a, b):
     return c
 
 
-#NJIT@nb.njit @nb.njit
+@nb.njit
 def in_layer(r_vec, xi_k_1):
     return xi_k_1 <= r_vec[2]
 
 
-#NJIT@nb.njit @nb.njit
+@nb.njit
 def is_lost(r_vec, r_max):
     return r_vec[0] ** 2 + r_vec[1] ** 2 >= r_max ** 2
 
 
 # Moves one particle as far as possible on current xi layer
 
-#@nb.njit
+@nb.njit
 def try_move_particle(beam, idx, fields_k_1, fields_k, max_radius, grid_steps,
                       r_step, xi_step_size, xi_layer):
     xi_k = xi_layer * -xi_step_size  # xi_{k}

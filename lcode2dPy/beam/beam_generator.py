@@ -19,11 +19,12 @@ def Gauss(med=0, sigma=1, vmin=-1, vmax=0):
 
 def rGauss(sigma=1, vmin=0, vmax=1):
     def rgauss_maker(N):
-#         p1 = 0 if vmin is None else stats.weibull_min.cdf(vmin) # cdf doesn't work properly
-#         p2 = 1 if vmax is None else stats.weibull_min.cdf(vmax)
-        p1 = 0
-        p2 = 1
-        return sigma*np.sqrt(2.)*stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
+        p1 = 0 if vmin is None else stats.weibull_min.cdf(vmin, 2) # cdf doesn't work properly
+        p2 = 1 if vmax is None else stats.weibull_min.cdf(vmax, 2)
+        # p1 = 0
+        # p2 = 1
+        # return sigma*np.sqrt(2.)*stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
+        return stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
     rgauss_maker.med = 0
     rgauss_maker.sigma = sigma
     return rgauss_maker

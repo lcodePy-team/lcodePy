@@ -3,7 +3,7 @@ from numba import njit
 from numpy.core.numeric import zeros_like
 
 
-#NJIT@nb.njit @njit
+@njit
 def _interpolate_fields(cell_idx, local_coord, fields):
     """Interpolates fields from grid to particles positions."""
     a_1 = local_coord - 0.5
@@ -34,7 +34,7 @@ def _interpolate_fields(cell_idx, local_coord, fields):
     return e_x, e_y, e_z, b_y, b_z
 
 
-#NJIT@nb.njit @njit
+@njit
 def _interpolate_noisereductor(
     noise_amplitude, cell_idx, local_coord, r_step,
 ):
@@ -54,7 +54,7 @@ def _interpolate_noisereductor(
     return result
 
 
-#NJIT@nb.njit @njit
+@njit
 def _move_one_particle(
         fields,
         r, p_r, p_f, p_z, q, m,
@@ -158,7 +158,7 @@ def _move_one_particle(
     return r_new, p_r, p_f, p_z, q, path, gammam * dl_t
 
 
-#NJIT@nb.njit @njit
+@njit
 def _move_particles_with_substepping(fields, particles, noise_amplitude, r_step, xi_step_p, max_radius):
     """Move particles in fields, correct steps if necessary."""
     particles_new = particles.copy()

@@ -18,7 +18,7 @@ def beam_substepping_step(q_m, p_z, substepping_energy):
     return dt
 
 
-#NJIT@nb.njit
+@nb.njit
 def cross_nb(vec1, vec2):
     result = np.zeros_like(vec1)
     result[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1]
@@ -27,17 +27,17 @@ def cross_nb(vec1, vec2):
     return result
 
 
-#NJIT@nb.njit
+@nb.njit
 def in_layer(r_vec, xi_k_1):
     return xi_k_1 <= r_vec[2]
 
 
-#NJIT@nb.njit
+@nb.njit
 def is_lost(r_vec, r_max):
     return r_vec[0] ** 2 + r_vec[1] ** 2 >= r_max ** 2
 
 
-#NJIT@nb.njit
+@nb.njit
 def beam_to_vec(beam, idx):
     p_x = beam.p_r[idx]
     p_y = beam.M[idx] / beam.r[idx]
@@ -46,7 +46,7 @@ def beam_to_vec(beam, idx):
     return p_vec, r_vec, beam.remaining_steps[idx]
 
 
-#NJIT@nb.njit
+@nb.njit
 def vec_to_beam(beam, idx, r_vec, p_vec, steps_left, lost, magnetic_field):
     x = r_vec[0]
     y = r_vec[1]
@@ -73,7 +73,7 @@ def configure_move_beam_slice(config):
                    'magnetic_field': nb.float64,}
 
     # Moves particles as far as possible on its xi layer
-#NJIT@nb.njit @nb.njit(locals=locals_spec)
+    @nb.njit(locals=locals_spec)
     def move_beam_slice(beam_slice, xi_layer, fields_after_slice, fields_before_slice):
         xi_end = xi_layer * -xi_step_p
         if beam_slice.size == 0:
@@ -148,7 +148,7 @@ def layout_beam_slice(
     return rho_layout, prev_rho_layout
 
 
-#NJIT@nb.njit
+@nb.njit
 def init_substepping(beam_slice, time_step, substepping_energy):
     mask = beam_slice.dt == 0
     dt = beam_substepping_step(beam_slice.q_m[mask], beam_slice.p_z[mask], substepping_energy)
@@ -162,7 +162,7 @@ def beam_slice_mover(config):
     substepping_energy = config.getfloat('beam-substepping-energy')
     move_particles = configure_move_beam_slice(config)
 
-    #NJIT@nb.njit
+    @nb.njit
     def move_beam_slice(
         beam_slice, xi_layer_idx, fields_after_slice, fields_before_slice,
     ):
