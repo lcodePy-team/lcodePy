@@ -83,9 +83,10 @@ class BeamSlice:
         self.remaining_steps = np.concatenate((
             self.remaining_steps, other_slice.remaining_steps,
         ))
-        self.status = np.concatenate((self.status, other_slice.status))
-        self.lost = np.concatenate((self.lost), other_slice.lost)
+        #self.status = np.concatenate((self.status, other_slice.status))
+        self.lost = np.concatenate(((self.lost), other_slice.lost))
         return self
 
     def mark_lost(self, idx):
         self.lost[idx] = True
+        self.nlost += 1
