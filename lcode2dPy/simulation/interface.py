@@ -20,6 +20,7 @@ class Simulation:
     def __init__(self, config=default_config, beam_generator=make_beam,
                  beam_pars=None, diagnostics=None):
         self.config = config
+        self.t_step = config.getfloat('time-step')
 
         geometry = config.get('geometry')
         if  geometry == '3d' or geometry == '3D':
@@ -42,7 +43,9 @@ class Simulation:
         self.diagnostics = MyDiagnostics(config, diagnostics)
 
     def step(self, N_steps):
+        """Compute N time steps."""
         # t step function, makes N_steps time steps.
+
         # Beam generation
         self.diagnostics.config()
         if self.beam_source is None:
@@ -58,12 +61,16 @@ class Simulation:
         # Time loop
         for t_i in range(N_steps):
             fields, plasma_particles = init_plasma(self.config)
-            plasma_particles_new, fields_new = self.push_solver.step_dt(plasma_particles, fields, self.beam_source, self.beam_drain, self.current_time, self.diagnostics)
+
+            plasma_particles_new, fields_new = self.push_solver.step_dt(
+                plasma_particles, fields, self.beam_source, self.beam_drain,
+                self.current_time, self.diagnostics)
+                
             beam_particles = self.beam_drain.beam_slice()
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
             self.beam_source = MemoryBeamSource(beam_slice)
             self.beam_drain = MemoryBeamDrain()
-            self.current_time = self.current_time + self.config.getfloat('time-step')
+            self.current_time = self.current_time + self.t_step
             # Every t step diagnostics 
             # if self.diagnostics:
             #     self.diagnostics.every_dt()
