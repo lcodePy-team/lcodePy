@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+from lcode2dPy import beam
 
 from lcode2dPy.beam import (
     BeamSlice,
@@ -27,6 +28,14 @@ particle_dtype = np.dtype(
 # @nb.njit
 def split_beam_slice(beam_slice, xi_end):
     lost_slice = BeamSlice(0)
+    lost_sorted_idxes = np.argsort(beam_slice.lost)
+    beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
+    beam_slice.dt = beam_slice.dt[lost_sorted_idxes]
+    beam_slice.remaining_steps = beam_slice.remaining_steps[lost_sorted_idxes]
+    beam_slice.lost = beam_slice.lost[lost_sorted_idxes]
+    lost_slice = beam_slice.get_subslice(beam_slice.nlost, beam_slice.size)
+    beam_slice = beam_slice.get_subslice(0, beam_slice.nlost)
+    
 
     moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
     stable_count = moving_mask.size - np.sum(moving_mask)
@@ -35,7 +44,7 @@ def split_beam_slice(beam_slice, xi_end):
     beam_slice.particles = beam_slice.particles[sorted_idxes]
     beam_slice.dt = beam_slice.dt[sorted_idxes]
     beam_slice.remaining_steps = beam_slice.remaining_steps[sorted_idxes]
-
+    beam_slice.lost = beam_slice.lost[sorted_idxes]
     stable_slice = beam_slice.get_subslice(0, stable_count)
     moving_slice = beam_slice.get_subslice(stable_count, beam_slice.size)
 
@@ -49,6 +58,7 @@ class PusherAndSolver:
         self.move_beam_slice = beam_slice_mover(config)
         self.solver = CylindricalPlasmaSolver(config)
         self.r_step = float(config.get('window-width-step-size'))
+        self.is_rigid = 1 if config.get('rigid-beam')=='y' else 0
         max_radius = float(config.get('window-width'))
         self.n_cells = int(max_radius / self.r_step) + 1
         self.xi_step_p = config.getfloat('xi-step')
@@ -62,6 +72,8 @@ class PusherAndSolver:
         for layer_idx in np.arange(self.xi_layers_num):
             # Get beam layer with xi \in [xi^{layer_idx + 1}, xi^{layer_idx})
             # Its index is `layer_idx`
+           
+            
             beam_slice_to_layout = beam_source.get_beam_slice(
                 (layer_idx - 1) * -self.xi_step_p, layer_idx * -self.xi_step_p,
             )
@@ -72,18 +84,20 @@ class PusherAndSolver:
                 self.r_step,
                 self.xi_step_p,
             )
+            
             # Now we can compute plasma layer `layer_idx` reaction
             plasma_particles_new, plasma_fields_new, steps = self.solver.step_dxi(
                 plasma_particles, plasma_fields, rho_beam,
             )
             # Now we can move beam layer `layer_idx - 1`
+
             self.move_beam_slice(
                 beam_slice_to_move,
                 layer_idx - 1,
                 plasma_fields_new,
                 plasma_fields,
             )
-            
+            # TODO lost потом обрабатывать
             lost_slice, stable_slice, moving_slice = split_beam_slice(
                 beam_slice_to_move, (layer_idx - 1) * -self.xi_step_p,
             )
@@ -95,8 +109,9 @@ class PusherAndSolver:
             
             # Every xi step diagnostics
             if diagnostics:
-                diagnostics.every_dxi(t + self.config.getfloat('time-step'), layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice_to_move)
+                diagnostics.dxi(t + self.config.getfloat('time-step'), layer_idx, plasma_particles, plasma_fields, rho_beam, stable_slice)
             else:
                 if layer_idx % 100 == 0:
                     print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
+            print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
         return plasma_particles, plasma_fields

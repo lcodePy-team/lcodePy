@@ -66,5 +66,5 @@ class RhoJComputer(object):
         currents = _deposit_currents(particles, self.r_step, self.n_cells)
         currents = currents.normalize(self.cell_volume)
         # Add charge density of background ions
-        currents.rho += np.full_like(currents.rho, 1.0)
+        currents.rho += 1
         return currents

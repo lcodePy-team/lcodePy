@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+from numpy.core.numeric import zeros_like
 
 
 @njit
@@ -18,6 +19,8 @@ def _interpolate_fields(cell_idx, local_coord, fields):
         jp = jm
     elif jc == 0:
         jm = jp
+    elif jc >= fields.E_r.size:
+        return 0, 0, 0, 0, 0
     if jc == 0:
         e_x = (a_3 - a_1) * fields.E_r[jm] + a_2 * fields.E_r[jc]
         e_y = (a_3 - a_1) * fields.E_f[jm] + a_2 * fields.E_f[jc]
@@ -35,9 +38,14 @@ def _interpolate_fields(cell_idx, local_coord, fields):
 def _interpolate_noisereductor(
     noise_amplitude, cell_idx, local_coord, r_step,
 ):
+
+    if cell_idx >= noise_amplitude.size:
+        return 0
     """Calculates noise correction value to be added to e_x."""
     if cell_idx == 0 or noise_amplitude[cell_idx] == 0:
         return 0
+
+    
 
     noise_func = np.pi * np.sin(np.pi * local_coord)
     noise_func += np.cos(np.pi * local_coord) / cell_idx
