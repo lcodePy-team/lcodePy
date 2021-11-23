@@ -128,9 +128,11 @@ def deposit(grid_steps, grid_step_size,
 def beam_substepping_step(q_m, pz, substepping_energy):
     dt = cp.ones_like(q_m, dtype=cp.float64)
     max_dt = cp.sqrt(cp.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
-    for i in range(q_m.size):
-        while dt[i] > max_dt[i]:
-            dt[i] /= 2.0
+    
+    a = cp.ceil(cp.log2(dt / max_dt))
+    a[a < 0] = 0
+    dt /= 2 ** a
+
     return dt
 
 
@@ -229,11 +231,11 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         # Add time shift correction (dxi = (v_z - c)*dt)
 
         if not_in_layer(xi_halfstep, xi_k_1):
-            x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+            # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
             return
 
         if is_lost(x_halfstep, y_halfstep, max(0.9 * max_radius, max_radius - 1)):
-            x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+            # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
             id[k] *= -1  # Particle hit the wall and is now lost
             remaining_steps[k] = 0
             return
@@ -267,8 +269,8 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
 
         # TODO: Do we need to add it here?
-        if not_in_layer(xi_halfstep, xi_k_1):
-            return
+        # if not_in_layer(xi_halfstep, xi_k_1):
+        #     return
 
         if is_lost(x[k], y[k], max(0.9 * max_radius, max_radius - 1)):
             id[k] *= -1  # Particle hit the wall and is now lost
@@ -328,10 +330,15 @@ class BeamCalculator:
     def layout_next_xi_layer(self):
         xi_1 = -self.xi_step_size * (self.xi_layer + 1)
         xi_2 = -self.xi_step_size * (self.xi_layer + 2)
+
         # Does it find all particles that lay in the layer?
         # Doesn't look like this. Check it.
-        end = cp.searchsorted(-self.beam.xi, cp.asarray(-xi_2))
-        return self.layout_count, end, xi_1, xi_2
+
+        arr_to_search = -self.beam.xi[self.layout_count:]
+        # end = cp.searchsorted(arr_to_search, cp.asarray(-xi_2))
+        end = cp.argmax(arr_to_search > cp.asarray(-xi_2))
+
+        return self.layout_count, end + self.layout_count, xi_1, xi_2
 
     def start_time_step(self):
         self.rho_layout = cp.zeros((self.grid_steps, self.grid_steps),
@@ -392,10 +399,13 @@ class BeamCalculator:
     def move_next_xi_layer(self):
         xi = -self.xi_step_size * self.xi_layer
         xi_1 = -self.xi_step_size * (self.xi_layer + 1)
-        for i in cp.arange(self.touched_count, self.layout_count):
-            if self.beam.xi[i] - xi_1 < 0:
-                return self.touched_count, i, xi, xi_1
-        return self.touched_count, self.layout_count, xi, xi_1
+        
+        # Does it find all particles that lay in the layer?
+        # Doesn't look like this. Check it.
+        arr_to_search = -self.beam.xi[self.touched_count:self.layout_count]
+        end = cp.argmax(arr_to_search > cp.asarray(-xi_1))
+
+        return self.touched_count, end + self.touched_count, xi, xi_1
 
     def start_moving_layer(self):
         start, end, xi_k, xi_k_1 = self.move_next_xi_layer()
@@ -412,6 +422,7 @@ class BeamCalculator:
     # Sorts beam to preserve order
     # Sort order: remaining_steps ascending
     def stop_moving_layer(self):
+        # Uses numpy somewhere here. TODO: Find here and use cupy instead.
         idxes = cp.arange(self.stable_count, self.touched_count)
         if idxes.size == 0:
             return
