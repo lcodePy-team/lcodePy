@@ -202,7 +202,7 @@ def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
 @numba.cuda.jit
 def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           xi_layer, max_radius,
-                          q_m, dt, remaining_steps,
+                          q_m_, dt_, remaining_steps,
                           x, y, xi, px, py, pz, id,
                           Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
                           Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
@@ -215,7 +215,7 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
 
     xi_k = xi_layer * -xi_step_size  # xi_{k}
     xi_k_1 = (xi_layer + 1) * -xi_step_size  # xi_{k+1}
-    q_m = q_m[k]; dt = dt[k]
+    q_m = q_m_[k]; dt = dt_[k]
 
     while remaining_steps[k] > 0:
         # Initial impulse and position vectors
