@@ -9,7 +9,7 @@ from lcode2dPy.plasma3d.data import Particles
 
 # Field interpolation and particle movement (fused) #
 
-@nb.njit(cache=True)
+@nb.njit
 def interp25(a, i, j,
              w2M2P, w1M2P, w02P, w1P2P, w2P2P,
              w2M1P, w1M1P, w01P, w1P1P, w2P1P,
@@ -36,7 +36,7 @@ def interp25(a, i, j,
     )
 
 
-@nb.njit
+@nb.njit(parallel=True)
 def move_smart_kernel(xi_step_size, reflect_boundary,
                       grid_step_size, grid_steps,
                       ms, qs,
@@ -52,7 +52,7 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
     and the the best estimation of its next location currently available to us.
     Also reflect the particles from `+-reflect_boundary`.
     """
-    for k in range(ms.size):
+    for k in nb.prange(ms.size):
         m, q = ms[k], qs[k]
 
         opx, opy, opz = prev_px[k], prev_py[k], prev_pz[k]
@@ -180,9 +180,9 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
     x_prev_offt = particles.x_offt
     y_prev_offt = particles.y_offt
 
-    px_prev = particles.p_x
-    py_prev = particles.p_y
-    pz_prev = particles.p_z
+    px_prev = particles.px
+    py_prev = particles.py
+    pz_prev = particles.pz
 
     estimated_x_offt = estimated_particles.x_offt
     estimated_y_offt = estimated_particles.y_offt
@@ -200,8 +200,8 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
                       x_prev_offt.ravel(), y_prev_offt.ravel(),
                       estimated_x_offt.ravel(), estimated_y_offt.ravel(),
                       px_prev.ravel(), py_prev.ravel(), pz_prev.ravel(),
-                      fields.E_x, fields.E_y, fields.E_z,
-                      fields.B_x, fields.B_y, fields.B_z,
+                      fields.Ex, fields.Ey, fields.Ez,
+                      fields.Bx, fields.By, fields.Bz,
                       x_offt_new.ravel(), y_offt_new.ravel(),
                       px_new.ravel(), py_new.ravel(), pz_new.ravel())
 
@@ -219,7 +219,7 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
     m, q = particles.m, particles.q
     x_init, y_init = particles.x_init, particles.y_init
     prev_x_offt, prev_y_offt = particles.x_offt, particles.y_offt
-    px, py, pz = particles.p_x, particles.p_y, particles.p_z
+    px, py, pz = particles.px, particles.py, particles.pz
 
     x, y = x_init + prev_x_offt, y_init + prev_y_offt
     gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)

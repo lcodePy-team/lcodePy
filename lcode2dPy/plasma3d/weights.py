@@ -6,7 +6,7 @@ from math import sqrt, floor
 
 # Deposition and interpolation helper functions #
 
-@nb.njit#(parallel=True)
+@nb.njit
 def weights(x, y, grid_steps, grid_step_size):
     """
     Calculate the indices of a cell corresponding to the coordinates,
@@ -52,7 +52,7 @@ def weights(x, y, grid_steps, grid_step_size):
     )
 
 
-@nb.njit(cache=True)
+@nb.njit
 def deposit25(a, i, j, val, 
         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
@@ -91,14 +91,14 @@ def deposit25(a, i, j, val,
 
 # Deposition #
 
-@nb.njit# (parallel=True)
+@nb.njit(parallel=True)
 def deposit_kernel(grid_steps, grid_step_size,
                    x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
                    out_ro, out_jx, out_jy, out_jz):
     """
     Deposit plasma particles onto the charge density and current grids.
     """
-    for k in range(m.size):    
+    for k in nb.prange(m.size):    
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)

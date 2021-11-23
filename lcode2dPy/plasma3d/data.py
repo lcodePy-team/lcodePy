@@ -6,63 +6,63 @@ from numba.experimental import jitclass
 _float_array = float64[:, :]
 
 _fields_spec = [
-    ('E_x', _float_array),
-    ('E_y', _float_array),
-    ('E_z', _float_array),
-    ('B_x', _float_array),
-    ('B_y', _float_array),
-    ('B_z', _float_array),
+    ('Ex', _float_array),
+    ('Ey', _float_array),
+    ('Ez', _float_array),
+    ('Bx', _float_array),
+    ('By', _float_array),
+    ('Bz', _float_array),
 ]
 
 
 @jitclass(spec=_fields_spec)
 class Fields(object):
     def __init__(self, n_cells: int) -> None:
-        self.E_x = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.E_y = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.E_z = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.B_x = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.B_y = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.B_z = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Ex = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Ey = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Ez = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Bx = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.By = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Bz = np.zeros((n_cells, n_cells), dtype=np.float64)
 
     # Average operation is necessary on intermediate steps to have
     # better approximations of all fields
     def average(self, other):
-        fields = Fields((self.E_x).shape[0])
-        fields.E_x = (self.E_x + other.E_x) / 2
-        fields.E_y = (self.E_y + other.E_y) / 2
-        fields.E_z = (self.E_z + other.E_z) / 2
-        fields.B_x = (self.B_x + other.B_x) / 2
-        fields.B_y = (self.B_y + other.B_y) / 2
-        fields.B_z = (self.B_z + other.B_z) / 2
+        fields = Fields((self.Ex).shape[0])
+        fields.Ex = (self.Ex + other.Ex) / 2
+        fields.Ey = (self.Ey + other.Ey) / 2
+        fields.Ez = (self.Ez + other.Ez) / 2
+        fields.Bx = (self.Bx + other.Bx) / 2
+        fields.By = (self.By + other.By) / 2
+        fields.Bz = (self.Bz + other.Bz) / 2
         return fields
 
     def copy(self):
-        new_fields = Fields((self.E_x).shape[0])
-        new_fields.E_x = np.copy(self.E_x)
-        new_fields.E_y = np.copy(self.E_y)
-        new_fields.E_z = np.copy(self.E_z)
-        new_fields.B_x = np.copy(self.B_x)
-        new_fields.B_y = np.copy(self.B_y)
-        new_fields.B_z = np.copy(self.B_z)
+        new_fields = Fields((self.Ex).shape[0])
+        new_fields.Ex = np.copy(self.Ex)
+        new_fields.Ey = np.copy(self.Ey)
+        new_fields.Ez = np.copy(self.Ez)
+        new_fields.Bx = np.copy(self.Bx)
+        new_fields.By = np.copy(self.By)
+        new_fields.Bz = np.copy(self.Bz)
         return new_fields
 
 
 _currents_spec = [
-    ('rho', _float_array),
-    ('j_x', _float_array),
-    ('j_y', _float_array),
-    ('j_z', _float_array),
+    ('ro', _float_array),
+    ('jx', _float_array),
+    ('jy', _float_array),
+    ('jz', _float_array),
 ]
 
 
 @jitclass(spec=_currents_spec)
 class Currents(object):
-    def __init__(self, rho, j_x, j_y, j_z):
-        self.rho = rho
-        self.j_x = j_x
-        self.j_y = j_y
-        self.j_z = j_z
+    def __init__(self, ro, jx, jy, jz):
+        self.ro = ro
+        self.jx = jx
+        self.jy = jy
+        self.jz = jz
 
 
 _particles_spec = [
@@ -70,9 +70,9 @@ _particles_spec = [
     ('y_init', _float_array),
     ('x_offt', _float_array),
     ('y_offt', _float_array),
-    ('p_x', _float_array),
-    ('p_y', _float_array),
-    ('p_z', _float_array),
+    ('px', _float_array),
+    ('py', _float_array),
+    ('pz', _float_array),
     ('q', _float_array),
     ('m', _float_array),
 ]
@@ -80,21 +80,21 @@ _particles_spec = [
 
 @jitclass(spec=_particles_spec)
 class Particles(object):
-    def __init__(self, x_init, y_init, x_offt, y_offt, p_x, p_y, p_z, q, m):
+    def __init__(self, x_init, y_init, x_offt, y_offt, px, py, pz, q, m):
         self.x_init = np.copy(x_init)
         self.y_init = np.copy(y_init)
         self.x_offt = np.copy(x_offt)
         self.y_offt = np.copy(y_offt)
-        self.p_x = np.copy(p_x)
-        self.p_y = np.copy(p_y)
-        self.p_z = np.copy(p_z)
+        self.px = np.copy(px)
+        self.py = np.copy(py)
+        self.pz = np.copy(pz)
         self.q = np.copy(q)
         self.m = np.copy(m)
 
     def copy(self):
         return Particles(self.x_init, self.y_init,
                          self.x_offt, self.y_offt,
-                         self.p_x, self.p_y, self.p_z,
+                         self.px, self.py, self.pz,
                          self.q, self.m)
 
 
