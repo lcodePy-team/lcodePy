@@ -1,6 +1,9 @@
 import numpy as np
 import numba as nb
 
+particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
+                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
 
 spec = [
     ('length', nb.int64),
