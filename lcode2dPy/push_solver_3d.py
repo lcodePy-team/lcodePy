@@ -3,7 +3,6 @@ from numba import njit
 import time
 
 from lcode2dPy.beam3d import (
-    beam_generator,
     beam,
 )
 
