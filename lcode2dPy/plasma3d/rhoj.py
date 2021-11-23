@@ -1,7 +1,4 @@
 """Routine to compute charge density and currents of particles."""
-import numpy as np
-import numba as nb
-
 from lcode2dPy.plasma3d.data import Currents
 from lcode2dPy.plasma3d.weights import deposit
 

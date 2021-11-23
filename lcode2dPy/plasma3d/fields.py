@@ -1,6 +1,5 @@
 """Functions to find fields on the next step of plasma evolution."""
 import numpy as np
-import numba as nb
 
 import scipy.fftpack
 

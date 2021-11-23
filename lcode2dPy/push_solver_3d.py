@@ -1,10 +1,4 @@
-import numpy as np
-from numba import njit
 import time
-
-from lcode2dPy.beam3d import (
-    beam,
-)
 
 from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
 

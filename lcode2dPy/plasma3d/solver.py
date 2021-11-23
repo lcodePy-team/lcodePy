@@ -1,7 +1,4 @@
 """Module for calculator of one full step along xi."""
-import numpy as np
-import numba as nb
-
 from lcode2dPy.plasma3d.fields import FieldComputer
 from lcode2dPy.plasma3d.move import ParticleMover
 from lcode2dPy.plasma3d.rhoj import RhoJComputer
