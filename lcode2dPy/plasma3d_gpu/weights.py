@@ -1,12 +1,17 @@
 """Module for weights calculation, interpolation and deposition routines."""
-import numba as nb
-import numpy as np
+import numba as numba
+import numba.cuda
+
+import cupy as cp
 
 from math import sqrt, floor
 
+WARP_SIZE = 32
+
+
 # Deposition and interpolation helper functions #
 
-@nb.njit
+@numba.njit
 def weights(x, y, grid_steps, grid_step_size):
     """
     Calculate the indices of a cell corresponding to the coordinates,
@@ -52,7 +57,7 @@ def weights(x, y, grid_steps, grid_step_size):
     )
 
 
-@nb.njit
+@numba.jit
 def deposit25(a, i, j, val, 
         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
@@ -60,108 +65,110 @@ def deposit25(a, i, j, val,
         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
         w2M2M, w1M2M, w02M, w1P2M, w2P2M):
     """
-    Deposit value into a cell and 24 surrounding cells (using `weights` output).
+    Deposit value into a cell and 8 surrounding cells (using `weights` output).
     """
-    a[i - 2, j + 2] += val * w2M2P
-    a[i - 1, j + 2] += val * w1M2P
-    a[i + 0, j + 2] += val * w02P
-    a[i + 1, j + 2] += val * w1P2P
-    a[i + 2, j + 2] += val * w2P2P
-    a[i - 2, j + 1] += val * w2M1P
-    a[i - 1, j + 1] += val * w1M1P
-    a[i + 0, j + 1] += val * w01P
-    a[i + 1, j + 1] += val * w1P1P
-    a[i + 2, j + 1] += val * w2P1P
-    a[i - 2, j + 0] += val * w2M0
-    a[i - 1, j + 0] += val * w1M0
-    a[i + 0, j + 0] += val * w00
-    a[i + 1, j + 0] += val * w1P0
-    a[i + 2, j + 0] += val * w2P0
-    a[i - 2, j - 1] += val * w2M1M
-    a[i - 1, j - 1] += val * w1M1M
-    a[i + 0, j - 1] += val * w01M
-    a[i + 1, j - 1] += val * w1P1M
-    a[i + 2, j - 1] += val * w2P1M
-    a[i - 2, j - 2] += val * w2M2M
-    a[i - 1, j - 2] += val * w1M2M
-    a[i + 0, j - 2] += val * w02M
-    a[i + 1, j - 2] += val * w1P2M
-    a[i + 2, j - 2] += val * w2P2M
+    numba.cuda.atomic.add(a, (i - 2, j + 2), val * w2M2P)
+    numba.cuda.atomic.add(a, (i - 1, j + 2), val * w1M2P)
+    numba.cuda.atomic.add(a, (i + 0, j + 2), val * w02P)
+    numba.cuda.atomic.add(a, (i + 1, j + 2), val * w1P2P)
+    numba.cuda.atomic.add(a, (i + 2, j + 2), val * w2P2P)
+    numba.cuda.atomic.add(a, (i - 2, j + 1), val * w2M1P)
+    numba.cuda.atomic.add(a, (i - 1, j + 1), val * w1M1P)
+    numba.cuda.atomic.add(a, (i + 0, j + 1), val * w01P)
+    numba.cuda.atomic.add(a, (i + 1, j + 1), val * w1P1P)
+    numba.cuda.atomic.add(a, (i + 2, j + 1), val * w2P1P)
+    numba.cuda.atomic.add(a, (i - 2, j + 0), val * w2M0)
+    numba.cuda.atomic.add(a, (i - 1, j + 0), val * w1M0)
+    numba.cuda.atomic.add(a, (i + 0, j + 0), val * w00)
+    numba.cuda.atomic.add(a, (i + 1, j + 0), val * w1P0)
+    numba.cuda.atomic.add(a, (i + 2, j + 0), val * w2P0)
+    numba.cuda.atomic.add(a, (i - 2, j - 1), val * w2M1M)
+    numba.cuda.atomic.add(a, (i - 1, j - 1), val * w1M1M)
+    numba.cuda.atomic.add(a, (i + 0, j - 1), val * w01M)
+    numba.cuda.atomic.add(a, (i + 1, j - 1), val * w1P1M)
+    numba.cuda.atomic.add(a, (i + 2, j - 1), val * w2P1M)
+    numba.cuda.atomic.add(a, (i - 2, j - 2), val * w2M2M)
+    numba.cuda.atomic.add(a, (i - 1, j - 2), val * w1M2M)
+    numba.cuda.atomic.add(a, (i + 0, j - 2), val * w02M)
+    numba.cuda.atomic.add(a, (i + 1, j - 2), val * w1P2M)
+    numba.cuda.atomic.add(a, (i + 2, j - 2), val * w2P2M)
 
 
 # Deposition #
 
-@nb.njit(parallel=True)
+@numba.cuda.jit
 def deposit_kernel(grid_steps, grid_step_size,
                    x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
                    out_ro, out_jx, out_jy, out_jz):
     """
     Deposit plasma particles onto the charge density and current grids.
     """
-    for k in nb.prange(m.size):    
-        # Deposit the resulting fine particle on ro/j grids.
-        gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
-        dro = q[k] / (1 - pz[k] / gamma_m)
-        djx = px[k] * (dro / gamma_m)
-        djy = py[k] * (dro / gamma_m)
-        djz = pz[k] * (dro / gamma_m)
+    k = numba.cuda.grid(1)
+    if k >= m.size:
+        return   
+    
+    # Deposit the resulting fine particle on ro/j grids.
+    gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
+    dro = q[k] / (1 - pz[k] / gamma_m)
+    djx = px[k] * (dro / gamma_m)
+    djy = py[k] * (dro / gamma_m)
+    djz = pz[k] * (dro / gamma_m)
 
-        x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
-        (i, j, 
-         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-         w2M0,  w1M0,  w00,  w1P0,  w2P0,
-         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-         w2M2M, w1M2M, w02M, w1P2M, w2P2M
-        ) = weights(
-            x, y, grid_steps, grid_step_size
-        )
-        
-        deposit25(out_ro, i, j, dro,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jx, i, j, djx,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jy, i, j, djy,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jz, i, j, djz, 
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+    x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
+    (i, j, 
+        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+        w2M0,  w1M0,  w00,  w1P0,  w2P0,
+        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+        w2M2M, w1M2M, w02M, w1P2M, w2P2M
+    ) = weights(
+        x, y, grid_steps, grid_step_size
+    )
+    
+    deposit25(out_ro, i, j, dro,
+                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+    deposit25(out_jx, i, j, djx,
+                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+    deposit25(out_jy, i, j, djy,
+                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+    deposit25(out_jz, i, j, djz, 
+                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
+                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
+                w2M0,  w1M0,  w00,  w1P0,  w2P0,
+                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
+                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
 
 
-
-@nb.njit
 def deposit(grid_steps, grid_step_size,
             x_init, y_init, x_offt, y_offt, px, py, pz, q, m):
     """
     Deposit plasma particles onto the charge density and current grids.
     This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
     """   
-    ro = np.zeros((grid_steps, grid_steps))
-    jx = np.zeros((grid_steps, grid_steps))
-    jy = np.zeros((grid_steps, grid_steps))
-    jz = np.zeros((grid_steps, grid_steps))
+    ro = cp.zeros((grid_steps, grid_steps))
+    jx = cp.zeros((grid_steps, grid_steps))
+    jy = cp.zeros((grid_steps, grid_steps))
+    jz = cp.zeros((grid_steps, grid_steps))
 
-    deposit_kernel(grid_steps, grid_step_size,
-                   x_init.ravel(), y_init.ravel(),
-                   x_offt.ravel(), y_offt.ravel(),
-                   m.ravel(), q.ravel(),
-                   px.ravel(), py.ravel(), pz.ravel(),
-                   ro, jx, jy, jz)
+    cfg = int(cp.ceil(m.size / WARP_SIZE)), WARP_SIZE
+    deposit_kernel[cfg](grid_steps, grid_step_size,
+                        x_init.ravel(), y_init.ravel(),
+                        x_offt.ravel(), y_offt.ravel(),
+                        m.ravel(), q.ravel(),
+                        px.ravel(), py.ravel(), pz.ravel(),
+                        ro, jx, jy, jz)
 
     return ro, jx, jy, jz
 

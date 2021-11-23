@@ -1,8 +1,9 @@
 """Module for plasma (3d solver) initialization routines."""
 import numpy as np
+import cupy as cp
 
-from lcode2dPy.plasma3d.data import Fields, Particles, Currents, Const_Arrays
-from lcode2dPy.plasma3d.weights import initial_deposition
+from lcode2dPy.plasma3d_gpu.data import GPUArrays
+from lcode2dPy.plasma3d_gpu.weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -132,19 +133,16 @@ def init_plasma(config):
     plasma_fineness       = config.getint('plasma-fineness')
     solver_trick          = config.getint('field-solver-subtraction-trick')
 
-    # for convenient diagnostics, a cell should be in the center of the grid 
+    # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
-    
+
     # particles should not reach the window pre-boundary cells
     assert reflect_padding_steps > 2
-    
+
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,
                     grid_step_size,
                     fineness=plasma_fineness)
-
-    def zeros():
-        return np.zeros((grid_steps, grid_steps), dtype=np.float64)
 
     ro_initial = initial_deposition(grid_steps, grid_step_size,
                                     x_init, y_init, x_offt, y_offt,
@@ -153,9 +151,24 @@ def init_plasma(config):
     mix_matrix = mixed_matrix(grid_steps, grid_step_size, solver_trick)
     neu_matrix = neumann_matrix(grid_steps, grid_step_size)
 
-    fields = Fields(grid_steps)
-    particles = Particles(x_init, y_init, x_offt, y_offt, px, py, pz, q, m)
-    currents = Currents(zeros(), zeros(), zeros(), zeros())
-    const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix, neu_matrix)
+    const_arrays = GPUArrays(ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
+                             field_mixed_matrix=mix_matrix,
+                             neumann_matrix=neu_matrix)
+
+    def zeros():
+        return cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
+
+    fields = GPUArrays(Ex=zeros(), Ey=zeros(), Ez=zeros(),
+                       Bx=zeros(), By=zeros(), Bz=zeros())
+
+    particles = GPUArrays(x_init=x_init, y_init=y_init,
+                          x_offt=x_offt, y_offt=y_offt,
+                          px=px, py=py, pz=pz, q=q, m=m)
+
+    currents = GPUArrays(ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
+
+    const_arrays = GPUArrays(ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
+                             field_mixed_matrix=mix_matrix,
+                             neumann_matrix=neu_matrix)
 
     return fields, particles, currents, const_arrays
