@@ -1,6 +1,8 @@
 import time
+import cupy as cp
 
-from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
+from lcode2dPy.plasma3d_gpu.data import GPUArraysView
+from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
 
 
 class PushAndSolver3d:
@@ -16,27 +18,31 @@ class PushAndSolver3d:
                 beam_source, beam_calculator):
 
         beam_calculator.start_time_step()
-        
-        for xi_i in range(self.xi_steps + 1):
-            beam_ro = beam_calculator.layout_beam()
 
-            prev_pl_fields = pl_fields.copy()
+        gpu_index = 0
+        with cp.cuda.Device(gpu_index):
+            for xi_i in range(self.xi_steps + 1):
+                beam_ro = beam_calculator.layout_beam()
 
-            time1 = time.time()            
-            pl_particles, pl_fields, pl_currents = self.pl_solver.step_dxi(
-                pl_particles, pl_fields, pl_currents, pl_const_arrays, beam_ro)
-            time2 = time.time()
+                prev_pl_fields = pl_fields.copy()
 
-            print(f"Plasma solver done in {time2-time1:+.4f} s.", end='\t')
+                # time1 = time.time()            
+                pl_particles, pl_fields, pl_currents = self.pl_solver.step_dxi(
+                    pl_particles, pl_fields, pl_currents, pl_const_arrays, beam_ro)
+                # time2 = time.time()
 
-            time1 = time.time()
-            beam_calculator.move_beam(pl_fields, prev_pl_fields)
-            time2 = time.time()
+                # print(f"Plasma solver done in {time2-time1:+.4f} s.", end='\t')
 
-            print(f"Beam pusher done in {time2-time1:+.4f} s.")
+                # time1 = time.time()
+                beam_calculator.move_beam(pl_fields, prev_pl_fields)
+                # beam_calculator.xi_layer += 1
+                # time2 = time.time()
 
-            Ez_00 = pl_fields.E_z[self.grid_steps//2, self.grid_steps//2]
+                # print(f"Beam pusher done in {time2-time1:+.4f} s.")
+                
+                view_pl_fields = GPUArraysView(pl_fields)
+                Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
-            print(f'xi={xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
+                print(f'xi={xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
 
         beam_calculator.stop_time_step()
