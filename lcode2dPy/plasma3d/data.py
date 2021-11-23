@@ -1,7 +1,6 @@
 """Module for setting classes for Fields, Currents and Partciles data types."""
 import numpy as np
-from numba import float64
-from numba.experimental import jitclass
+from numba import float64, jitclass
 
 _float_array = float64[:, :]
 
