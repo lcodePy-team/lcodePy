@@ -1,5 +1,8 @@
 import time
+import numpy as np
 import cupy as cp
+
+import os
 
 from lcode2dPy.plasma3d_gpu.data import GPUArraysView
 from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
@@ -14,10 +17,16 @@ class PushAndSolver3d:
         self.xi_steps = int(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
+        self.time_step_i = 0
+        self.time_step_size = config.getfloat('time-step')
+
     def step_dt(self, pl_fields, pl_particles, pl_currents, pl_const_arrays,
                 beam_source, beam_calculator):
 
         beam_calculator.start_time_step()
+
+        Ez_00_arr = []
+        xi_arr = []
 
         gpu_index = 0
         with cp.cuda.Device(gpu_index):
@@ -35,14 +44,23 @@ class PushAndSolver3d:
 
                 # time1 = time.time()
                 beam_calculator.move_beam(pl_fields, prev_pl_fields)
-                # beam_calculator.xi_layer += 1
                 # time2 = time.time()
 
                 # print(f"Beam pusher done in {time2-time1:+.4f} s.")
                 
                 view_pl_fields = GPUArraysView(pl_fields)
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
+                Ez_00_arr.append(Ez_00)
+                xi_arr.append(-xi_i * self.xi_step_size)
 
                 print(f'xi={xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
 
         beam_calculator.stop_time_step()
+
+        self.time_step_i += 1
+
+        if not os.path.isdir('xi_Ez'):
+            os.mkdir('xi_Ez')
+        np.savez(f'''./xi_Ez/xi_Ez_{(self.time_step_i *
+                                     self.time_step_size):+09.2f}.npz''',
+                                     xi=xi_arr, Ez_00=Ez_00_arr)
