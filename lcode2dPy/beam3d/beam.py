@@ -1,6 +1,8 @@
 import numpy as np
 import numba as nb
 
+from math import floor, sqrt
+
 # from numba import int64, float64
 # from numba.experimental import jitclass
 
@@ -18,7 +20,6 @@ import numba as nb
 #     ('pz', _float_array),
 #     ('q_m', _float_array),
 #     ('q_norm', _float_array),
-
 #     ('id', _int_array),
 #     ('dt', _float_array),
 #     ('remaining_steps', _int_array)
@@ -30,17 +31,18 @@ class BeamParticles:
     def __init__(self, size):
         self.length = 0
         self.size = size
-        self.xi = np.zeros(size)
-        self.x = np.zeros(size)
-        self.y = np.zeros(size)
-        self.px = np.zeros(size)
-        self.py = np.zeros(size)
-        self.pz = np.zeros(size)
-        self.q_m = np.zeros(size)
-        self.q_norm = np.zeros(size)
-        self.id = np.zeros(size, dtype=np.int64)
-        self.dt = np.zeros(size)
-        self.remaining_steps = np.zeros(size, dtype=np.int_)
+        self.xi = np.zeros(size,     dtype=np.float64)
+        self.x = np.zeros(size,      dtype=np.float64)
+        self.y = np.zeros(size,      dtype=np.float64)
+        self.px = np.zeros(size,     dtype=np.float64)
+        self.py = np.zeros(size,     dtype=np.float64)
+        self.pz = np.zeros(size,     dtype=np.float64)
+        self.q_m = np.zeros(size,    dtype=np.float64)
+        self.q_norm = np.zeros(size, dtype=np.float64)
+        self.id = np.zeros(size,     dtype=np.int64)
+        self.dt = np.zeros(size,     dtype=np.float64)
+        self.remaining_steps = np.zeros(size,
+                                     dtype=np.int64)
 
     def load(self, *args, **kwargs):
         with np.load(*args, **kwargs) as loaded:
@@ -54,8 +56,9 @@ class BeamParticles:
             self.q_m = loaded['q_m']
             self.q_norm = loaded['q_norm']
             self.id = loaded['id']
-            self.dt = np.zeros(self.size)
-            self.remaining_steps = np.zeros(self.size)
+            self.dt = np.zeros(self.size, dtype=np.float64)
+            self.remaining_steps = np.zeros(self.size,
+                                          dtype=np.int64)
 
     def save(self, *args, **kwargs):
         np.savez_compressed(*args, **kwargs, 
@@ -143,31 +146,30 @@ def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev 
 
 
 @nb.njit
-def single_particle_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev - xi)/D_XIP
+def weights(x, y, xi_loc, grid_steps, grid_step_size):
+    """
+    """
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
-    i = int(np.floor(x_h) + grid_steps // 2)
-    j = int(np.floor(y_h) + grid_steps // 2)
-    dx, dy = x_h - np.floor(x_h) - .5, y_h - np.floor(y_h) - .5
+    i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
+    x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
+    # xi_loc = dxi = (xi_prev - xi) / D_XIP
 
-    a0_xi = dxi
-    a1_xi = (1 - dxi)
-    a0_x = dx
-    a1_x = (1 - dx)
-    a0_y = dy
-    a1_y = (1 - dy)
+    wxi0 = xi_loc
+    wxiP = (1 - xi_loc)
+    wx0 = x_loc
+    wxP = (1 - x_loc)
+    wy0 = y_loc
+    wyP = (1 - y_loc)
 
-    a000 = a0_xi * a0_x * a0_y
-    a001 = a0_xi * a0_x * a1_y
-    a010 = a0_xi * a1_x * a0_y
-    a011 = a0_xi * a1_x * a1_y
-    a100 = a1_xi * a0_x * a0_y
-    a101 = a1_xi * a0_x * a1_y
-    a110 = a1_xi * a1_x * a0_y
-    a111 = a1_xi * a1_x * a1_y
+    w000, w00P = wxi0 * wx0 * wy0, wxi0 * wx0 * wyP
+    w0P0, w0PP = wxi0 * wxP * wy0, wxi0 * wxP * wyP
+    wP00, wP0P = wxiP * wx0 * wy0, wxiP * wx0 * wyP
+    wPP0, wPPP = wxiP * wxP * wy0, wxiP * wxP * wyP
 
-    return i, j, a000, a001, a010, a011, a100, a101, a110, a111
+    return i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP
 
 # TODO: we have similar functions for GPU in lcode3d code
+
 
 @nb.njit
 def deposit_particles(value, out0, out1, i, j, a000, a001, a010, a011,
@@ -183,41 +185,47 @@ def deposit_particles(value, out0, out1, i, j, a000, a001, a010, a011,
 
 
 @nb.njit
-def interpolate_particle(value0, value1, i, j, a000, a001, a010, a011,
-                                               a100, a101, a110, a111):
+def interp(value_0, value_1, i, j,
+                w000, w00P, w0P0, w0PP,
+                wP00, wP0P, wPP0, wPPP):
+    """
+    Collect value from a cell and surrounding cells (using `weights` output).
+    """
     return (
-        a000 * value0[i + 0, j + 0] +
-        a001 * value0[i + 0, j + 1] +
-        a010 * value0[i + 1, j + 0] +
-        a011 * value0[i + 1, j + 1] +
-        a100 * value1[i + 0, j + 0] +
-        a101 * value1[i + 0, j + 1] +
-        a110 * value1[i + 1, j + 0] +
-        a111 * value1[i + 1, j + 1]
+        w000 * value_0[i + 0, j + 0] +
+        w00P * value_0[i + 0, j + 1] +
+        w0P0 * value_0[i + 1, j + 0] +
+        w0PP * value_0[i + 1, j + 1] +
+        wP00 * value_1[i + 0, j + 0] +
+        wP0P * value_1[i + 0, j + 1] +
+        wPP0 * value_1[i + 1, j + 0] +
+        wPPP * value_1[i + 1, j + 1]
     )
 
 
 @nb.njit
 def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
-                    fields_k_1, fields_k):
-    dxi = (xi_k - xi) / xi_step_size
+                    Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
+                    Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
+    xi_loc = (xi_k - xi) / xi_step_size
 
-    i, j, a000, a001, a010, a011, a100, a101, a110, a111 =\
-        single_particle_weights(x, y, dxi, grid_steps, grid_step_size)
+    i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = weights(
+        x, y, xi_loc, grid_steps, grid_step_size
+    )
 
-    Ex = interpolate_particle(fields_k.Ex, fields_k_1.Ex, i, j, 
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-    Ey = interpolate_particle(fields_k.Ey, fields_k_1.Ey, i, j,
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-    Ez = interpolate_particle(fields_k.Ez, fields_k_1.Ez, i, j,
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-    Bx = interpolate_particle(fields_k.Bx, fields_k_1.Bx, i, j,
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-    By = interpolate_particle(fields_k.By, fields_k_1.By, i, j,
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-    Bz = interpolate_particle(fields_k.Bz, fields_k_1.Bz, i, j,
-                               a000, a001, a010, a011, a100, a101, a110, a111)
-                               
+    Ex = interp(Ex_k, Ex_k_1, i, j, 
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Ey = interp(Ey_k, Ey_k_1, i, j,
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Ez = interp(Ez_k, Ez_k_1, i, j,
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Bx = interp(Bx_k, Bx_k_1, i, j,
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    By = interp(By_k, By_k_1, i, j,
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Bz = interp(Bz_k, Bz_k_1, i, j,
+                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+
     return Ex, Ey, Ez, Bx, By, Bz
 
 
@@ -245,85 +253,117 @@ def is_lost(x, y, r_max):
     # return abs(x) >= walls_width or abs(y) >= walls_width
 
 
+@nb.njit
+def sign(x):
+    return -1 if x < 0 else 1 if x > 0 else 0
+
+
 # Moves one particle as far as possible on current xi layer
 
-@nb.njit
-def try_move_particle(beam_q_m, beam_dt, beam_remaining_steps,
-                      beam_x, beam_y, beam_xi, beam_px, beam_py, beam_pz,
-                      beam_id,
-                      idx, fields_k_1, fields_k, max_radius, grid_steps,
-                      r_step, xi_step_size, xi_layer):
+@nb.njit #(parallel=True)
+def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
+                          xi_layer, max_radius,
+                          q_m_, dt_, remaining_steps,
+                          x, y, xi, px, py, pz, id,
+                          Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
+                          Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
+    """
+    Moves one particle as far as possible on current xi layer.
+    """
     xi_k = xi_layer * -xi_step_size  # xi_{k}
     xi_k_1 = (xi_layer + 1) * -xi_step_size  # xi_{k+1}
-    q_m: float = beam_q_m[idx]
-    dt: float = beam_dt[idx]
-    while beam_remaining_steps[idx] > 0:
-        # Initial impulse and position vectors
-        opx, opy, opz = beam_px[idx], beam_py[idx], beam_pz[idx]
-        ox, oy, oxi = beam_x[idx], beam_y[idx], beam_xi[idx]
+    
+    for k in nb.prange(len(id)):
+        q_m = q_m_[k]; dt = dt_[k]
 
-        # Compute approximate position of the particle in the middle of the step
-        gamma_m: float = np.sqrt((1 / q_m) ** 2 + opx ** 2 + opy ** 2 + opz ** 2)
+        while remaining_steps[k] > 0:
+            # Initial impulse and position vectors
+            opx, opy, opz = px[k], py[k], pz[k]
+            ox, oy, oxi = x[k], y[k], xi[k]
 
-        x_halfstep  = ox  + dt / 2 * (opx / gamma_m)
-        y_halfstep  = oy  + dt / 2 * (opy / gamma_m)
-        xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
-        # Add time shift correction (dxi = (v_z - c)*dt)
+            # Compute approximate position of the particle in the middle of the step
+            gamma_m = sqrt((1 / q_m) ** 2 + opx ** 2 + opy ** 2 + opz ** 2)
 
-        if not_in_layer(xi_halfstep, xi_k_1):
-            # beam_x[idx]  = x_halfstep
-            # beam_y[idx]  = y_halfstep
-            # beam_xi[idx] = xi_halfstep
-            return
+            x_halfstep  = ox  + dt / 2 * (opx / gamma_m)
+            y_halfstep  = oy  + dt / 2 * (opy / gamma_m)
+            xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
+            # Add time shift correction (dxi = (v_z - c)*dt)
 
-        if is_lost(x_halfstep, y_halfstep, max(0.9 * max_radius, max_radius - 1)):
-            beam_id[idx] *= -1  # Particle hit the wall and is now lost
-            # beam_x[idx]  = x_halfstep
-            # beam_y[idx]  = y_halfstep
-            # beam_xi[idx] = xi_halfstep
-            beam_remaining_steps[idx] = 0
-            return
+            if not_in_layer(xi_halfstep, xi_k_1):
+                # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+                break
 
-        # Interpolate fields and compute new impulse
-        Ex, Ey, Ez, Bx, By, Bz = particle_fields(x_halfstep, y_halfstep, xi_halfstep,
-                                       grid_steps, r_step,
-                                       xi_step_size, xi_k,
-                                       fields_k_1, fields_k)
-        
-        vx, vy, vz = opx / gamma_m, opy / gamma_m, opz / gamma_m
-        px_halfstep = (opx + np.sign(q_m) * dt / 2 * (Ex + vy * Bz - vz * By))
-        py_halfstep = (opy + np.sign(q_m) * dt / 2 * (Ey + vz * Bx - vx * Bz))
-        pz_halfstep = (opz + np.sign(q_m) * dt / 2 * (Ez + vx * By - vy * Bx))
+            if is_lost(x_halfstep, y_halfstep, max(0.9 * max_radius, max_radius - 1)):
+                # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+                id[k] *= -1  # Particle hit the wall and is now lost
+                remaining_steps[k] = 0
+                break
 
-        # Compute final coordinates and impulses
-        gamma_m: float = np.sqrt((1 / q_m) ** 2
-                                 + px_halfstep ** 2 + py_halfstep ** 2 + pz_halfstep ** 2)
+            # Interpolate fields and compute new impulse
+            (Ex, Ey, Ez,
+            Bx, By, Bz) = particle_fields(x_halfstep, y_halfstep, xi_halfstep,
+                                                    grid_steps, grid_step_size,
+                                                    xi_step_size, xi_k,
+                                                    Ex_k_1, Ey_k_1, Ez_k_1,
+                                                    Bx_k_1, By_k_1, Bz_k_1,
+                                                    Ex_k, Ey_k, Ez_k,
+                                                    Bx_k, By_k, Bz_k)
 
-        x_fullstep  = ox  + dt * (px_halfstep / gamma_m)
-        y_fullstep  = oy  + dt * (py_halfstep / gamma_m)
-        xi_fullstep = oxi + dt * (pz_halfstep / gamma_m - 1)
+            # Compute new impulse
+            vx, vy, vz = opx / gamma_m, opy / gamma_m, opz / gamma_m
+            px_halfstep = (opx + sign(q_m) * dt / 2 * (Ex + vy * Bz - vz * By))
+            py_halfstep = (opy + sign(q_m) * dt / 2 * (Ey + vz * Bx - vx * Bz))
+            pz_halfstep = (opz + sign(q_m) * dt / 2 * (Ez + vx * By - vy * Bx))
 
-        px_fullstep = 2 * px_halfstep - opx
-        py_fullstep = 2 * py_halfstep - opy
-        pz_fullstep = 2 * pz_halfstep - opz
+            # Compute final coordinates and impulses
+            gamma_m = sqrt((1 / q_m) ** 2
+                        + px_halfstep ** 2 + py_halfstep ** 2 + pz_halfstep ** 2)
 
-        beam_x[idx]  = x_fullstep
-        beam_y[idx]  = y_fullstep
-        beam_xi[idx] = xi_fullstep
-        beam_px[idx] = px_fullstep
-        beam_py[idx] = py_fullstep
-        beam_pz[idx] = pz_fullstep
-  
-        # TODO: Do we need to add it here?
-        # if not_in_layer(xi_halfstep, xi_k_1):
-        #     return
+            x[k]  = ox  + dt * (px_halfstep / gamma_m)      #  x fullstep
+            y[k]  = oy  + dt * (py_halfstep / gamma_m)      #  y fullstep
+            xi[k] = oxi + dt * (pz_halfstep / gamma_m - 1)  # xi fullstep
 
-        if is_lost(x_fullstep, y_fullstep, max(0.9 * max_radius, max_radius - 1)):
-            beam_id[idx] *= -1  # Particle hit the wall and is now lost
-            beam_remaining_steps[idx] = 0
-            return
+            px[k] = 2 * px_halfstep - opx                   # px fullstep
+            py[k] = 2 * py_halfstep - opy                   # py fullstep
+            pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
 
-        beam_remaining_steps[idx] -= 1
+            # TODO: Do we need to add it here?
+            # if not_in_layer(xi_halfstep, xi_k_1):
+            #     continue
+
+            if is_lost(x[k], y[k], max(0.9 * max_radius, max_radius - 1)):
+                id[k] *= -1  # Particle hit the wall and is now lost
+                remaining_steps[k] = 0
+                break
+
+            remaining_steps[k] -= 1
+
+
+def move_particles(grid_steps, grid_step_size, xi_step_size,
+                   idxes, xi_layer, max_radius,
+                   beam, fields_k_1, fields_k):
+    """
+    This is a convenience wrapper around the `move_particles_kernel` CUDA kernel.
+    """
+    x_new,  y_new,  xi_new = beam.x[idxes],  beam.y[idxes],  beam.xi[idxes]
+    px_new, py_new, pz_new = beam.px[idxes], beam.py[idxes], beam.pz[idxes]
+    id_new, remaining_steps_new = beam.id[idxes], beam.remaining_steps[idxes]
+
+    move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
+                          xi_layer, max_radius,
+                          beam.q_m[idxes], beam.dt[idxes],
+                          remaining_steps_new,
+                          x_new, y_new, xi_new,
+                          px_new, py_new, pz_new,
+                          id_new,
+                          fields_k_1.Ex, fields_k_1.Ey, fields_k_1.Ez,
+                          fields_k_1.Bx, fields_k_1.By, fields_k_1.Bz,
+                          fields_k.Ex, fields_k.Ey, fields_k.Ez,
+                          fields_k.Bx, fields_k.By, fields_k.Bz)
+
+    beam.x[idxes],  beam.y[idxes],  beam.xi[idxes] = x_new,  y_new,  xi_new
+    beam.px[idxes], beam.py[idxes], beam.pz[idxes] = px_new, py_new, pz_new
+    beam.id[idxes], beam.remaining_steps[idxes] = id_new, remaining_steps_new
 
 
 class BeamCalculator:
@@ -351,7 +391,7 @@ class BeamCalculator:
         # Does it find all particles that lay in the layer?
         # Doesn't look like this. Check it.
         arr_to_search = -self.beam.xi[self.layout_count:]
-        if arr_to_search.size != 0:
+        if len(arr_to_search) != 0:
             end = np.argmax(arr_to_search > -xi_2)
         else:
             end = 0
@@ -402,19 +442,15 @@ class BeamCalculator:
 
     def move_beam(self, fields_k_1, fields_k):
         self.start_moving_layer()
+
         idxes: np.ndarray = np.arange(self.stable_count, self.touched_count)[
             self.beam.id[self.stable_count:self.touched_count] > 0]
-        
-        for i in idxes:
-            try_move_particle(self.beam.q_m, self.beam.dt,
-                              self.beam.remaining_steps,
-                              self.beam.x, self.beam.y, self.beam.xi,
-                              self.beam.px, self.beam.py, self.beam.pz,
-                              self.beam.id,
-                              i, fields_k_1, fields_k,
-                              self.max_radius, self.grid_steps,
-                              self.grid_step_size, self.xi_step_size,
-                              self.xi_layer)
+        if len(idxes) != 0:
+            move_particles(self.grid_steps, self.grid_step_size,
+                           self.xi_step_size, idxes, self.xi_layer,
+                           self.max_radius,
+                           self.beam, fields_k_1, fields_k)
+
         self.stop_moving_layer()
         self.xi_layer += 1
 
@@ -425,7 +461,7 @@ class BeamCalculator:
         # Does it find all particles that lay in the layer?
         # Doesn't look like this. Check it.
         arr_to_search = -self.beam.xi[self.touched_count:self.layout_count]
-        if arr_to_search.size != 0:
+        if len(arr_to_search) != 0:
             end = np.argmax(arr_to_search > -xi_1)
         else:
             end = 0
