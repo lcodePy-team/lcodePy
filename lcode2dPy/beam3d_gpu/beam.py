@@ -335,8 +335,10 @@ class BeamCalculator:
         # Doesn't look like this. Check it.
 
         arr_to_search = -self.beam.xi[self.layout_count:]
-        # end = cp.searchsorted(arr_to_search, cp.asarray(-xi_2))
-        end = cp.argmax(arr_to_search > cp.asarray(-xi_2))
+        if arr_to_search.size != 0:
+            end = cp.argmax(arr_to_search > cp.asarray(-xi_2))
+        else:
+            end = 0
 
         return self.layout_count, end + self.layout_count, xi_1, xi_2
 
@@ -403,7 +405,10 @@ class BeamCalculator:
         # Does it find all particles that lay in the layer?
         # Doesn't look like this. Check it.
         arr_to_search = -self.beam.xi[self.touched_count:self.layout_count]
-        end = cp.argmax(arr_to_search > cp.asarray(-xi_1))
+        if arr_to_search.size != 0:
+            end = cp.argmax(arr_to_search > cp.asarray(-xi_1))
+        else:
+            end = 0
 
         return self.touched_count, end + self.touched_count, xi, xi_1
 
