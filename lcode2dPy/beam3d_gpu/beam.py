@@ -135,8 +135,8 @@ def beam_substepping_step(q_m, pz, substepping_energy):
 
 
 @numba.njit
-def in_layer(xi, xi_k_1):
-    return xi_k_1 <= xi
+def not_in_layer(xi, xi_k_1):
+    return xi_k_1 > xi
 
 
 @numba.njit
@@ -228,12 +228,14 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
         # Add time shift correction (dxi = (v_z - c)*dt)
 
-        if not in_layer(xi_halfstep, xi_k_1):
-            # TODO: Particle parameters doesn't get updated!
+        if not_in_layer(xi_halfstep, xi_k_1):
+            x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
             return
+
         if is_lost(x_halfstep, y_halfstep, max(0.9 * max_radius, max_radius - 1)):
             x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
             id[k] *= -1  # Particle hit the wall and is now lost
+            remaining_steps[k] = 0
             return
 
         # Interpolate fields and compute new impulse
@@ -264,16 +266,16 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         py[k] = 2 * py_halfstep - opy                   # py fullstep
         pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
 
-        remaining_steps[k] -= 1
-
         # TODO: Do we need to add it here?
-        # if not in_layer(xi_halfstep, xi_k_1):
-        #     # TODO: Particle parameters doesn't get updated!
-        #     break
+        if not_in_layer(xi_halfstep, xi_k_1):
+            return
+
         if is_lost(x[k], y[k], max(0.9 * max_radius, max_radius - 1)):
             id[k] *= -1  # Particle hit the wall and is now lost
+            remaining_steps[k] = 0
             return
-            # beam_remaining_steps[idx] = 0 # Doesn't make anything better, I suppose.
+
+        remaining_steps[k] -= 1
 
 
 def move_particles(grid_steps, grid_step_size, xi_step_size,

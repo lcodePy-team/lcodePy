@@ -109,13 +109,12 @@ class BeamParticles:
 
 # Functions like in weights.py in lcode2dPy
 
-
 @nb.njit
 def add_at_numba(out, idx_x, idx_y, value):
     for i in np.arange(len(idx_x)):
         out[idx_x[i], idx_y[i]] += value[i]
 
-# TODO: get rid of these two quite simple functions
+# TODO: get rid of this quite simple function.
 
 @nb.njit
 def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev - xi)/D_XIP
@@ -236,8 +235,8 @@ def beam_substepping_step(q_m, pz, substepping_energy):
 
 
 @nb.njit
-def in_layer(xi, xi_k_1):
-    return xi_k_1 <= xi
+def not_in_layer(xi, xi_k_1):
+    return xi_k_1 > xi
 
 
 @nb.njit
@@ -258,7 +257,7 @@ def try_move_particle(beam_q_m, beam_dt, beam_remaining_steps,
     xi_k_1 = (xi_layer + 1) * -xi_step_size  # xi_{k+1}
     q_m: float = beam_q_m[idx]
     dt: float = beam_dt[idx]
-    while beam_remaining_steps[idx] > 0 and beam_id[idx] > 0:
+    while beam_remaining_steps[idx] > 0:
         # Initial impulse and position vectors
         opx, opy, opz = beam_px[idx], beam_py[idx], beam_pz[idx]
         ox, oy, oxi = beam_x[idx], beam_y[idx], beam_xi[idx]
@@ -271,13 +270,15 @@ def try_move_particle(beam_q_m, beam_dt, beam_remaining_steps,
         xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
         # Add time shift correction (dxi = (v_z - c)*dt)
 
-        if not in_layer(xi_halfstep, xi_k_1):
+        if not_in_layer(xi_halfstep, xi_k_1):
             return
+
         if is_lost(x_halfstep, y_halfstep, max(0.9 * max_radius, max_radius - 1)):
             beam_id[idx] *= -1  # Particle hit the wall and is now lost
             beam_x[idx]  = x_halfstep
             beam_y[idx]  = y_halfstep
             beam_xi[idx] = xi_halfstep
+            beam_remaining_steps[idx] = 0
             return
 
         # Interpolate fields and compute new impulse
@@ -309,11 +310,17 @@ def try_move_particle(beam_q_m, beam_dt, beam_remaining_steps,
         beam_px[idx] = px_fullstep
         beam_py[idx] = py_fullstep
         beam_pz[idx] = pz_fullstep
-        beam_remaining_steps[idx] -= 1
+  
+        # TODO: Do we need to add it here?
+        if not_in_layer(xi_halfstep, xi_k_1):
+            return
+
         if is_lost(x_fullstep, y_fullstep, max(0.9 * max_radius, max_radius - 1)):
             beam_id[idx] *= -1  # Particle hit the wall and is now lost
+            beam_remaining_steps[idx] = 0
             return
-            # beam_remaining_steps[idx] = 0 # Doesn't make anything better, I suppose.
+
+        beam_remaining_steps[idx] -= 1
 
 
 class BeamCalculator:
