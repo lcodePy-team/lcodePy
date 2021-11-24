@@ -64,6 +64,9 @@ lost_particle_dtype = np.dtype([('time', 'f8'), ('xi', 'f8'), ('r', 'f8'), ('p_z
 class MemoryBeamSource(BeamSource):
     def __init__(self, beam_slice: BeamSlice):
         self._beam_slice = beam_slice
+        self._used_count = 0
+        if beam_slice.particles.size == 0:
+            return
         sorted_idxes = np.argsort(-self._beam_slice.xi)
         self._beam_slice.particles = self._beam_slice.particles[sorted_idxes]
         # Remove stub particle for compatibility (xi = -100000)
@@ -71,7 +74,7 @@ class MemoryBeamSource(BeamSource):
             self._beam_slice.particles = self._beam_slice.particles[:-1]
         self._beam_slice.dt.fill(0.0)
         self._beam_slice.remaining_steps.fill(1.0)
-        self._used_count = 0
+        
 
     def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
         assert xi_min < xi_max
@@ -109,7 +112,7 @@ class MemoryBeamDrain(BeamDrain):
             self._beam_buffer_lost.append(beam_slice)
 
     def beam_slice(self):
-        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer])
+        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
 
 
 class DebugSource(BeamSource):
