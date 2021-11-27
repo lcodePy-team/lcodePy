@@ -28,13 +28,13 @@ particle_dtype = np.dtype(
 # @nb.njit
 def split_beam_slice(beam_slice, xi_end):
     lost_slice = BeamSlice(0)
-    lost_sorted_idxes = np.argsort(beam_slice.lost)
-    beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
-    beam_slice.dt = beam_slice.dt[lost_sorted_idxes]
-    beam_slice.remaining_steps = beam_slice.remaining_steps[lost_sorted_idxes]
-    beam_slice.lost = beam_slice.lost[lost_sorted_idxes]
-    lost_slice = beam_slice.get_subslice(beam_slice.nlost, beam_slice.size)
-    beam_slice = beam_slice.get_subslice(0, beam_slice.nlost)
+    # lost_sorted_idxes = np.argsort(beam_slice.lost)
+    # beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
+    # beam_slice.dt = beam_slice.dt[lost_sorted_idxes]
+    # beam_slice.remaining_steps = beam_slice.remaining_steps[lost_sorted_idxes]
+    # beam_slice.lost = beam_slice.lost[lost_sorted_idxes]
+    # lost_slice = beam_slice.get_subslice(0, beam_slice.nlost)
+    # beam_slice = beam_slice.get_subslice(beam_slice.nlost, beam_slice.size)
     
 
     moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
