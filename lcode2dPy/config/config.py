@@ -11,7 +11,7 @@ class Config:
         self.config_values = {}
 
     def get(self, option_name: str, fallback: str = '') -> str:
-        self.update_config_values(option_name)
+        self.adjust_config_values(option_name)
 
         if option_name in self.config_values:
             return self.config_values.get(option_name)
@@ -55,27 +55,27 @@ class Config:
 
         return cfg
 
-    def update_config_values(self, option_name: str):
+    def adjust_config_values(self, option_name: str):
         """
-        Updates config values in 3d.
+        Adjusts config values in 3d.
         Required for compatibility of 2d and 3d codes.
         """
         if (option_name == 'window-width-steps' and
             self.get('geometry') == '3d'):
             # Goes here every time Config.get('window-width-steps') is
-            # called in 3d to update window-width and window-width-steps.
-            self.update_window_width_and_steps_3d()
+            # called in 3d to adjust window-width and window-width-steps.
+            self.adjust_window_width_and_steps_3d()
 
         if (option_name == 'plasma-fineness' and
             self.get('geometry') == '3d'):
             # Goes here every time Config.get('plasma-fineness') is called
-            # in 3d to update it according to 'plasma-particles-per-cell'.
-            self.update_plasma_fineness()
+            # in 3d to adjust it according to 'plasma-particles-per-cell'.
+            self.adjust_plasma_fineness()
 
-    def update_window_width_and_steps_3d(self):
+    def adjust_window_width_and_steps_3d(self):
         """
         Calculates the optimal number for window-width-steps and uses
-        it to update window-width and window-width-steps in case of 3d.
+        it to adjust window-width and window-width-steps in case of 3d.
         """
         # 0. Calculates an estimation of 'window-width-steps' value.
         estim = int(self.getfloat('window-width') /
@@ -89,16 +89,16 @@ class Config:
                                  if good_size(a)])
 
         # 2. Finds the closest good number to the estimation and
-        #    uses it to update window-width and window-width-steps.
+        #    uses it to adjust window-width and window-width-steps.
         optimal_steps = good_numbers[np.abs(good_numbers - estim).argmin()]
         self.set('window-width', (optimal_steps *
                                   self.getfloat('window-width-step-size')))
         self.set('window-width-steps', optimal_steps)
         # TODO: Add a message for the user.
 
-    def update_plasma_fineness(self):
+    def adjust_plasma_fineness(self):
         """
-        Calculates and updates 'plasma-fineness' using
+        Calculates and adjusts 'plasma-fineness' using
         'plasma-particles-per-cell'.
         """
         sqrt_per_cell = np.sqrt(self.getfloat('plasma-particles-per-cell'))
