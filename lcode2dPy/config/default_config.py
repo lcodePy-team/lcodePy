@@ -8,8 +8,6 @@ default_config.set('geometry', 'circ') # or 3d or 2d_plane
 # Parameters of simulation window:
 default_config.set('window-width', 5.0) # Has different meanings in 2d and 3d!
 default_config.set('window-width-step-size', 0.05)
-default_config.set('window-width-steps', 101) # Only needed in 3d
-# TODO: get rid of this parameter in 3d
 
 default_config.set('window-length', 15.0)
 default_config.set('xi-step', 0.05)
@@ -19,6 +17,9 @@ default_config.set('time-limit', 200.5)
 default_config.set('time-step', 25)
 default_config.set('continuation', 'n') # for 3d - only 'n' is available
 # TODO: implement other models for 3d simulation
+
+# Parameters of plasma model:
+default_config.set('plasma-particles-per-cell', 10)
 
 # Parameters of beam model:
 default_config.set('rigid-beam', 'y') # Only this parameter from this group is used in 3d
@@ -59,7 +60,4 @@ default_config.set('reflect-padding-steps', 5)
 default_config.set('plasma-padding-steps', 10)
 
 # Conflicts:
-default_config.set('plasma-particles-per-cell', 10)
-default_config.set('plasma-fineness', 2) # Similar to 'plasma-particles-per-cell'
-
 default_config.set('corrector-steps', 2) # Can we even change this???
