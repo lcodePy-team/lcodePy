@@ -13,7 +13,6 @@ WARP_SIZE = 32
 
 class BeamParticles:
     def __init__(self, size):
-        self.length = 0
         self.size = size
         self.xi = cp.zeros(size)
         self.x  = cp.zeros(size)
@@ -29,7 +28,7 @@ class BeamParticles:
 
     def load(self, *args, **kwargs):
         with cp.load(*args, **kwargs) as loaded:
-            self.length = self.size = loaded['xi'].size
+            self.size = loaded['xi'].size
             self.xi = loaded['xi']
             self.x = loaded['x']
             self.y = loaded['y']

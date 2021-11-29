@@ -29,7 +29,6 @@ from math import floor, sqrt
 # @jitclass(spec=spec)
 class BeamParticles:
     def __init__(self, size):
-        self.length = 0
         self.size = size
         self.xi = np.zeros(size,     dtype=np.float64)
         self.x = np.zeros(size,      dtype=np.float64)
@@ -46,7 +45,7 @@ class BeamParticles:
 
     def load(self, *args, **kwargs):
         with np.load(*args, **kwargs) as loaded:
-            self.length = self.size = len(loaded['xi'])
+            self.size = len(loaded['xi'])
             self.xi = loaded['xi']
             self.x = loaded['x']
             self.y = loaded['y']
