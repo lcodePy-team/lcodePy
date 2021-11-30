@@ -3,30 +3,12 @@ import numba as nb
 
 from math import floor, sqrt
 
-# from numba import int64, float64
-# from numba.experimental import jitclass
 
-# _int_array = int64[:]
-# _float_array = float64[:]
-
-# spec = [
-#     ('length', int64),
-#     ('size', int64),
-#     ('xi', _float_array),
-#     ('x', _float_array),
-#     ('y', _float_array),
-#     ('px', _float_array),
-#     ('py', _float_array),
-#     ('pz', _float_array),
-#     ('q_m', _float_array),
-#     ('q_norm', _float_array),
-#     ('id', _int_array),
-#     ('dt', _float_array),
-#     ('remaining_steps', _int_array)
-# ]
+particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
+                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
 
 
-# @jitclass(spec=spec)
 class BeamParticles:
     def __init__(self, size):
         self.size = size
@@ -109,7 +91,7 @@ class BeamParticles:
 #     self.remaining_steps = np.zeros(self.size)
 
 
-# Functions like in weights.py in lcode2dPy
+# Deposition and interpolation helper function #
 
 @nb.njit
 def add_at_numba(out, idx_x, idx_y, value):
@@ -228,8 +210,7 @@ def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
     return Ex, Ey, Ez, Bx, By, Bz
 
 
-# Functions like in beam_calculate.py in lcode2dPy
-
+# Move_particles_kernel helper functions #
 
 @nb.njit
 def beam_substepping_step(q_m, pz, substepping_energy):
@@ -259,7 +240,7 @@ def sign(x):
 
 # Moves one particle as far as possible on current xi layer
 
-@nb.njit #(parallel=True)
+@nb.njit(parallel=True)
 def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           xi_layer, max_radius,
                           q_m_, dt_, remaining_steps,
