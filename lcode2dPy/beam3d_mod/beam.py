@@ -27,7 +27,7 @@ class BeamParticles:
         self.remaining_steps = np.zeros(size,
                                      dtype=np.int64)
         # An additional parameter to track lost particles.
-        self.lost = np.zeros(size, dtype=np.bool8)
+        # self.lost = np.zeros(size, dtype=np.bool8)
 
     def load(self, *args, **kwargs):
         with np.load(*args, **kwargs) as loaded:
@@ -44,7 +44,7 @@ class BeamParticles:
             self.dt = np.zeros(self.size, dtype=np.float64)
             self.remaining_steps = np.zeros(self.size,
                                           dtype=np.int64)
-            self.lost = np.zeros(self.size, dtype=np.bool8)
+            # self.lost = np.zeros(self.size, dtype=np.bool8)
 
     def save(self, *args, **kwargs):
         np.savez_compressed(*args, **kwargs,
@@ -77,54 +77,111 @@ class BeamParticles:
         self.id = self.id[sort_idxes]
         self.dt = self.dt[sort_idxes]
         self.remaining_steps = self.remaining_steps[sort_idxes]
-        self.lost = self.lost[sort_idxes]
+        # self.lost = self.lost[sort_idxes]
 
-    def get_layer(self, begin, end):
+    def get_layer(self, indexes_arr):
         """
-        Return a layer with indexes from 'begin' to 'end'.
+        Return a layer with indexes from indexes_arr.
         """
         # TODO: Find a better method of getting a layer!
         #       Have a look at plasma3d_gpu.data for examples.
-        sublayer = BeamParticles(end - begin)
+        new_beam_layer = BeamParticles(indexes_arr.size)
 
-        sublayer.xi = self.xi[begin:end]
-        sublayer.x = self.x[begin:end]
-        sublayer.y = self.y[begin:end]
-        sublayer.px = self.px[begin:end]
-        sublayer.py = self.py[begin:end]
-        sublayer.pz = self.pz[begin:end]
-        sublayer.q_m = self.q_m[begin:end]
-        sublayer.q_norm = self.q_norm[begin:end]
-        sublayer.id = self.id[begin:end]
-        sublayer.dt = self.dt[begin:end]
-        sublayer.remaining_steps = self.remaining_steps[begin:end]
-        sublayer.lost =   self.lost[begin:end]
+        new_beam_layer.xi = self.xi[indexes_arr]
+        new_beam_layer.x = self.x[indexes_arr]
+        new_beam_layer.y = self.y[indexes_arr]
+        new_beam_layer.px = self.px[indexes_arr]
+        new_beam_layer.py = self.py[indexes_arr]
+        new_beam_layer.pz = self.pz[indexes_arr]
+        new_beam_layer.q_m = self.q_m[indexes_arr]
+        new_beam_layer.q_norm = self.q_norm[indexes_arr]
+        new_beam_layer.id = self.id[indexes_arr]
+        new_beam_layer.dt = self.dt[indexes_arr]
+        new_beam_layer.remaining_steps = self.remaining_steps[indexes_arr]
+        # new_beam_layer.lost =   self.lost[indexes_arr]
 
-        return sublayer
-    
-    def concatenate(self, other_layer):
-        """
-        Concatenate two beam particles layers.
-        """
-        # TODO: The same task as for self.get_sublayer()
-        self.size += other_layer.size
+        return new_beam_layer
 
-        self.xi = np.concatenate(self.xi, other_layer.xi)
-        self.x = np.concatenate(self.x, other_layer.x)
-        self.y = np.concatenate(self.y, other_layer.y)
-        self.px = np.concatenate(self.px, other_layer.px)
-        self.py = np.concatenate(self.py, other_layer.py)
-        self.pz = np.concatenate(self.pz, other_layer.pz)
-        self.q_m = np.concatenate(self.q_m, other_layer.q_m)
-        self.q_norm = np.concatenate(self.q_norm, other_layer.q_norm)
-        self.id = np.concatenate(self.id, other_layer.id)
-        self.dt = np.concatenate(self.dt, other_layer.dt)
-        self.remaining_steps = np.concatenate(self.remaining_steps,
-                                              other_layer.remaining_steps)
-        self.lost = np.concatenate(self.lost, other_layer.lost)
+
+def concatenate_beam_layers(b_layer_1: BeamParticles, b_layer_2: BeamParticles):
+    """
+    Concatenate two beam particles layers.
+    """
+    new_b_layer = BeamParticles(b_layer_1.size + b_layer_2.size)
+    # TODO: The same task as for self.get_sublayer()
+
+    new_b_layer.xi =     np.concatenate((b_layer_1.xi, b_layer_2.xi))
+    new_b_layer.x =      np.concatenate((b_layer_1.x, b_layer_2.x))
+    new_b_layer.y =      np.concatenate((b_layer_1.y, b_layer_2.y))
+    new_b_layer.px =     np.concatenate((b_layer_1.px, b_layer_2.px))
+    new_b_layer.py =     np.concatenate((b_layer_1.py, b_layer_2.py))
+    new_b_layer.pz =     np.concatenate((b_layer_1.pz, b_layer_2.pz))
+    new_b_layer.q_m =    np.concatenate((b_layer_1.q_m, b_layer_2.q_m))
+    new_b_layer.q_norm = np.concatenate((b_layer_1.q_norm, b_layer_2.q_norm))
+    new_b_layer.id =     np.concatenate((b_layer_1.id, b_layer_2.id))
+    new_b_layer.dt =     np.concatenate((b_layer_1.dt, b_layer_2.dt))
+    new_b_layer.remaining_steps = np.concatenate((b_layer_1.remaining_steps,
+                                            b_layer_2.remaining_steps))
+
+    return new_b_layer
 
 #TODO: The BeamParticles class makes jitting harder. And we don't really need
 #      this class. Get rid of it.
+
+class BeamSource:
+    """
+    This class helps to extract a beam layer from beam particles array.
+    """
+    # Do we really need this class?
+    def __init__(self, config, beam: BeamParticles):
+        # From config:
+        self.xi_step_size = config.getfloat('xi-step')
+        
+        # Get the whole beam or a beam layer:
+        beam.xi_sorted()
+        self.beam = beam
+
+        # Dropped sorted_idxes = argsort(-self.beam.xi)...
+        # It needs to be somewhere!
+
+        # Shows how many particles have already deposited:
+        self.layout_count = 0 # or _used_count in beam2d
+
+    def get_beam_layer_to_layout(self, plasma_layer_idx):
+        # xi_min = - self.xi_step_size * plasma_layer_idx
+        xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
+
+        begin = self.layout_count
+
+        # Does it find all particles that lay in the layer?
+        # Doesn't look like this. Check it.
+        # TODO: Clean this mess with so many minuses!
+        #       Isn't that array sorted already? If yes, use searchsorted
+        arr_to_search = -self.beam.xi[self.layout_count:]
+        if len(arr_to_search) != 0:
+            layer_length = np.argmax(arr_to_search > -xi_max)
+        else:
+            layer_length = 0
+        self.layout_count += layer_length
+
+        indexes_arr = np.arange(begin, begin + layer_length)
+        return self.beam.get_layer(indexes_arr)
+
+
+class BeamDrain:
+    def __init__(self):
+        self.beam_buffer = BeamParticles(0)
+        self.lost_buffer = BeamParticles(0)
+
+    def push_beam_layer(self, beam_layer: BeamParticles):
+        if beam_layer.size > 0:
+            self.beam_buffer = concatenate_beam_layers(self.beam_buffer,
+                                                       beam_layer)
+
+    def push_beam_lost(self, lost_layer: BeamParticles):
+        if lost_layer.size > 0:
+            self.lost_buffer = concatenate_beam_layers(self.lost_buffer,
+                                                       lost_layer)
 
 
 # Deposition and interpolation helper function #
@@ -280,9 +337,10 @@ def sign(x):
 def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           beam_xi_layer, lost_radius,
                           q_m_, dt_, remaining_steps,
-                          x, y, xi, px, py, pz, id, lost,
+                          x, y, xi, px, py, pz, id,
                           Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
-                          Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
+                          Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k,
+                          lost_idxes, moved_idxes, fell_idxes):
     """
     Moves one particle as far as possible on current xi layer.
     """
@@ -306,13 +364,14 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
             # Add time shift correction (dxi = (v_z - c)*dt)
 
             if not_in_layer(xi_halfstep, xi_k_1):
-                # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+                x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+                fell_idxes[k] = True
                 break
 
             if is_lost(x_halfstep, y_halfstep, lost_radius):
-                # x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+                x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
                 id[k] *= -1  # Particle hit the wall and is now lost
-                lost[k] = True
+                lost_idxes[k] = True
                 remaining_steps[k] = 0
                 break
 
@@ -345,12 +404,13 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
             pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
 
             # TODO: Do we need to add it here?
-            # if not_in_layer(xi_halfstep, xi_k_1):
-            #     continue
+            if not_in_layer(xi_halfstep, xi_k_1):
+                fell_idxes[k] = True
+                break
 
             if is_lost(x[k], y[k], lost_radius):
                 id[k] *= -1  # Particle hit the wall and is now lost
-                lost[k] = True
+                lost_idxes[k] = True
                 remaining_steps[k] = 0
                 break
 
@@ -359,14 +419,14 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
 
 def move_particles(grid_steps, grid_step_size, xi_step_size,
                    idxes, beam_xi_layer, lost_radius,
-                   beam, fields_k_1, fields_k):
+                   beam, fields_k_1, fields_k,
+                   lost_idxes, moved_idxes, fell_idxes):
     """
     This is a convenience wrapper around the `move_particles_kernel` CUDA kernel.
     """
     x_new,  y_new,  xi_new = beam.x[idxes],  beam.y[idxes],  beam.xi[idxes]
     px_new, py_new, pz_new = beam.px[idxes], beam.py[idxes], beam.pz[idxes]
     id_new, remaining_steps_new = beam.id[idxes], beam.remaining_steps[idxes]
-    lost_new = beam.lost[idxes]
 
     move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           beam_xi_layer, lost_radius,
@@ -374,16 +434,18 @@ def move_particles(grid_steps, grid_step_size, xi_step_size,
                           remaining_steps_new,
                           x_new, y_new, xi_new,
                           px_new, py_new, pz_new,
-                          id_new, lost_new,
+                          id_new,
                           fields_k_1.Ex, fields_k_1.Ey, fields_k_1.Ez,
                           fields_k_1.Bx, fields_k_1.By, fields_k_1.Bz,
                           fields_k.Ex, fields_k.Ey, fields_k.Ez,
-                          fields_k.Bx, fields_k.By, fields_k.Bz)
+                          fields_k.Bx, fields_k.By, fields_k.Bz,
+                          lost_idxes, moved_idxes, fell_idxes)
 
     beam.x[idxes],  beam.y[idxes],  beam.xi[idxes] = x_new,  y_new,  xi_new
     beam.px[idxes], beam.py[idxes], beam.pz[idxes] = px_new, py_new, pz_new
     beam.id[idxes], beam.remaining_steps[idxes] = id_new, remaining_steps_new
-    beam.lost[idxes] = lost_new
+    
+    return lost_idxes, moved_idxes, fell_idxes
 
 
 class BeamCalculator:
@@ -394,22 +456,30 @@ class BeamCalculator:
         self.grid_steps = config.getint('window-width-steps')
         self.time_step = config.getfloat('time-step')
         self.substepping_energy = 2 #config.get("beam-substepping-energy")
-        
+
         # Calculate the radius that marks that a particle is lost.
         max_radius = self.grid_step_size * self.grid_steps / 2
         self.lost_radius = max(0.9 * max_radius, max_radius - 1) # or just max_radius?
 
-    # Helper functions for push_solver_3d.py file an inner steps:
+    # Helper functions for one time step cicle:
 
     def start_time_step(self):
+        """
+        Perform necessary operations before starting the time step.
+        """
         # Get a grid for beam rho density
         self.rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
+    def finish_time_step(self, beam_source: BeamSource):
+        """
+        Perform necessary operations after finishing the time step.
+        """
+        beam_source.beam.xi_sorted()
+
     # Helper functions for depositing beam particles of a layer:
 
     def layout_beam_layer(self, beam_layer, plasma_layer_idx):
-        idxes = np.arange(beam_layer.id.size)
         rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
@@ -433,6 +503,9 @@ class BeamCalculator:
     # Helper functions for moving beam particles of a layer:
 
     def start_moving_layer(self, beam_layer, idxes):
+        """
+        Perform necessary operations before moving a beam layer.
+        """
         # TODO: Do we need to set dt and remaining_steps only for particles
         #       that have dt == 0?
         # mask = beam_layer.id[beam_layer.dt == 0] and idxes -> mask ???
@@ -462,58 +535,29 @@ class BeamCalculator:
         # beam_layer.remaining_steps[idxes] = (
         #                            beam_layer.remaining_steps[sort_idxes])
 
-    def move_beam_layer(self, beam_layer, plasma_layer_idx,
-                        fields_after_layer, fields_before_layer):
-        idxes = beam_layer.id[beam_layer.id > 0]
+    def move_beam_layer(self, beam_layer: BeamParticles, fell_size,
+                        pl_layer_idx, fields_after_layer, fields_before_layer):
+        idxes_1 = np.arange(beam_layer.id.size - fell_size)
+        idxes_2 = np.arange(beam_layer.id.size)
 
-        if len(idxes) != 0:
-            self.start_moving_layer(beam_layer, idxes)
+        size = idxes_2.size
+        lost_idxes  = np.zeros(size, dtype=np.bool8)
+        moved_idxes = np.zeros(size, dtype=np.bool8)
+        fell_idxes  = np.zeros(size, dtype=np.bool8)
 
-            beam_layer_idx = plasma_layer_idx - 1
-            move_particles(self.grid_steps, self.grid_step_size,
-                           self.xi_step_size, idxes, beam_layer_idx,
-                           self.lost_radius,
-                           beam_layer, fields_after_layer, fields_before_layer)
+        if len(idxes_2) != 0:
+            self.start_moving_layer(beam_layer, idxes_1)
+            beam_layer_to_move_idx = pl_layer_idx - 1
 
-        self.stop_moving_layer(beam_layer)
+            lost_idxes, moved_idxes, fell_idxes = move_particles(
+                self.grid_steps, self.grid_step_size,
+                self.xi_step_size, idxes_2, beam_layer_to_move_idx,
+                self.lost_radius,
+                beam_layer, fields_after_layer, fields_before_layer,
+                lost_idxes, moved_idxes, fell_idxes)
 
-
-class BeamSource:
-    """
-    This class helps to extract a beam layer from beam particles array.
-    BeamSource guarantees that all particles in returned layer lie between
-    xi_max and xi_min.
-    
-    """
-    def __init__(self, config, beam):
-        # From config:
-        self.xi_step_size = config.getfloat('xi-step')
-        
-        # Get the whole beam or a beam layer:
-        beam.xi_sorted()
-        self.beam = beam
-
-        # Dropped sorted_idxes = argsort(-self.beam.xi)...
-        # It needs to be somewhere!
-
-        # Shows how many particles have already deposited:
-        self.layout_count = 0 # or _used_count in beam2d
-
-    def get_beam_layer_to_layout(self, plasma_layer_idx):
-        # xi_min = - self.xi_step_size * plasma_layer_idx
-        xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
-
-        begin = self.layout_count
-
-        # Does it find all particles that lay in the layer?
-        # Doesn't look like this. Check it.
-        # TODO: Clean this mess with so many minuses!
-        #       Isn't that array sorted already? If yes, use searchsorted
-        arr_to_search = -self.beam.xi[self.layout_count:]
-        if len(arr_to_search) != 0:
-            layer_length = np.argmax(arr_to_search > -xi_max)
-        else:
-            layer_length = 0
-        self.layout_count += layer_length
-
-        return self.beam.get_layer(begin, begin + layer_length)
+        lost  = beam_layer.get_layer(lost_idxes)
+        moved = beam_layer.get_layer(moved_idxes)
+        fell  = beam_layer.get_layer(fell_idxes)
+        return lost, moved, fell
+        # self.stop_moving_layer(beam_layer)
