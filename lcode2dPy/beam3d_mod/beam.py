@@ -474,12 +474,6 @@ class BeamCalculator:
         self.rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
-    def finish_time_step(self, beam_source: BeamSource):
-        """
-        Perform necessary operations after finishing the time step.
-        """
-        beam_source.beam.xi_sorted()
-
     # Helper functions for depositing beam particles of a layer:
 
     def layout_beam_layer(self, beam_layer, plasma_layer_idx):
@@ -516,27 +510,6 @@ class BeamCalculator:
                                    self.substepping_energy)
         beam_layer.dt[idxes] = dt * self.time_step
         beam_layer.remaining_steps[idxes] = (1. / dt).astype(np.int_)
-
-    # def stop_moving_layer(self, beam_layer):
-    #     idxes = beam_layer.id
-    #     if len(idxes) == 0:
-    #         return
-
-    #     beam_layer.xi_sorted()
-        # s = np.argsort(beam_layer.remaining_steps[idxes])
-        # sort_idxes = idxes[s]
-        # beam_layer.xi[idxes] =     beam_layer.xi[sort_idxes]
-        # beam_layer.x[idxes] =      beam_layer.x[sort_idxes]
-        # beam_layer.y[idxes] =      beam_layer.y[sort_idxes]
-        # beam_layer.px[idxes] =     beam_layer.px[sort_idxes]
-        # beam_layer.py[idxes] =     beam_layer.py[sort_idxes]
-        # beam_layer.pz[idxes] =     beam_layer.pz[sort_idxes]
-        # beam_layer.q_m[idxes] =    beam_layer.q_m[sort_idxes]
-        # beam_layer.q_norm[idxes] = beam_layer.q_norm[sort_idxes]
-        # beam_layer.id[idxes] =     beam_layer.id[sort_idxes]
-        # beam_layer.dt[idxes] =     beam_layer.dt[sort_idxes]
-        # beam_layer.remaining_steps[idxes] = (
-        #                            beam_layer.remaining_steps[sort_idxes])
 
     def move_beam_layer(self, beam_layer: BeamParticles, fell_size,
                         pl_layer_idx, fields_after_layer, fields_before_layer):

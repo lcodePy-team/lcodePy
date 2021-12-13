@@ -63,8 +63,6 @@ class PushAndSolver3d:
 
             print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
 
-        self.beam_calc.finish_time_step(beam_source)
-
         self.time_step_i += 1
 
         # if not os.path.isdir('xi_Ez_cpu'):
