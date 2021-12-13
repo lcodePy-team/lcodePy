@@ -415,6 +415,9 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                 break
 
             remaining_steps[k] -= 1
+        
+        if fell_idxes[k] == False and lost_idxes[k] == False:
+            moved_idxes[k] = True
 
 
 def move_particles(grid_steps, grid_step_size, xi_step_size,
@@ -556,8 +559,8 @@ class BeamCalculator:
                 beam_layer, fields_after_layer, fields_before_layer,
                 lost_idxes, moved_idxes, fell_idxes)
 
-        lost  = beam_layer.get_layer(lost_idxes)
-        moved = beam_layer.get_layer(moved_idxes)
-        fell  = beam_layer.get_layer(fell_idxes)
+        lost  = beam_layer.get_layer(idxes_2[lost_idxes])
+        moved = beam_layer.get_layer(idxes_2[moved_idxes])
+        fell  = beam_layer.get_layer(idxes_2[fell_idxes])
+
         return lost, moved, fell
-        # self.stop_moving_layer(beam_layer)
