@@ -3,8 +3,6 @@ import numba as nb
 
 from math import floor, sqrt
 
-from lcode2dPy.beam.beam_slice import BeamSlice
-
 # We don't really need this class. It's more convenient
 # to have something like GPUArrays from plasma3d_gpu.
 
@@ -12,7 +10,7 @@ class BeamParticles:
     def __init__(self, size):
         """
         Create a new empty array of beam particles. Can be used both as
-        a whole beam particles array and as a slice of beam particles.
+        a whole beam particles array and as a layer of beam particles.
         """
         self.size = size
 
@@ -60,7 +58,7 @@ class BeamParticles:
                             q_norm = self.q_norm,
                             id = self.id)
 
-    # Essentials for beam slice calculations #
+    # Essentials for beam layer calculations #
 
     def xi_sorted(self):
         """
@@ -81,49 +79,49 @@ class BeamParticles:
         self.remaining_steps = self.remaining_steps[sort_idxes]
         self.lost = self.lost[sort_idxes]
 
-    def get_slice(self, begin, end):
+    def get_layer(self, begin, end):
         """
-        Return a slice with indexes from 'begin' to 'end'.
+        Return a layer with indexes from 'begin' to 'end'.
         """
-        # TODO: Find a better method of getting a slice!
+        # TODO: Find a better method of getting a layer!
         #       Have a look at plasma3d_gpu.data for examples.
-        subslice = BeamParticles(end - begin)
+        sublayer = BeamParticles(end - begin)
 
-        subslice.xi = self.xi[begin:end]
-        subslice.x = self.x[begin:end]
-        subslice.y = self.y[begin:end]
-        subslice.px = self.px[begin:end]
-        subslice.py = self.py[begin:end]
-        subslice.pz = self.pz[begin:end]
-        subslice.q_m = self.q_m[begin:end]
-        subslice.q_norm = self.q_norm[begin:end]
-        subslice.id = self.id[begin:end]
-        subslice.dt = self.dt[begin:end]
-        subslice.remaining_steps = self.remaining_steps[begin:end]
-        subslice.lost =   self.lost[begin:end]
+        sublayer.xi = self.xi[begin:end]
+        sublayer.x = self.x[begin:end]
+        sublayer.y = self.y[begin:end]
+        sublayer.px = self.px[begin:end]
+        sublayer.py = self.py[begin:end]
+        sublayer.pz = self.pz[begin:end]
+        sublayer.q_m = self.q_m[begin:end]
+        sublayer.q_norm = self.q_norm[begin:end]
+        sublayer.id = self.id[begin:end]
+        sublayer.dt = self.dt[begin:end]
+        sublayer.remaining_steps = self.remaining_steps[begin:end]
+        sublayer.lost =   self.lost[begin:end]
 
-        return subslice
+        return sublayer
     
-    def concatenate(self, other_slice):
+    def concatenate(self, other_layer):
         """
-        Concatenate two beam particles slices.
+        Concatenate two beam particles layers.
         """
-        # TODO: The same task as for self.get_subslice()
-        self.size += other_slice.size
+        # TODO: The same task as for self.get_sublayer()
+        self.size += other_layer.size
 
-        self.xi = np.concatenate(self.xi, other_slice.xi)
-        self.x = np.concatenate(self.x, other_slice.x)
-        self.y = np.concatenate(self.y, other_slice.y)
-        self.px = np.concatenate(self.px, other_slice.px)
-        self.py = np.concatenate(self.py, other_slice.py)
-        self.pz = np.concatenate(self.pz, other_slice.pz)
-        self.q_m = np.concatenate(self.q_m, other_slice.q_m)
-        self.q_norm = np.concatenate(self.q_norm, other_slice.q_norm)
-        self.id = np.concatenate(self.id, other_slice.id)
-        self.dt = np.concatenate(self.dt, other_slice.dt)
+        self.xi = np.concatenate(self.xi, other_layer.xi)
+        self.x = np.concatenate(self.x, other_layer.x)
+        self.y = np.concatenate(self.y, other_layer.y)
+        self.px = np.concatenate(self.px, other_layer.px)
+        self.py = np.concatenate(self.py, other_layer.py)
+        self.pz = np.concatenate(self.pz, other_layer.pz)
+        self.q_m = np.concatenate(self.q_m, other_layer.q_m)
+        self.q_norm = np.concatenate(self.q_norm, other_layer.q_norm)
+        self.id = np.concatenate(self.id, other_layer.id)
+        self.dt = np.concatenate(self.dt, other_layer.dt)
         self.remaining_steps = np.concatenate(self.remaining_steps,
-                                              other_slice.remaining_steps)
-        self.lost = np.concatenate(self.lost, other_slice.lost)
+                                              other_layer.remaining_steps)
+        self.lost = np.concatenate(self.lost, other_layer.lost)
 
 #TODO: The BeamParticles class makes jitting harder. And we don't really need
 #      this class. Get rid of it.
@@ -408,22 +406,22 @@ class BeamCalculator:
         self.rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
-    # Helper functions for depositing beam particles of a slice:
+    # Helper functions for depositing beam particles of a layer:
 
-    def layout_beam_slice(self, beam_slice, plasma_layer_idx):
-        idxes = np.arange(beam_slice.id.size)
+    def layout_beam_layer(self, beam_layer, plasma_layer_idx):
+        idxes = np.arange(beam_layer.id.size)
         rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
-        if beam_slice.id.size != 0:
+        if beam_layer.id.size != 0:
             xi_plasma_layer = - self.xi_step_size * plasma_layer_idx
 
-            x, y = beam_slice.x, beam_slice.y
-            dxi  = (xi_plasma_layer - beam_slice.xi) / self.xi_step_size
+            x, y = beam_layer.x, beam_layer.y
+            dxi  = (xi_plasma_layer - beam_layer.xi) / self.xi_step_size
             i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = \
                 particles_weights(x, y, dxi, self.grid_steps, self.grid_step_size)
 
-            deposit_particles(beam_slice.q_norm,
+            deposit_particles(beam_layer.q_norm,
                               self.rho_layout, rho_layout, i, j,
                               w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
 
@@ -432,58 +430,58 @@ class BeamCalculator:
 
         return rho_layout
 
-    # Helper functions for moving beam particles of a slice:
+    # Helper functions for moving beam particles of a layer:
 
-    def start_moving_layer(self, beam_slice, idxes):
+    def start_moving_layer(self, beam_layer, idxes):
         # TODO: Do we need to set dt and remaining_steps only for particles
         #       that have dt == 0?
-        # mask = beam_slice.id[beam_slice.dt == 0] and idxes -> mask ???
-        dt = beam_substepping_step(beam_slice.q_m[idxes], beam_slice.pz[idxes],
+        # mask = beam_layer.id[beam_layer.dt == 0] and idxes -> mask ???
+        dt = beam_substepping_step(beam_layer.q_m[idxes], beam_layer.pz[idxes],
                                    self.substepping_energy)
-        beam_slice.dt[idxes] = dt * self.time_step
-        beam_slice.remaining_steps[idxes] = (1. / dt).astype(np.int_)
+        beam_layer.dt[idxes] = dt * self.time_step
+        beam_layer.remaining_steps[idxes] = (1. / dt).astype(np.int_)
 
-    # def stop_moving_layer(self, beam_slice):
-    #     idxes = beam_slice.id
+    # def stop_moving_layer(self, beam_layer):
+    #     idxes = beam_layer.id
     #     if len(idxes) == 0:
     #         return
 
-    #     beam_slice.xi_sorted()
-        # s = np.argsort(beam_slice.remaining_steps[idxes])
+    #     beam_layer.xi_sorted()
+        # s = np.argsort(beam_layer.remaining_steps[idxes])
         # sort_idxes = idxes[s]
-        # beam_slice.xi[idxes] =     beam_slice.xi[sort_idxes]
-        # beam_slice.x[idxes] =      beam_slice.x[sort_idxes]
-        # beam_slice.y[idxes] =      beam_slice.y[sort_idxes]
-        # beam_slice.px[idxes] =     beam_slice.px[sort_idxes]
-        # beam_slice.py[idxes] =     beam_slice.py[sort_idxes]
-        # beam_slice.pz[idxes] =     beam_slice.pz[sort_idxes]
-        # beam_slice.q_m[idxes] =    beam_slice.q_m[sort_idxes]
-        # beam_slice.q_norm[idxes] = beam_slice.q_norm[sort_idxes]
-        # beam_slice.id[idxes] =     beam_slice.id[sort_idxes]
-        # beam_slice.dt[idxes] =     beam_slice.dt[sort_idxes]
-        # beam_slice.remaining_steps[idxes] = (
-        #                            beam_slice.remaining_steps[sort_idxes])
+        # beam_layer.xi[idxes] =     beam_layer.xi[sort_idxes]
+        # beam_layer.x[idxes] =      beam_layer.x[sort_idxes]
+        # beam_layer.y[idxes] =      beam_layer.y[sort_idxes]
+        # beam_layer.px[idxes] =     beam_layer.px[sort_idxes]
+        # beam_layer.py[idxes] =     beam_layer.py[sort_idxes]
+        # beam_layer.pz[idxes] =     beam_layer.pz[sort_idxes]
+        # beam_layer.q_m[idxes] =    beam_layer.q_m[sort_idxes]
+        # beam_layer.q_norm[idxes] = beam_layer.q_norm[sort_idxes]
+        # beam_layer.id[idxes] =     beam_layer.id[sort_idxes]
+        # beam_layer.dt[idxes] =     beam_layer.dt[sort_idxes]
+        # beam_layer.remaining_steps[idxes] = (
+        #                            beam_layer.remaining_steps[sort_idxes])
 
-    def move_beam_slice(self, beam_slice, plasma_layer_idx,
-                        fields_after_slice, fields_before_slice):
-        idxes = beam_slice.id[beam_slice.id > 0]
+    def move_beam_layer(self, beam_layer, plasma_layer_idx,
+                        fields_after_layer, fields_before_layer):
+        idxes = beam_layer.id[beam_layer.id > 0]
 
         if len(idxes) != 0:
-            self.start_moving_layer(beam_slice, idxes)
+            self.start_moving_layer(beam_layer, idxes)
 
             beam_layer_idx = plasma_layer_idx - 1
             move_particles(self.grid_steps, self.grid_step_size,
                            self.xi_step_size, idxes, beam_layer_idx,
                            self.lost_radius,
-                           beam_slice, fields_after_slice, fields_before_slice)
+                           beam_layer, fields_after_layer, fields_before_layer)
 
-        self.stop_moving_layer(beam_slice)
+        self.stop_moving_layer(beam_layer)
 
 
 class BeamSource:
     """
-    This class helps to extract a beam slice from beam particles array.
-    BeamSource guarantees that all particles in returned slice lie between
+    This class helps to extract a beam layer from beam particles array.
+    BeamSource guarantees that all particles in returned layer lie between
     xi_max and xi_min.
     
     """
@@ -491,7 +489,7 @@ class BeamSource:
         # From config:
         self.xi_step_size = config.getfloat('xi-step')
         
-        # Get the whole beam or a beam slice:
+        # Get the whole beam or a beam layer:
         beam.xi_sorted()
         self.beam = beam
 
@@ -501,9 +499,8 @@ class BeamSource:
         # Shows how many particles have already deposited:
         self.layout_count = 0 # or _used_count in beam2d
 
-    def get_beam_slice_to_layout(self, plasma_layer_idx):
-        # The first beam slice before plasma has xi_layer_idx = 0, not -1!
-        xi_min = - self.xi_step_size * plasma_layer_idx
+    def get_beam_layer_to_layout(self, plasma_layer_idx):
+        # xi_min = - self.xi_step_size * plasma_layer_idx
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
 
         begin = self.layout_count
@@ -519,4 +516,4 @@ class BeamSource:
             layer_length = 0
         self.layout_count += layer_length
 
-        return self.beam.get_slice(begin, begin + layer_length)
+        return self.beam.get_layer(begin, begin + layer_length)

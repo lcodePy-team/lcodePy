@@ -32,8 +32,10 @@ class PushAndSolver3d:
         xi_arr = []
 
         for xi_i in range(self.xi_steps + 1):
-            beam_slice = beam_source.get_beam_slice_to_layout(xi_i)
-            beam_ro = self.beam_calculator.layout_beam_slice(beam_slice, xi_i)
+            beam_layer = beam_source.get_beam_layer_to_layout(xi_i)
+            beam_ro = self.beam_calculator.layout_beam_layer(beam_layer, xi_i)
+
+            # beam_layer = beam_append(beam_layer, fell_from_prev_layer)
 
             prev_pl_fields = pl_fields.copy()
 
@@ -45,7 +47,7 @@ class PushAndSolver3d:
             # print(f"Plasma solver done in {time2-time1:+.4f} s.", end='\t')
 
             # time1 = time.time()
-            # self.beam_calculator.move_beam(beam_slice, xi_i,
+            # self.beam_calculator.move_beam(beam_layer, xi_i,
             #                            pl_fields, prev_pl_fields)
             # time2 = time.time()
 
