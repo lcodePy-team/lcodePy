@@ -135,7 +135,7 @@ class BeamSource:
     def __init__(self, config, beam: BeamParticles):
         # From config:
         self.xi_step_size = config.getfloat('xi-step')
-        
+
         # Get the whole beam or a beam layer:
         beam.xi_sorted()
         self.beam = beam
@@ -147,18 +147,16 @@ class BeamSource:
         self.layout_count = 0 # or _used_count in beam2d
 
     def get_beam_layer_to_layout(self, plasma_layer_idx):
-        # xi_min = - self.xi_step_size * plasma_layer_idx
+        xi_min = - self.xi_step_size * plasma_layer_idx
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
 
         begin = self.layout_count
 
-        # Does it find all particles that lay in the layer?
-        # Doesn't look like this. Check it.
-        # TODO: Clean this mess with so many minuses!
-        #       Isn't that array sorted already? If yes, use searchsorted
-        arr_to_search = -self.beam.xi[self.layout_count:]
+        # Does it find all particles that lay in the layer? Check it.
+        arr_to_search = self.beam.xi[begin:]
         if arr_to_search.size != 0:
-            layer_length = cp.argmax(arr_to_search > cp.asarray(-xi_max))
+            layer_length = cp.sum((cp.asarray(xi_max) < arr_to_search) *
+                                  (arr_to_search <= cp.asarray(xi_min)))
         else:
             layer_length = 0
         self.layout_count += int(layer_length)
