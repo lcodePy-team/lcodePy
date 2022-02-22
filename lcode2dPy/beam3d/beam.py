@@ -156,8 +156,8 @@ class BeamSource:
         # Does it find all particles that lay in the layer? Check it.
         arr_to_search = self.beam.xi[begin:]
         if len(arr_to_search) != 0:
-            layer_length = np.sum((xi_max < arr_to_search) *
-                                  (arr_to_search <= xi_min))
+            layer_length = np.sum((xi_max <= arr_to_search) *
+                                  (arr_to_search < xi_min))
         else:
             layer_length = 0
         self.layout_count += layer_length
@@ -362,7 +362,6 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
             # Add time shift correction (dxi = (v_z - c)*dt)
 
             if not_in_layer(xi_halfstep, xi_k_1):
-                x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
                 fell_idxes[k] = True
                 break
 
@@ -401,11 +400,6 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
             py[k] = 2 * py_halfstep - opy                   # py fullstep
             pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
 
-            # TODO: Do we need to add it here?
-            if not_in_layer(xi_halfstep, xi_k_1):
-                fell_idxes[k] = True
-                break
-
             if is_lost(x[k], y[k], lost_radius):
                 id[k] *= -1  # Particle hit the wall and is now lost
                 lost_idxes[k] = True
@@ -414,6 +408,10 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
 
             remaining_steps[k] -= 1
         
+        # TODO: Do we need to add it here? (Yes, write why)
+        if remaining_steps[k] == 0 and not_in_layer(xi_halfstep, xi_k_1):
+            fell_idxes[k] = True
+
         if fell_idxes[k] == False and lost_idxes[k] == False:
             moved_idxes[k] = True
 
