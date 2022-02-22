@@ -102,7 +102,8 @@ class Config:
         'plasma-particles-per-cell'.
         """
         sqrt_per_cell = np.sqrt(self.getfloat('plasma-particles-per-cell'))
-        self.set('plasma-fineness', round(sqrt_per_cell))
+        self.set('plasma-fineness', round(sqrt_per_cell))        
+        self.set('plasma-particles-per-cell', round(sqrt_per_cell) ** 2)
         # TODO: Add a message for the user.
 
 
