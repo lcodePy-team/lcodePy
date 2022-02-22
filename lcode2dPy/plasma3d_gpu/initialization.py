@@ -2,6 +2,7 @@
 import numpy as np
 import cupy as cp
 
+from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.data import GPUArrays
 from lcode2dPy.plasma3d_gpu.weights import initial_deposition
 
@@ -122,7 +123,7 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
-def init_plasma(config):
+def init_plasma(config: Config):
     """
     Initialize all the arrays needed (for what?).
     """

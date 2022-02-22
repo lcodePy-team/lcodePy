@@ -3,14 +3,15 @@ import cupy as cp
 
 import os
 
+from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
-from lcode2dPy.plasma3d_gpu.data import GPUArraysView
+from lcode2dPy.plasma3d_gpu.data import GPUArrays, GPUArraysView
 from lcode2dPy.beam3d_gpu.beam import (BeamParticles, BeamSource, BeamDrain,
                                        BeamCalculator, concatenate_beam_layers)
 
 
 class PushAndSolver3d:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
 
         # Import plasma solver and beam pusher, pl = plasma
@@ -25,7 +26,8 @@ class PushAndSolver3d:
         self.time_step_i = 0
         self.time_step_size = config.getfloat('time-step')
 
-    def step_dt(self, pl_fields, pl_particles, pl_currents, pl_const_arrays,
+    def step_dt(self, pl_fields: GPUArrays, pl_particles: GPUArrays,
+                pl_currents: GPUArrays, pl_const_arrays: GPUArrays,
                 beam_source: BeamSource, beam_drain: BeamDrain):
         """
         Perform one time step of beam-plasma calculations.

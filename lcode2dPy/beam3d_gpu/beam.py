@@ -3,6 +3,8 @@ import numba
 
 from math import floor, sqrt
 
+from lcode2dPy.config.config import Config
+
 WARP_SIZE = 32
 
 # A new class for BeamParticles that is similar
@@ -132,7 +134,7 @@ class BeamSource:
     This class helps to extract a beam layer from beam particles array.
     """
     # Do we really need this class?
-    def __init__(self, config, beam: BeamParticles):
+    def __init__(self, config: Config, beam: BeamParticles):
         # From config:
         self.xi_step_size = config.getfloat('xi-step')
 
@@ -416,7 +418,7 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
 
 def move_particles(grid_steps, grid_step_size, xi_step_size,
                    idxes, beam_xi_layer, lost_radius,
-                   beam, fields_k_1, fields_k,
+                   beam: BeamParticles, fields_k_1, fields_k,
                    lost_idxes, moved_idxes, fell_idxes):
     """
     This is a convenience wrapper around the `move_particles_kernel` CUDA kernel.
@@ -448,7 +450,7 @@ def move_particles(grid_steps, grid_step_size, xi_step_size,
 
 
 class BeamCalculator:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         # Get main calculation parameters.
         self.xi_step_size = config.getfloat('xi-step')
         self.grid_step_size = config.getfloat('window-width-step-size')
@@ -472,7 +474,7 @@ class BeamCalculator:
 
     # Helper functions for depositing beam particles of a layer:
 
-    def layout_beam_layer(self, beam_layer, plasma_layer_idx):
+    def layout_beam_layer(self, beam_layer: BeamParticles, plasma_layer_idx):
         rho_layout = cp.zeros((self.grid_steps, self.grid_steps),
                                     dtype=cp.float64)
 
@@ -492,7 +494,7 @@ class BeamCalculator:
 
     # Helper functions for moving beam particles of a layer:
 
-    def start_moving_layer(self, beam_layer, idxes):
+    def start_moving_layer(self, beam_layer: BeamParticles, idxes):
         """
         Perform necessary operations before moving a beam layer.
         """

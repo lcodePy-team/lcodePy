@@ -1,6 +1,7 @@
 """Functions to find fields on the next step of plasma evolution."""
 import cupy as cp
 
+from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.data import GPUArrays, fields_average
 
 
@@ -215,7 +216,7 @@ class FieldComputer(object):
         Plane grid step size.
 
     """
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.xi_step_size = config.getfloat('xi-step')
         self.trick = config.getfloat('field-solver-subtraction-trick')

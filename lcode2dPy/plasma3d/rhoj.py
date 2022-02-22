@@ -1,13 +1,14 @@
 """Routine to compute charge density and currents of particles."""
-from lcode2dPy.plasma3d.data import Currents
+from lcode2dPy.config.config import Config
+from lcode2dPy.plasma3d.data import Currents, Particles, Const_Arrays
 from lcode2dPy.plasma3d.weights import deposit
 
 class RhoJComputer(object):
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.grid_steps = config.getint('window-width-steps')
 
-    def compute_rhoj(self, particles, const_arrays):
+    def compute_rhoj(self, particles: Particles, const_arrays: Const_Arrays):
         ro, jx, jy, jz = deposit(self.grid_steps, self.grid_step_size,
                                  particles.x_init, particles.y_init,
                                  particles.x_offt, particles.y_offt,

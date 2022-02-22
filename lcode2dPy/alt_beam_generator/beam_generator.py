@@ -1,5 +1,9 @@
 import numpy as np
 
+from lcode2dPy.config.config import Config
+
+from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
+
 particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
                              ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
@@ -8,7 +12,7 @@ particle_dtype3d = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
                              ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
-def rigid_beam_current(beam_shape, xi_step_p):
+def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
     xi_vals = np.arange(-xi_step_p / 2, -beam_shape.total_length, -xi_step_p)
     current = np.zeros_like(xi_vals)
     for idx, xi in np.ndenumerate(xi_vals):
@@ -16,9 +20,9 @@ def rigid_beam_current(beam_shape, xi_step_p):
     return current
 
 
-def generate_beam(config, beam_shape):
+def generate_beam(config: Config, beam_shape: BeamShape):
     xi_step_p = config.getfloat('window-width-step-size')
-    three_dimensions = (config.get('geometry') == '3d' or 
+    three_dimensions = (config.get('geometry') == '3d' or
                         config.get('geometry') == '3D')
     max_radius = xi_step_p * config.getint('window-width-steps') / 2
     # Should a user define max_radius by themselves?
@@ -27,7 +31,7 @@ def generate_beam(config, beam_shape):
     current = rigid_beam_current(beam_shape, xi_step_p)
     layers_number = len(current)
     elem_charge = np.abs(2 * beam_shape.current / beam_shape.particles_in_layer)
-    particles_in_layers = (beam_shape.particles_in_layer *
+    particles_in_layers: np.ndarray = (beam_shape.particles_in_layer *
                            np.abs(current / beam_shape.current)).astype(np.int_)
     total_particles = particles_in_layers.sum()
     if three_dimensions:

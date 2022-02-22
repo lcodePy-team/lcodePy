@@ -6,6 +6,7 @@ import cupy as cp
 
 from math import sqrt
 
+from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.weights import weights
 from lcode2dPy.plasma3d_gpu.data import GPUArrays
 
@@ -252,7 +253,7 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
 
 
 class ParticleMover:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.xi_step          = config.getfloat('xi-step')
         reflect_padding_steps = config.getint('reflect-padding-steps')
         self.grid_step_size   = config.getfloat('window-width-step-size')

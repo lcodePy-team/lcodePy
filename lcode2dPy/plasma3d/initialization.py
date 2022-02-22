@@ -1,6 +1,7 @@
 """Module for plasma (3d solver) initialization routines."""
 import numpy as np
 
+from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d.data import Fields, Particles, Currents, Const_Arrays
 from lcode2dPy.plasma3d.weights import initial_deposition
 
@@ -121,7 +122,7 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
-def init_plasma(config):
+def init_plasma(config: Config):
     """
     Initialize all the arrays needed (for what?).
     """

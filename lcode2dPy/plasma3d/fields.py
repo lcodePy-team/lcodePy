@@ -3,12 +3,13 @@ import numpy as np
 
 import scipy.fftpack
 
-from lcode2dPy.plasma3d.data import Fields
+from lcode2dPy.config.config import Config
+from lcode2dPy.plasma3d.data import Fields, Currents, Const_Arrays
 
 
 # Solving Laplace equation with Dirichlet boundary conditions (Ez) #
 
-def calculate_Ez(grid_step_size, const, currents):
+def calculate_Ez(grid_step_size, const: Const_Arrays, currents: Currents):
     """
     Calculate Ez as iDST2D(dirichlet_matrix * DST2D(djx/dx + djy/dy)).
     """
@@ -65,8 +66,8 @@ def dx_dy(arr, grid_step_size):
 
 
 def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
-                          const, fields_avg,
-                          beam_ro, currents, currents_prev):
+                          const: Const_Arrays, fields_avg: Fields,
+                          beam_ro, currents: Currents, currents_prev: Currents):
     """
     Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
     with and without transposition depending on the field component.
@@ -117,7 +118,7 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
 
 # Pushing particles without any fields (used for initial halfstep estimation) #
 
-def calculate_Bz(grid_step_size, const, currents):
+def calculate_Bz(grid_step_size, const: Const_Arrays, currents: Currents):
     """
     Calculate Bz as iDCT2D(dirichlet_matrix * DCT2D(djx/dy - djy/dx)).
     """
@@ -145,7 +146,7 @@ def calculate_Bz(grid_step_size, const, currents):
     #    unnormalized DCT-Type1 is its own inverse, up to a factor 2(N+1)
     #    and we take all scaling matters into account with a single factor
     #    hidden inside neumann_matrix.
-    Bz = scipy.fftpack.dctn(f, type=1)
+    Bz: np.ndarray = scipy.fftpack.dctn(f, type=1)
 
     Bz -= Bz.mean()  # Integral over Bz must be 0.
 
@@ -166,29 +167,33 @@ class FieldComputer(object):
         Plane grid step size.
 
     """
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.xi_step_size = config.getfloat('xi-step')
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')
 
-    def compute_fields(self, fields, fields_prev, const,
-                       rho_beam, currents_prev, currents):
+    def compute_fields(self, flds: Fields, flds_prev: Fields,
+                       const: Const_Arrays, rho_beam,
+                       curr_prev: Currents, curr: Currents):
         # Looks terrible! TODO: rewrite this function entirely
-        new_fields = Fields((fields.Ex).shape[0])
+        new_flds = Fields((flds.Ex).shape[0])
         
-        (new_fields.Ex, new_fields.Ey,
-         new_fields.Bx, new_fields.By) = calculate_Ex_Ey_Bx_By(self.grid_step_size, self.xi_step_size,
-                                                               self.trick, self.variant_A, const,
-                                                               fields, rho_beam, currents, currents_prev)
+        (new_flds.Ex,
+         new_flds.Ey,
+         new_flds.Bx,
+         new_flds.By) = calculate_Ex_Ey_Bx_By(self.grid_step_size,
+                                              self.xi_step_size,
+                                              self.trick, self.variant_A, const,
+                                              flds, rho_beam, curr, curr_prev)
                                                                
         if self.variant_A:
-            new_fields.Ex = 2 * new_fields.Ex - fields_prev.Ex
-            new_fields.Ey = 2 * new_fields.Ey - fields_prev.Ey
-            new_fields.Bx = 2 * new_fields.Bx - fields_prev.Bx
-            new_fields.By = 2 * new_fields.By - fields_prev.By
+            new_flds.Ex = 2 * new_flds.Ex - flds_prev.Ex
+            new_flds.Ey = 2 * new_flds.Ey - flds_prev.Ey
+            new_flds.Bx = 2 * new_flds.Bx - flds_prev.Bx
+            new_flds.By = 2 * new_flds.By - flds_prev.By
 
-        new_fields.Ez = calculate_Ez(self.grid_step_size, const, currents)
-        new_fields.Bz = calculate_Bz(self.grid_step_size, const, currents)
+        new_flds.Ez = calculate_Ez(self.grid_step_size, const, curr)
+        new_flds.Bz = calculate_Bz(self.grid_step_size, const, curr)
         
-        return new_fields, new_fields.average(fields_prev)
+        return new_flds, new_flds.average(flds_prev)
