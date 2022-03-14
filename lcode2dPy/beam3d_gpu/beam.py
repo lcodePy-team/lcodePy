@@ -7,6 +7,10 @@ from lcode2dPy.config.config import Config
 
 WARP_SIZE = 32
 
+particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
+                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
+
 # A new class for BeamParticles that is similar
 # to GPUArrays in plasma3d_gpu.data.
 # TODO: Use only one type of classes, we don't

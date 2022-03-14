@@ -5,6 +5,10 @@ from math import floor, sqrt
 
 from lcode2dPy.config.config import Config
 
+particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
+                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
+
 # We don't really need this class. It's more convenient
 # to have something like GPUArrays from plasma3d_gpu.
 
