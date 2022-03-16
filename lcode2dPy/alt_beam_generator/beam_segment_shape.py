@@ -1,12 +1,11 @@
-from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
-
 from lcode2dPy.alt_beam_generator.eshape import EShape
 from lcode2dPy.alt_beam_generator.rshape import RShape
 from lcode2dPy.alt_beam_generator.xishape import XiShape
 
 class BeamSegmentShape:
     def __init__(self):
-        self.beam_shape: BeamShape = None  # Beam shape owning this segment
+        # Default parameters for 'test 1' beam
+        self.beam_shape = None  # Beam shape owning this segment
         self.length = 5.01 # 2 * np.pi
         self.ampl = 5.
         self.xishape: XiShape = XiShape.get_shape('cos')
@@ -19,7 +18,7 @@ class BeamSegmentShape:
         self.eshape: EShape = EShape.get_shape('monoenergetic')
         self.mass_charge_ratio = 1  # m/q in manual
 
-    def set_beam_shape(self, beam_shape: BeamShape):
+    def set_beam_shape(self, beam_shape):
         self.beam_shape = beam_shape
 
     def initial_sigma_impulse(self, dxi):

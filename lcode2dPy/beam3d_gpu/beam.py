@@ -7,9 +7,9 @@ from lcode2dPy.config.config import Config
 
 WARP_SIZE = 32
 
-particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
-                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
-                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
+particle_dtype3d = cp.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                             ('px', 'f8'), ('py', 'f8'), ('pz', 'f8'),
+                             ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
 
 # A new class for BeamParticles that is similar
 # to GPUArrays in plasma3d_gpu.data.
@@ -36,6 +36,22 @@ class BeamParticles:
         self.dt = cp.zeros(size,     dtype=cp.float64)
         self.remaining_steps = cp.zeros(size,
                                      dtype=cp.int64)
+
+    def init_generated(self, beam_array: particle_dtype3d):
+        self.xi = cp.array(beam_array['xi'])
+        self.x = cp.array(beam_array['x'])
+        self.y = cp.array(beam_array['y'])
+        self.px = cp.array(beam_array['px'])
+        self.py = cp.array(beam_array['py'])
+        self.pz = cp.array(beam_array['pz'])
+        self.q_m = cp.array(beam_array['q_m'])
+        self.q_norm = cp.array(beam_array['q_norm'])
+        self.id = cp.array(beam_array['id'])
+
+        self.dt = cp.zeros_like(self.q_norm, dtype=cp.float64)
+        self.remaining_steps = cp.zeros_like(self.id, dtype=cp.int64)
+    
+        self.size = len(self.dt)
 
     def load(self, *args, **kwargs):
         with cp.load(*args, **kwargs) as loaded:
@@ -153,13 +169,20 @@ class BeamSource:
         self.layout_count = 0 # or _used_count in beam2d
 
     def get_beam_layer_to_layout(self, plasma_layer_idx):
+        """
+        Find all beam particles between plasma_layer_idx and
+        plasma_layer_idx + 1, return them as a layer (class BeamParticles).
+        """
         xi_min = - self.xi_step_size * plasma_layer_idx
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
 
+        # We use this only to speed up the search of requisite particles. Can
+        # be dropped by changing to arr_to_search = self.beam.xi and not using 
+        # layout_count at all.
         begin = self.layout_count
-
-        # Does it find all particles that lay in the layer? Check it.
         arr_to_search = self.beam.xi[begin:]
+
+        # Here we find the length of a layer where requisite particles lay.
         if arr_to_search.size != 0:
             layer_length = cp.sum((cp.asarray(xi_max) <= arr_to_search) *
                                   (arr_to_search < cp.asarray(xi_min)))
@@ -167,21 +190,35 @@ class BeamSource:
             layer_length = 0
         self.layout_count += int(layer_length)
 
+        # Here we create the array of indexes of requisite particles
+        # and return the beam layer of these particles.
         indexes_arr = cp.arange(begin, begin + layer_length)
         return self.beam.get_layer(indexes_arr)
 
 
 class BeamDrain:
+    """
+    This class is used to store beam particles when the calculation of their
+    movement ends.
+    """
     def __init__(self):
+        # We create two empty BeamParticles classes. Don't really like how it
+        # is done. We need to change this procces.
         self.beam_buffer = BeamParticles(0)
         self.lost_buffer = BeamParticles(0)
 
     def push_beam_layer(self, beam_layer: BeamParticles):
+        """
+        Add a beam layer that was moved to the beam buffer.
+        """
         if beam_layer.size > 0:
             self.beam_buffer = concatenate_beam_layers(self.beam_buffer,
                                                        beam_layer)
 
     def push_beam_lost(self, lost_layer: BeamParticles):
+        """
+        Add lost beam particles to the buffer of lost particles.
+        """
         if lost_layer.size > 0:
             self.lost_buffer = concatenate_beam_layers(self.lost_buffer,
                                                        lost_layer)
@@ -192,6 +229,8 @@ class BeamDrain:
 @numba.njit
 def weights(x, y, xi_loc, grid_steps, grid_step_size):
     """
+    Calculates the position and the weights of a beam particleon a 3d cartesian
+    grid.
     """
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)

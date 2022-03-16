@@ -5,9 +5,9 @@ from math import floor, sqrt
 
 from lcode2dPy.config.config import Config
 
-particle_dtype = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
-                           ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
-                           ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'f8')])
+particle_dtype3d = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
+                             ('px', 'f8'), ('py', 'f8'), ('pz', 'f8'),
+                             ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 # We don't really need this class. It's more convenient
 # to have something like GPUArrays from plasma3d_gpu.
@@ -32,8 +32,23 @@ class BeamParticles:
         self.dt = np.zeros(size,     dtype=np.float64)
         self.remaining_steps = np.zeros(size,
                                      dtype=np.int64)
-        # An additional parameter to track lost particles.
-        # self.lost = np.zeros(size, dtype=np.bool8)
+    
+    def init_generated(self, beam_array: particle_dtype3d):
+        self.xi = np.array(beam_array['xi'])
+        self.x = np.array(beam_array['x'])
+        self.y = np.array(beam_array['y'])
+        self.px = np.array(beam_array['px'])
+        self.py = np.array(beam_array['py'])
+        self.pz = np.array(beam_array['pz'])
+        self.q_m = np.array(beam_array['q_m'])
+        self.q_norm = np.array(beam_array['q_norm'])
+        self.id = np.array(beam_array['id'])
+
+        self.dt = np.zeros_like(self.q_norm, dtype=np.float64)
+        self.remaining_steps = np.zeros_like(self.id, dtype=np.int64)
+        
+        self.size = len(self.dt)
+
 
     def load(self, *args, **kwargs):
         with np.load(*args, **kwargs) as loaded:
@@ -50,7 +65,6 @@ class BeamParticles:
             self.dt = np.zeros(self.size, dtype=np.float64)
             self.remaining_steps = np.zeros(self.size,
                                           dtype=np.int64)
-            # self.lost = np.zeros(self.size, dtype=np.bool8)
 
     def save(self, *args, **kwargs):
         np.savez_compressed(*args, **kwargs,
@@ -154,13 +168,20 @@ class BeamSource:
         self.layout_count = 0 # or _used_count in beam2d
 
     def get_beam_layer_to_layout(self, plasma_layer_idx):
+        """
+        Find all beam particles between plasma_layer_idx and
+        plasma_layer_idx + 1, return them as a layer (class BeamParticles).
+        """
         xi_min = - self.xi_step_size * plasma_layer_idx
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
 
+        # We use this only to speed up the search of requisite particles. Can
+        # be dropped by changing to arr_to_search = self.beam.xi and not using 
+        # layout_count at all.
         begin = self.layout_count
-
-        # Does it find all particles that lay in the layer? Check it.
         arr_to_search = self.beam.xi[begin:]
+
+        # Here we find the length of a layer where requisite particles lay.
         if len(arr_to_search) != 0:
             layer_length = np.sum((xi_max <= arr_to_search) *
                                   (arr_to_search < xi_min))
@@ -168,21 +189,35 @@ class BeamSource:
             layer_length = 0
         self.layout_count += layer_length
 
+        # Here we create the array of indexes of requisite particles
+        # and return the beam layer of these particles.
         indexes_arr = np.arange(begin, begin + layer_length)
         return self.beam.get_layer(indexes_arr)
 
 
 class BeamDrain:
+    """
+    This class is used to store beam particles when the calculation of their
+    movement ends.
+    """
     def __init__(self):
+        # We create two empty BeamParticles classes. Don't really like how it
+        # is done. We need to change this procces.
         self.beam_buffer = BeamParticles(0)
         self.lost_buffer = BeamParticles(0)
 
     def push_beam_layer(self, beam_layer: BeamParticles):
+        """
+        Add a beam layer that was moved to the beam buffer.
+        """
         if beam_layer.size > 0:
             self.beam_buffer = concatenate_beam_layers(self.beam_buffer,
                                                        beam_layer)
 
     def push_beam_lost(self, lost_layer: BeamParticles):
+        """
+        Add lost beam particles to the buffer of lost particles.
+        """
         if lost_layer.size > 0:
             self.lost_buffer = concatenate_beam_layers(self.lost_buffer,
                                                        lost_layer)
@@ -226,6 +261,8 @@ def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev 
 @nb.njit
 def weights(x, y, xi_loc, grid_steps, grid_step_size):
     """
+    Calculates the position and the weights of a beam particleon a 3d cartesian
+    grid.
     """
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)

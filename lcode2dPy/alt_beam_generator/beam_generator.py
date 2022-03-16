@@ -9,7 +9,7 @@ particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 particle_dtype3d = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
-                             ('p_x', 'f8'), ('p_y', 'f8'), ('p_z', 'f8'),
+                             ('px', 'f8'), ('py', 'f8'), ('pz', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
@@ -62,15 +62,17 @@ def generate_beam(config: Config, beam_shape: BeamShape):
                                                     particles_in_layer)
             beam['x'][start_idx:end_idx] = x
             beam['y'][start_idx:end_idx] = y
-            beam['p_x'][start_idx:end_idx] = p_x
-            beam['p_y'][start_idx:end_idx] = p_y
+            beam['px'][start_idx:end_idx] = p_x
+            beam['py'][start_idx:end_idx] = p_y
+            beam['pz'][start_idx:end_idx] = segment.get_pz(rng, dxi,
+                                                        particles_in_layer)
         else:
             r_b, p_br, M_b = segment.get_r_values2d(rng, dxi, max_radius,
                                                     particles_in_layer)
             beam['r'][start_idx:end_idx] = r_b
             beam['p_r'][start_idx:end_idx] = p_br
             beam['M'][start_idx:end_idx] = M_b
-        beam['p_z'][start_idx:end_idx] = segment.get_pz(rng, dxi,
+            beam['p_z'][start_idx:end_idx] = segment.get_pz(rng, dxi,
                                                         particles_in_layer)
         beam['q_m'][start_idx:end_idx] = np.full(particles_in_layer, q_m)
         beam['q_norm'][start_idx:end_idx] = np.full(particles_in_layer, q_norm)
