@@ -34,7 +34,7 @@ default_config.set('continuation', 'n') # for 3d - only 'n' is available
 default_config.set('plasma-particles-per-cell', 10)
 
 # Parameters of beam model:
-default_config.set('rigid-beam', 'y') # Only this parameter from this group is used in 3d
+default_config.set('rigid-beam', 'n') # Only this parameter from this group is used in 3d
 default_config.set('beam-substepping-energy', 2)
 default_config.set('focusing', 'n')
 default_config.set('foc-period', 100)
