@@ -8,7 +8,7 @@ from lcode2dPy.beam_generator.beam_generator import make_beam, Gauss, rGauss
 from lcode2dPy.diagnostics.targets import MyDiagnostics
 
 # Imports for 2d simulation
-from lcode2dPy.push_solver import PusherAndSolver
+from lcode2dPy.push_solvers.push_solver import PusherAndSolver
 from lcode2dPy.beam.beam_slice import BeamSlice
 from lcode2dPy.beam.beam_slice import particle_dtype as beam_particle_dtype_2d
 from lcode2dPy.beam.beam_io import MemoryBeamSource, MemoryBeamDrain

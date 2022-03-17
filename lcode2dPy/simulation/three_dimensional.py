@@ -13,11 +13,11 @@ from lcode2dPy.alt_beam_generator.beam_generator import particle_dtype3d
 from lcode2dPy.alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
 
 # Imports for 3d simulation
-from lcode2dPy.push_solver_3d import PushAndSolver3d as PushAndSolver3d_cpu
+from lcode2dPy.push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3d_cpu
 from lcode2dPy.beam3d import beam as beam3d_cpu
 from lcode2dPy.plasma3d.initialization import init_plasma as init_plasma_cpu
 
-from lcode2dPy.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3d_gpu
+from lcode2dPy.push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3d_gpu
 from lcode2dPy.beam3d_gpu import beam as beam3d_gpu
 from lcode2dPy.plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
 
