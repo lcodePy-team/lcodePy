@@ -25,13 +25,29 @@ def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
     return current
 
 
-def generate_beam(config, beam_parameters, beam_module=beam3d_module):
+def generate_beam(config, beam_parameters: dict, beam_module=beam3d_module):
+    # We create a dictionary with default beam parameters (test 1 beam).
+    # Every manually set parameter will be overwritten.
+    # First 3 parameters go to BeamShape, other - to beam_segment_shape.
+    default_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000, 
+                               'rng_seed': 1,
+                               'length': 5.01, 'ampl': 5., 'xishape': 'cos',
+                               'radius': 1., 'energy': 1000., 'rshape': 'g',
+                               'angspread': 1e-5, 'angshape': 'l', 'espread': 0,
+                               'eshape': 'm', 'mass_charge_ratio': 1}
+    complete_beam_parameters = default_beam_parameters
+
+    for key in beam_parameters:
+        complete_beam_parameters[key] = beam_parameters[key]
+
     # You can set 'beam_current' and 'particles_in_layer' parameters
     # here for the whole beam (beam_shape).
-    beam_shape = BeamShape(**beam_parameters)
+    beam_shape = BeamShape(**complete_beam_parameters)
 
     # Works only for one segment (for now).
-    beam_segment = BeamSegmentShape(**beam_parameters)
+    # TODO: Add new functionality that allows the user to define multiple
+    #       beam segments.
+    beam_segment = BeamSegmentShape(**complete_beam_parameters)
     beam_shape.add_segment(beam_segment)
 
     # Now we generate beam particles. beam_module is either

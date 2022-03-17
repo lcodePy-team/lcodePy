@@ -6,17 +6,17 @@ class BeamSegmentShape:
     def __init__(self, **beam_parameters):
         # Default parameters for 'test 1' beam
         self.beam_shape = None  # Beam shape owning this segment
-        self.length = 5.01 # 2 * np.pi
-        self.ampl = 5.
-        self.xishape: XiShape = XiShape.get_shape('cos')
-        self.radius = 1.
-        self.energy = 1000.
-        self.rshape: RShape = RShape.get_shape('gaussian')
-        self.angspread = 1.0e-5
-        self.angshape: XiShape = XiShape.get_shape('l')
-        self.espread = 0
-        self.eshape: EShape = EShape.get_shape('monoenergetic')
-        self.mass_charge_ratio = 1  # m/q in manual
+        self.length = beam_parameters['length']
+        self.ampl = beam_parameters['ampl']
+        self.xishape: XiShape = XiShape.get_shape(beam_parameters['xishape'])
+        self.radius = beam_parameters['radius']
+        self.energy = beam_parameters['energy']
+        self.rshape: RShape = RShape.get_shape(beam_parameters['rshape'])
+        self.angspread = beam_parameters['angspread']
+        self.angshape: XiShape = XiShape.get_shape(beam_parameters['angshape'])
+        self.espread = beam_parameters['espread']
+        self.eshape: EShape = EShape.get_shape(beam_parameters['eshape'])
+        self.mass_charge_ratio = beam_parameters['mass_charge_ratio'] # m/q in manual
 
     def set_beam_shape(self, beam_shape):
         self.beam_shape = beam_shape

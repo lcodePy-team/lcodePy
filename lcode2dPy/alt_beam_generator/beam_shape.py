@@ -4,20 +4,9 @@ from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
 
 class BeamShape:
     def __init__(self, **beam_parameters):
-        if 'current' in beam_parameters.keys():
-            self.current = beam_parameters['current']
-        else:
-            self.current = 0.01
-                
-        if 'particles_in_layer' in beam_parameters.keys():
-            self.particles_in_layer = beam_parameters['particles_in_layer']
-        else:
-            self.particles_in_layer = 2000
-
-        if 'rng_seed' in beam_parameters.keys():
-            self.rng_seed = beam_parameters['rng_seed']
-        else:
-            self.rng_seed = 1
+        self.current = beam_parameters['current']
+        self.particles_in_layer = beam_parameters['particles_in_layer']
+        self.rng_seed = beam_parameters['rng_seed']
 
         self.segments: list[BeamSegmentShape] = []
         # self.rigid = False
