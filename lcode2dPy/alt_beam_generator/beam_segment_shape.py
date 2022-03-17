@@ -3,7 +3,7 @@ from lcode2dPy.alt_beam_generator.rshape import RShape
 from lcode2dPy.alt_beam_generator.xishape import XiShape
 
 class BeamSegmentShape:
-    def __init__(self):
+    def __init__(self, **beam_parameters):
         # Default parameters for 'test 1' beam
         self.beam_shape = None  # Beam shape owning this segment
         self.length = 5.01 # 2 * np.pi

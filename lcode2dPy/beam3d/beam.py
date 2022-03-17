@@ -13,7 +13,7 @@ particle_dtype3d = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
 # to have something like GPUArrays from plasma3d_gpu.
 
 class BeamParticles:
-    def __init__(self, size):
+    def __init__(self, size:int=0):
         """
         Create a new empty array of beam particles. Can be used both as
         a whole beam particles array and as a layer of beam particles.
