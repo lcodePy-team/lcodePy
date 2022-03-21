@@ -5,7 +5,7 @@ from lcode2dPy.config.config import Config
 from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
 from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
 
-from lcode2dPy.beam3d import beam as beam3d_module
+from lcode2dPy.beam3d import beam as beam3d_cpu_module
 
 
 particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
@@ -25,11 +25,11 @@ def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
     return current
 
 
-def generate_beam(config, beam_parameters: dict, beam_module=beam3d_module):
+def generate_beam(config, beam_parameters: dict=None,
+                  beam_module=beam3d_cpu_module):
     # We create a dictionary with default beam parameters (test 1 beam).
-    # Every manually set parameter will be overwritten.
     # First 3 parameters go to BeamShape, other - to beam_segment_shape.
-    default_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000, 
+    default_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000,
                                'rng_seed': 1,
                                'length': 5.01, 'ampl': 5., 'xishape': 'cos',
                                'radius': 1., 'energy': 1000., 'rshape': 'g',
@@ -37,8 +37,10 @@ def generate_beam(config, beam_parameters: dict, beam_module=beam3d_module):
                                'eshape': 'm', 'mass_charge_ratio': 1}
     complete_beam_parameters = default_beam_parameters
 
-    for key in beam_parameters:
-        complete_beam_parameters[key] = beam_parameters[key]
+    # Every manually set parameter will overwrite default one.
+    if beam_parameters is not None:
+        for key in beam_parameters:
+            complete_beam_parameters[key] = beam_parameters[key]
 
     # You can set 'beam_current' and 'particles_in_layer' parameters
     # here for the whole beam (beam_shape).

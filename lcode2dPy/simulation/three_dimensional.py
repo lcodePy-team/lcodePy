@@ -30,7 +30,15 @@ class Cartesian3dSimulation:
     """
     def __init__(self, config: Config=default_config, beam_parameters: dict={},
                  diagnostics=None):
-        # Firstly, we set some instance variables:
+        # Firstly, we check that the geomtry was set right:
+        geometry = config.get('geometry').lower()
+        if geometry != '3d':
+            raise Exception("Sorry, you set a wrong type of geometry. If you",
+                            "want to use Cartesian3dSimulation, change",
+                            f"geometry from {geometry} to 3d in config.",
+                            "(your_config.set('geometry', '3d'))")
+        
+        # We set some instance variables:
         self.config = config
         self.time_limit = config.getfloat('time-limit')
         self.time_step_size = config.getfloat('time-step')
@@ -98,7 +106,7 @@ class Cartesian3dSimulation:
                     self.beam_source = self.beam_module.BeamSource(self.config,
                                                                 beam_particles)
                     self.beam_drain  = self.beam_module.BeamDrain()
-                
+
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
                 # lcode2dPy.alt_beam_generator.beam_generator
