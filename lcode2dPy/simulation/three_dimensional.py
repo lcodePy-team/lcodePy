@@ -5,7 +5,7 @@ from lcode2dPy.config.default_config import default_config
 from lcode2dPy.config.config import Config
 
 # Diagnostics
-# from lcode2dPy.diagnostics.targets_3d import Diagnostics
+from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
 
 # Imports for beam generating in 3d (can be used for 2d also)
 from lcode2dPy.alt_beam_generator.beam_generator import generate_beam
@@ -29,7 +29,11 @@ class Cartesian3dSimulation:
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config: Config=default_config, beam_parameters: dict={},
-                 diagnostics=None):
+                 diagnostics: list=None):
+        # 0. We check if 'config' is just a Python dictionary:
+        if type(config) == dict:
+            config = Config(config)
+
         # Firstly, we check that the geomtry was set right:
         geometry = config.get('geometry').lower()
         if geometry != '3d':
@@ -48,13 +52,13 @@ class Cartesian3dSimulation:
         self.cont_mode = config.get('continuation')
 
         # Here we get information about the type of processing unit (CPU or GPU)
-        self.PU_type = config.get('processing-unit-type').lower()
+        self.pu_type = config.get('processing-unit-type').lower()
 
-        if self.PU_type == 'cpu':
+        if self.pu_type == 'cpu':
             self.push_solver = PushAndSolver3d_cpu(self.config)
             self.init_plasma = init_plasma_cpu
             self.beam_module = beam3d_cpu
-        elif self.PU_type == 'gpu':
+        elif self.pu_type == 'gpu':
             self.push_solver = PushAndSolver3d_gpu(self.config)
             self.init_plasma = init_plasma_gpu
             self.beam_module = beam3d_gpu
@@ -71,7 +75,9 @@ class Cartesian3dSimulation:
         self.beam_drain = None
 
         # Finally, we set the diagnostics.
-        # self.diagnostics = Diagnostics(config, diagnostics)
+        if type(diagnostics) != list and diagnostics is not None:
+            diagnostics = [diagnostics] # If a user set only one diag. class.
+        self.diagnostics = Diagnostics3d(config, diagnostics)
 
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
         beam_particles = self.beam_module.BeamParticles()
@@ -123,7 +129,8 @@ class Cartesian3dSimulation:
                 # Calculates one time step:
                 self.push_solver.step_dt(pl_fields, pl_particles,
                                         pl_currents, pl_const_arrays,
-                                        self.beam_source, self.beam_drain)
+                                        self.beam_source, self.beam_drain,
+                                        self.current_time, self.diagnostics)
 
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
@@ -131,8 +138,10 @@ class Cartesian3dSimulation:
                 self.beam_source = self.beam_module.BeamSource(self.config,
                                                     self.beam_drain.beam_buffer)
                 self.beam_drain  = self.beam_module.BeamDrain()
-
+                
                 self.current_time = self.current_time + self.time_step_size
+            
+            print('\n', 'The work is done!')
 
         # Other plasma continuation mode has not been implemented yet.
         # If you are writing these modes, just change where you put
@@ -143,17 +152,17 @@ class Cartesian3dSimulation:
             raise Exception("Please, read the text above in your window.")
 
 
-class Diagnostics3d:
-    def __init__(self, dt_diag: dict, dxi_diag: dict):
-        self.config = None
-        self.dt_diag: dict = dt_diag
-        self.dxi_diag: dict = dxi_diag
+# class Diagnostics3d:
+#     def __init__(self, dt_diag: dict, dxi_diag: dict):
+#         self.config = None
+#         self.dt_diag: dict = dt_diag
+#         self.dxi_diag: dict = dxi_diag
 
-    def every_dt(self):
-        pass # TODO
+#     def every_dt(self):
+#         pass # TODO
 
-    def every_dxi(self, t, layer_idx, pl_fields, pl_particles, pl_currents, rho_beam, beam_slice):
-        for diag_name in self.dxi_diag.keys():
-            diag, pars = self.dxi_diag[diag_name]
-            diag(self, t, layer_idx, pl_fields, pl_particles, pl_currents, rho_beam, beam_slice, **pars)
-        return None
+#     def every_dxi(self, t, layer_idx, pl_fields, pl_particles, pl_currents, rho_beam, beam_slice):
+#         for diag_name in self.dxi_diag.keys():
+#             diag, pars = self.dxi_diag[diag_name]
+#             diag(self, t, layer_idx, pl_fields, pl_particles, pl_currents, rho_beam, beam_slice, **pars)
+#         return None

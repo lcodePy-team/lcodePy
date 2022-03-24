@@ -1,7 +1,4 @@
-import numpy as np
 import cupy as cp
-
-import os
 
 from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
@@ -23,12 +20,10 @@ class PushAndSolver3d:
         self.xi_steps = int(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
-        self.time_step_i = 0
-        self.time_step_size = config.getfloat('time-step')
-
     def step_dt(self, pl_fields: GPUArrays, pl_particles: GPUArrays,
                 pl_currents: GPUArrays, pl_const_arrays: GPUArrays,
-                beam_source: BeamSource, beam_drain: BeamDrain):
+                beam_source: BeamSource, beam_drain: BeamDrain,
+                current_time, diagnostics=None):
         """
         Perform one time step of beam-plasma calculations.
         """
@@ -62,18 +57,20 @@ class PushAndSolver3d:
                 beam_drain.push_beam_layer(moved)
                 # beam_drain.push_beam_lost(lost)
 
-                # Some diagnostics:
+                # Diagnostics:
+                if diagnostics:
+                    xi_plasma_layer = - self.xi_step_size * xi_i
+                    diagnostics.dxi(current_time, xi_plasma_layer,
+                        GPUArraysView(pl_fields), GPUArraysView(pl_currents),
+                        GPUArraysView(ro_beam))
+
+                # # Some diagnostics:
                 view_pl_fields = GPUArraysView(pl_fields)
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
                 Ez_00_arr.append(Ez_00)
                 xi_arr.append(-xi_i * self.xi_step_size)
 
                 print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
-
-        self.time_step_i += 1
-
-        # if not os.path.isdir('xi_Ez_cpu'):
-        #     os.mkdir('xi_Ez_cpu')
-        # np.savez(f'''./xi_Ez_cpu/xi_Ez_{(self.time_step_i *
-        #                              self.time_step_size):+09.2f}.npz''',
-        #                              xi=xi_arr, Ez_00=Ez_00_arr)
+        
+        if diagnostics:
+            diagnostics.dump(current_time)
