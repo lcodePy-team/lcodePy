@@ -138,7 +138,9 @@ def init_plasma(config: Config):
     assert grid_steps % 2 == 1
 
     # particles should not reach the window pre-boundary cells
-    assert reflect_padding_steps > 2
+    if reflect_padding_steps <= 2:
+        raise Exception("""'reflect_padding_steps' parameter is too low.
+Details: 'reflect_padding_steps' must be bigger than 2. By default it is 5.""")
 
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,

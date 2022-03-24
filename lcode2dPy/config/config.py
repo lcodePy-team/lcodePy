@@ -8,6 +8,7 @@ from lcode2dPy.config.default_config_values import default_config_values
 
 
 class Config:
+    # We don't really need config_values, can work with _arr. TODO: discuss this.
     config_values: dict[str, str]
 
     def __init__(self, new_config_values: dict=None, default_config=True):
