@@ -1,12 +1,30 @@
 """Functions to find fields on the next step of plasma evolution."""
-import numpy as np
+import cupy as cp
 
-import scipy.fftpack
-
-from lcode2dPy.plasma3d.data import Fields
+from lcode2dPy.plasma3d_gpu.data import GPUArrays, fields_average
 
 
 # Solving Laplace equation with Dirichlet boundary conditions (Ez) #
+
+def dst2d(a):
+    """
+    Calculate DST-Type1-2D, jury-rigged from anti-symmetrically-padded rFFT.
+    """
+    assert a.shape[0] == a.shape[1]
+    N = a.shape[0]
+    #                                    / 0  0  0  0  0  0 \
+    #  0  0  0  0                       |  0 /1  2\ 0 -2 -1  |
+    #  0 /1  2\ 0   anti-symmetrically  |  0 \3  4/ 0 -4 -3  |
+    #  0 \3  4/ 0       padded to       |  0  0  0  0  0  0  |
+    #  0  0  0  0                       |  0 -3 -4  0 +4 +3  |
+    #                                    \ 0 -1 -2  0 +2 +1 /
+    p = cp.zeros((2 * N + 2, 2 * N + 2))
+    p[1:N+1, 1:N+1], p[1:N+1, N+2:] = a,             -cp.fliplr(a)
+    p[N+2:,  1:N+1], p[N+2:,  N+2:] = -cp.flipud(a), +cp.fliplr(cp.flipud(a))
+
+    # after padding: rFFT-2D, cut out the top-left segment, take -real part
+    return -cp.fft.rfft2(p)[1:N+1, 1:N+1].real
+
 
 def calculate_Ez(grid_step_size, const, currents):
     """
@@ -21,7 +39,7 @@ def calculate_Ez(grid_step_size, const, currents):
     rhs_inner = -(djx_dx + djy_dy) / (grid_step_size * 2)  # -?
 
     # 1. Apply DST-Type1-2D (Discrete Sine Transform Type 1 2D) to the RHS.
-    f = scipy.fftpack.dstn(rhs_inner, type=1)
+    f = dst2d(rhs_inner)
 
     # 2. Multiply f by the special matrix that does the job and normalizes.
     f *= const.dirichlet_matrix
@@ -31,9 +49,9 @@ def calculate_Ez(grid_step_size, const, currents):
     #    unnormalized DST-Type1 is its own inverse, up to a factor 2(N+1)
     #    and we take all scaling matters into account with a single factor
     #    hidden inside dirichlet_matrix.
-    
-    Ez_inner = scipy.fftpack.dstn(f, type=1)
-    Ez = np.pad(Ez_inner, 1, 'constant', constant_values=0)
+    Ez_inner = dst2d(f)
+    Ez = cp.pad(Ez_inner, 1, 'constant', constant_values=0)
+
     return Ez
 
 
@@ -45,11 +63,21 @@ def mix2d(a):
     (DST in first direction, DCT in second one).
     """
     # NOTE: LCODE 3D uses x as the first direction, thus the confision below.
-    a_dst     = scipy.fftpack.dst(a,     type=1, axis=0)
-    a_dst_dct = scipy.fftpack.dct(a_dst, type=1, axis=1)
-    # add zeros in top and bottom
-    a_out = np.pad(a_dst_dct, ((1,1),(0,0)), 'constant', constant_values=0)
-    return a_out
+    M, N = a.shape
+    #                                  /(0  1  2  0)-2 -1 \      +---->  x
+    #  / 1  2 \                       | (0  3  4  0)-4 -3  |     |      (M)
+    #  | 3  4 |  mixed-symmetrically  | (0  5  6  0)-6 -5  |     |
+    #  | 5  6 |       padded to       | (0  7  8  0)-8 -7  |     v
+    #  \ 7  8 /                       |  0 +5 +6  0 -6 -5  |
+    #                                  \ 0 +3 +4  0 -4 -3 /      y (N)
+    p = cp.zeros((2 * M + 2, 2 * N - 2))  # wider than before
+    p[1:M+1, :N] = a
+    p[M+2:2*M+2, :N] = -cp.flipud(a)  # flip to right on drawing above
+    p[1:M+1, N-1:2*N-2] = cp.fliplr(a)[:, :-1]  # flip down on drawing above
+    p[M+2:2*M+2, N-1:2*N-2] = -cp.flipud(cp.fliplr(a))[:, :-1]
+    # Note: the returned array is wider than the input array, it is padded
+    # with zeroes (depicted above as a square region marked with round braces).
+    return -cp.fft.rfft2(p)[:M+2, :N].imag  # FFT, cut a corner with 0s, -imag
 
 
 def dx_dy(arr, grid_step_size):
@@ -58,7 +86,7 @@ def dx_dy(arr, grid_step_size):
     NOTE: use gradient instead if available (cupy doesn't have gradient yet).
     NOTE: arrays are assumed to have zeros on the perimeter.
     """
-    dx, dy = np.zeros_like(arr), np.zeros_like(arr)
+    dx, dy = cp.zeros_like(arr), cp.zeros_like(arr)
     dx[1:-1, 1:-1] = arr[2:, 1:-1] - arr[:-2, 1:-1]  # arrays have 0s
     dy[1:-1, 1:-1] = arr[1:-1, 2:] - arr[1:-1, :-2]  # on the perimeter
     return dx / (grid_step_size * 2), dy / (grid_step_size * 2)
@@ -81,7 +109,7 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
     ro = currents.ro if not variant_A else (currents.ro + currents_prev.ro) / 2
     jz = currents.jz if not variant_A else (currents.jz + currents_prev.jz) / 2
 
-    # 1. Calculate gradients and RHS.
+    # 0. Calculate gradients and RHS.
     dro_dx, dro_dy = dx_dy(ro + beam_ro, grid_step_size)
     djz_dx, djz_dy = dx_dy(jz + beam_ro, grid_step_size)
     djx_dxi = (jx_prev - jx) / xi_step_size  # - ?
@@ -97,14 +125,14 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
     # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
     # rhs[:, -1] += bound_top[:] * (2 / grid_step_size)
 
-    # 2. Apply our mixed DCT-DST transform to RHS.
+    # 1. Apply our mixed DCT-DST transform to RHS.
     Ey_f = mix2d(Ey_rhs[1:-1, :])[1:-1, :]
 
-    # 3. Multiply f by the magic matrix.
+    # 2. Multiply f by the magic matrix.
     mix_mat = const.field_mixed_matrix
     Ey_f *= mix_mat
 
-    # 4. Apply our mixed DCT-DST transform again.
+    # 3. Apply our mixed DCT-DST transform again.
     Ey = mix2d(Ey_f)
 
     # Likewise for other fields:
@@ -117,6 +145,27 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
 
 # Pushing particles without any fields (used for initial halfstep estimation) #
 
+def dct2d(a):
+    """
+    Calculate DCT-Type1-2D, jury-rigged from symmetrically-padded rFFT.
+    """
+    assert a.shape[0] == a.shape[1]
+    N = a.shape[0]
+    #                                    //1  2  3  4\ 3  2 \
+    # /1  2  3  4\                      | |5  6  7  8| 7  6  |
+    # |5  6  7  8|     symmetrically    | |9  A  B  C| B  A  |
+    # |9  A  B  C|      padded to       | \D  E  F  G/ F  E  |
+    # \D  E  F  G/                      |  9  A  B  C  B  A  |
+    #                                    \ 5  6  7  8  7  6 /
+    p = cp.zeros((2 * N - 2, 2 * N - 2))
+    p[:N, :N] = a
+    p[N:, :N] = cp.flipud(a)[1:-1, :]  # flip to right on drawing above
+    p[:N, N:] = cp.fliplr(a)[:, 1:-1]  # flip down on drawing above
+    p[N:, N:] = cp.flipud(cp.fliplr(a))[1:-1, 1:-1]  # bottom-right corner
+    # after padding: rFFT-2D, cut out the top-left segment, take -real part
+    return -cp.fft.rfft2(p)[:N, :N].real
+
+
 def calculate_Bz(grid_step_size, const, currents):
     """
     Calculate Bz as iDCT2D(dirichlet_matrix * DCT2D(djx/dy - djy/dx)).
@@ -127,15 +176,15 @@ def calculate_Bz(grid_step_size, const, currents):
 
     djx_dy = jx[1:-1, 2:] - jx[1:-1, :-2]
     djy_dx = jy[2:, 1:-1] - jy[:-2, 1:-1]
-    djx_dy = np.pad(djx_dy, 1, 'constant', constant_values=0)
-    djy_dx = np.pad(djy_dx, 1, 'constant', constant_values=0)
+    djx_dy = cp.pad(djx_dy, 1, 'constant', constant_values=0)
+    djy_dx = cp.pad(djy_dx, 1, 'constant', constant_values=0)
     rhs = -(djx_dy - djy_dx) / (grid_step_size * 2)  # -?
 
     # As usual, the boundary conditions are zero
     # (otherwise add them to boundary cells, divided by grid_step_size/2
 
     # 1. Apply DST-Type1-2D (Discrete Sine Transform Type 1 2D) to the RHS.
-    f = scipy.fftpack.dctn(rhs, type=1)
+    f = dct2d(rhs)
 
     # 2. Multiply f by the special matrix that does the job and normalizes.
     f *= const.neumann_matrix
@@ -145,7 +194,7 @@ def calculate_Bz(grid_step_size, const, currents):
     #    unnormalized DCT-Type1 is its own inverse, up to a factor 2(N+1)
     #    and we take all scaling matters into account with a single factor
     #    hidden inside neumann_matrix.
-    Bz = scipy.fftpack.dctn(f, type=1)
+    Bz = dct2d(f)
 
     Bz -= Bz.mean()  # Integral over Bz must be 0.
 
@@ -175,20 +224,22 @@ class FieldComputer(object):
     def compute_fields(self, fields, fields_prev, const,
                        rho_beam, currents_prev, currents):
         # Looks terrible! TODO: rewrite this function entirely
-        new_fields = Fields((fields.Ex).shape[0])
-        
-        (new_fields.Ex, new_fields.Ey,
-         new_fields.Bx, new_fields.By) = calculate_Ex_Ey_Bx_By(self.grid_step_size, self.xi_step_size,
-                                                               self.trick, self.variant_A, const,
-                                                               fields, rho_beam, currents, currents_prev)
-                                                               
-        if self.variant_A:
-            new_fields.Ex = 2 * new_fields.Ex - fields_prev.Ex
-            new_fields.Ey = 2 * new_fields.Ey - fields_prev.Ey
-            new_fields.Bx = 2 * new_fields.Bx - fields_prev.Bx
-            new_fields.By = 2 * new_fields.By - fields_prev.By
 
-        new_fields.Ez = calculate_Ez(self.grid_step_size, const, currents)
-        new_fields.Bz = calculate_Bz(self.grid_step_size, const, currents)
-        
-        return new_fields, new_fields.average(fields_prev)
+        Ex, Ey, Bx, By = calculate_Ex_Ey_Bx_By(
+                            self.grid_step_size, self.xi_step_size,
+                            self.trick, self.variant_A, const,
+                            fields, rho_beam, currents, currents_prev)
+                                            
+        if self.variant_A:
+            Ex = 2 * Ex - fields_prev.Ex
+            Ey = 2 * Ey - fields_prev.Ey
+            Bx = 2 * Bx - fields_prev.Bx
+            By = 2 * By - fields_prev.By
+
+        Ez = calculate_Ez(self.grid_step_size, const, currents)
+        Bz = calculate_Bz(self.grid_step_size, const, currents)
+
+        new_fields = GPUArrays(Ex=Ex, Ey=Ey, Ez=Ez,
+                               Bx=Bx, By=By, Bz=Bz)
+
+        return new_fields, fields_average(new_fields, fields_prev)

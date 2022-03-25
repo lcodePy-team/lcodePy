@@ -1,6 +1,6 @@
 """Routine to compute charge density and currents of particles."""
-from lcode2dPy.plasma3d.data import Currents
-from lcode2dPy.plasma3d.weights import deposit
+from lcode2dPy.plasma3d_gpu.data import GPUArrays
+from lcode2dPy.plasma3d_gpu.weights import deposit
 
 class RhoJComputer(object):
     def __init__(self, config):
@@ -14,11 +14,9 @@ class RhoJComputer(object):
                                  particles.px, particles.py,
                                  particles.pz,
                                  particles.q, particles.m)
-        
+
         # Also add the background ion charge density.
         # Do it last to preserve more float precision
         ro += const_arrays.ro_initial
 
-        return Currents(ro, jx, jy, jz)
-    
-
+        return GPUArrays(ro=ro, jx=jx, jy=jy, jz=jz)
