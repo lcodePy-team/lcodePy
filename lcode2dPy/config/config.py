@@ -9,7 +9,7 @@ from lcode2dPy.config.default_config_values import default_config_values
 
 class Config:
     # We don't really need config_values, can work with _arr. TODO: discuss this.
-    config_values: dict[str, str]
+    # config_values: dict[str, str] # And we don't really need to declare this.
 
     def __init__(self, new_config_values: dict=None, default_config=True):
         # Initialize an empty dictionaty for config values:
@@ -44,7 +44,7 @@ class Config:
 
     def getint(self, option_name: str, fallback: int = 0) -> int:
         try:
-            return int(self.get(option_name))
+            return int(float(self.get(option_name)))
         except ValueError:
             return fallback
 
