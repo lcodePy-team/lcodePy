@@ -29,18 +29,25 @@ def generate_beam(config, beam_parameters: dict=None,
                   beam_module=beam3d_cpu_module):
     # We create a dictionary with default beam parameters (test 1 beam).
     # First 3 parameters go to BeamShape, other - to beam_segment_shape.
-    default_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000,
-                               'rng_seed': 1,
-                               'length': 5.01, 'ampl': 5., 'xishape': 'cos',
-                               'radius': 1., 'energy': 1000., 'rshape': 'g',
-                               'angspread': 1e-5, 'angshape': 'l', 'espread': 0,
-                               'eshape': 'm', 'mass_charge_ratio': 1}
-    complete_beam_parameters = default_beam_parameters
+    complete_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000,
+                                'rng_seed': 1,
+                                'length': 5.01, 'ampl': 5., 'xishape': 'cos',
+                                'radius': 1., 'energy': 1000., 'rshape': 'g',
+                                'angspread': 1e-5, 'angshape': 'l', 'espread': 0,
+                                'eshape': 'm', 'mass_charge_ratio': 1}
 
-    # Every manually set parameter will overwrite default one.
     if beam_parameters is not None:
-        for key in beam_parameters:
-            complete_beam_parameters[key] = beam_parameters[key]
+        # Here we change default beam parameters if a user set a new default
+        # parameters.
+        if 'default' in beam_parameters.keys():
+            for def_key in beam_parameters['default'].keys():
+                complete_beam_parameters[def_key] = (
+                    beam_parameters['default'])[def_key]
+
+        # Every manually set parameter will overwrite default one.
+        for key in beam_parameters.keys():
+            if key is not 'default':
+                complete_beam_parameters[key] = beam_parameters[key]
 
     # You can set 'beam_current' and 'particles_in_layer' parameters
     # here for the whole beam (beam_shape).
