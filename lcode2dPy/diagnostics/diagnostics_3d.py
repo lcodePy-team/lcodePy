@@ -1,5 +1,5 @@
 import numpy as np
-import cupy as cp
+import math
 
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -44,16 +44,16 @@ class Diagnostics3d:
             diag.dump(current_time)
 
 
-class Diagnostics3d_f_xi:
+class Diagnostics_f_xi:
     allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                    'Ez2', 'Bz2', 'nb2'] 
+                    'Ez2', 'Bz2', 'nb2']
                     # 'Phi', 'ni']
                     # TODO: add them and functionality!
     allowed_f_xi_type = ['numbers']
     #TODO: add 'pictures' and 'both' and functionality
 
-    def __init__(self, f_xi: str='Ez', f_xi_type='numbers', axis_x=0, axis_y=0,
-                 auxiliary_x=1, auxiliary_y=1, output_period=100):
+    def __init__(self, output_period=100, f_xi='Ez', f_xi_type='numbers',
+                 axis_x=0, axis_y=0, auxiliary_x=1, auxiliary_y=1):
         # It creates a list of string elements such as Ez, Ex, By...
         self.f_xi_names = from_str_into_list(f_xi)
         for name in self.f_xi_names:
@@ -71,6 +71,7 @@ class Diagnostics3d_f_xi:
         # THe position of a `probe' line 2 from the center:
         self.aux_x, self.aux_y = auxiliary_x, auxiliary_y
 
+        # Set time periodicity of detailed output:
         self.period = output_period
 
         # We store data as a simple Python dictionary of lists for f(xi) data.
@@ -78,16 +79,16 @@ class Diagnostics3d_f_xi:
         self.data = {name: [] for name in self.f_xi_names}
         self.data['xi'] = []
 
-    def pull_config(self, config: Config=default_config):
+    def pull_config(self, config=default_config):
         """Pulls a config to get all required parameters."""
         self.steps = config.getint('window-width-steps')
         self.step_size = config.getfloat('window-width-step-size')
 
-        # We change how we store the positions of the 'probe' lines:        
-        self.ax_x = int(self.ax_x / self.step_size)
-        self.ax_y = int(self.ax_y / self.step_size)
-        self.aux_x = int(self.aux_x / self.step_size)
-        self.aux_y = int(self.aux_y / self.step_size)
+        # We change how we store the positions of the 'probe' lines:
+        self.ax_x  = self.steps // 2 + int(self.ax_x / self.step_size)
+        self.ax_y  = self.steps // 2 + int(self.ax_y / self.step_size)
+        self.aux_x = self.steps // 2 + int(self.aux_x / self.step_size)
+        self.aux_y = self.steps // 2 + int(self.aux_y / self.step_size)
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
@@ -102,40 +103,178 @@ class Diagnostics3d_f_xi:
             print("The diagnostics will not work because",
                   f"{self.period} % {self.time_step_size} != 0")
 
-    def dxi(self, current_time, xi_plasma_layer, 
-                pl_fields, pl_currents, ro_beam):
+    def dxi(self, current_time, xi_plasma_layer,
+            pl_particles, pl_fields, pl_currents, ro_beam):
         if current_time % self.period == 0:
             self.data['xi'].append(xi_plasma_layer)
 
             for name in self.f_xi_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz']:
-                    field = getattr(pl_fields, name)[
-                        self.steps//2 + self.ax_x, self.steps//2 + self.ax_y]
+                    field = getattr(pl_fields, name)[self.ax_x, self.ax_y]
                     self.data[name].append(field)
-                
+
                 if name == 'ne':
-                    ro = getattr(pl_currents, 'ro')[
-                        self.steps//2 + self.ax_x, self.steps//2 + self.ax_y]
+                    ro = getattr(pl_currents, 'ro')[self.ax_x, self.ax_y]
                     self.data[name].append(ro)
-                
+
                 if name == 'nb':
-                    ro_beam = ro_beam[
-                        self.steps//2 + self.ax_x, self.steps//2 + self.ax_y]
-                    self.data[name].append(ro_beam)
+                    ro = ro_beam[self.ax_x, self.ax_y]
+                    self.data[name].append(ro)
 
                 if name in ['Ez2', 'Bz2']:
-                    field = getattr(pl_fields, name[:2])[
-                        self.steps//2 + self.aux_x, self.steps//2 + self.aux_y]
+                    field = getattr(pl_fields, name[:2])[self.aux_x, self.aux_y]
                     self.data[name].append(field)
-                
+
                 if name == 'nb2':
-                    ro_beam = ro_beam[
-                        self.steps//2 + self.aux_x, self.steps//2 + self.aux_y]
-                    self.data[name].append(ro_beam)
+                    ro = ro_beam[self.aux_x, self.aux_y]
+                    self.data[name].append(ro)
 
     def dump(self, current_time):
         time_for_save = current_time + self.time_step_size
+
         Path('./diagnostics').mkdir(parents=True, exist_ok=True)
         if 'numbers' in self.f_xi_type or 'both' in self.f_xi_type:
             np.savez(f'./diagnostics/f_xi_{time_for_save:08.2f}.npz',
                      **self.data)
+
+class Diagnostics_colormaps:
+    allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
+                         'px', 'py', 'pz']
+                        # 'Phi', 'ni']
+                    # TODO: add them and functionality!
+    allowed_colormaps_type = ['numbers']
+    #TODO: add 'pictures' and 'both' and functionality
+    
+    def __init__(self, output_period=100,
+                 colormaps='Ez', colormaps_type='numbers',
+                 xi_from=float('inf'), xi_to=float('-inf'),
+                 r_from=0, r_to=float('inf'),
+                 output_merging_r: int=1, output_merging_xi: int=1):
+        # It creates a list of string elements such as Ez, Ex, By...
+        self.colormaps_names = from_str_into_list(colormaps)
+        for name in self.colormaps_names:
+            if name not in self.allowed_colormaps:
+                raise Exception(f'{name} value is not supported as a colormap.')
+
+        # Output mode for the functions of xi:
+        if colormaps_type in self.allowed_colormaps_type:
+            self.colormaps_type = colormaps_type
+        else:
+            raise Exception(f'{colormaps_type} type of colormap diagnostics is not supported.')
+
+        # Set time periodicity of detailed output:
+        self.period = output_period
+
+        # Set borders of a subwindow:
+        self.xi_from, self.xi_to = xi_from, xi_to
+        self.r_from, self.r_to = r_from, r_to
+
+        # Set values for merging functionality:
+        self.merging_r  = int(output_merging_r)
+        self.merging_xi = int(output_merging_xi)
+
+        # We store data as a Python dictionary of numpy arrays for colormaps
+        # data. I'm not sure this is the best way to handle data storing.
+        self.data = {name: [] for name in self.colormaps_names}
+        self.data['xi'] = []
+
+    def pull_config(self, config=default_config):
+        """Pulls a config to get all required parameters."""
+        self.steps = config.getint('window-width-steps')
+        self.step_size = config.getfloat('window-width-step-size')
+
+        # Here we define subwindow borders in terms of number of steps:
+        self.r_from = self.steps // 2 + self.r_from / self.step_size
+        self.r_to   = self.steps // 2 + self.r_to   / self.step_size
+
+        # We check that r_from and r_to are in the borders of window.
+        # Otherwise, we make them equal to the size of the window.
+        if self.r_to > self.steps:
+            self.r_to = self.steps
+        else:
+            self.r_to = int(self.r_to)
+        
+        if self.r_from < 0:
+            self.r_from = 0
+        else:
+            self.r_from = int(self.r_from)
+
+        # Here we check if the output period is less than the time step size.
+        # In that case each time step is diagnosed. The first time step is
+        # always diagnosed. And we check if period % time_step_size = 0,
+        # because otherwise it won't diagnosed anything.
+        self.time_step_size = config.getfloat('time-step')
+
+        if self.period < self.time_step_size:
+            self.period = self.time_step_size   
+
+        if self.period % self.time_step_size != 0:
+            print("The diagnostics will not work because",
+                  f"{self.period} % {self.time_step_size} != 0")
+
+    def dxi(self, current_time, xi_plasma_layer,
+            pl_particles, pl_fields, pl_currents, ro_beam):
+        if (current_time % self.period == 0 and xi_plasma_layer <= self.xi_from
+            and xi_plasma_layer >= self.xi_to):
+            self.data['xi'].append(xi_plasma_layer)
+
+            for name in self.colormaps_names:
+                if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz']:
+                    val = getattr(pl_fields, name)[
+                        self.steps//2, self.r_from:self.r_to]
+                    self.data[name].append(val)
+
+                if name == 'ne':
+                    val = getattr(pl_currents, 'ro')[
+                        self.steps//2, self.r_from:self.r_to]
+                    self.data[name].append(val)
+
+                if name == 'nb':
+                    val = ro_beam[self.steps//2, self.r_from:self.r_to]
+                    self.data[name].append(val)
+
+                if name in ['px', 'py', 'pz']:
+                    val = getattr(pl_particles, name)[
+                        self.steps//2, self.r_from:self.r_to]
+                    self.data[name].append(val)
+    
+    def dump(self, current_time):
+        # In case of colormaps, we reshape every data list except for xi list.
+        size = len(self.data['xi'])
+        for name in self.data:
+            if name != 'xi' and size != 0:
+                self.data[name] = np.reshape(np.array(self.data[name]),
+                                            (size, -1))
+
+        # Merging the data along r and xi axes:
+        if self.merging_r > 1 or self.merging_xi > 1:
+            for name in self.data:
+                if name != 'xi':
+                    self.data[name] = conv_2d(self.data[name],
+                                              self.merging_xi, self.merging_r)
+
+        # Saving the data to a file:
+        time_for_save = current_time + self.time_step_size
+
+        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+        if 'numbers' in self.colormaps_type or 'both' in self.colormaps_type:
+            np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
+                     **self.data)
+
+def conv_2d(arr: np.ndarray, merging_xi, merging_r):
+    """Calculate strided convolution using a mean/uniform kernel."""
+    new_arr = []
+    for i in range(0, arr.shape[0], merging_xi):
+        start_i, end_i = i, i + merging_xi
+        if end_i > arr.shape[0]:
+            end_i = arr.shape[0]
+
+        for j in range(0, arr.shape[1], merging_r):
+            start_j, end_j = j, j + merging_r
+            if end_j > arr.shape[1]:
+                end_j = arr.shape[1]
+
+            new_arr.append(np.mean(arr[start_i:end_i,start_j:end_j]))
+
+    return np.reshape(np.array(new_arr),
+                      math.ceil(arr.shape[0] / merging_xi, -1))

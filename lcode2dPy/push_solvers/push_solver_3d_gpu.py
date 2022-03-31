@@ -5,6 +5,7 @@ from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
 from lcode2dPy.plasma3d_gpu.data import GPUArrays, GPUArraysView
 from lcode2dPy.beam3d_gpu.beam import (BeamParticles, BeamSource, BeamDrain,
                                        BeamCalculator, concatenate_beam_layers)
+from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
 
 
 class PushAndSolver3d:
@@ -23,16 +24,13 @@ class PushAndSolver3d:
     def step_dt(self, pl_fields: GPUArrays, pl_particles: GPUArrays,
                 pl_currents: GPUArrays, pl_const_arrays: GPUArrays,
                 beam_source: BeamSource, beam_drain: BeamDrain,
-                current_time, diagnostics=None):
+                current_time, diagnostics: Diagnostics3d=None):
         """
         Perform one time step of beam-plasma calculations.
         """
         self.beam_calc.start_time_step()
         beam_layer_to_move = BeamParticles(0)
         fell_size = 0
-
-        # Arrays for simple diagnostics
-        Ez_00_arr, xi_arr = [], []
 
         gpu_index = 0
         with cp.cuda.Device(gpu_index):
@@ -61,14 +59,12 @@ class PushAndSolver3d:
                 if diagnostics:
                     xi_plasma_layer = - self.xi_step_size * xi_i
                     diagnostics.dxi(current_time, xi_plasma_layer,
-                        GPUArraysView(pl_fields), GPUArraysView(pl_currents),
-                        GPUArraysView(ro_beam))
+                        GPUArraysView(pl_particles), GPUArraysView(pl_fields),
+                        GPUArraysView(pl_currents), GPUArraysView(ro_beam))
 
                 # # Some diagnostics:
                 view_pl_fields = GPUArraysView(pl_fields)
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
-                Ez_00_arr.append(Ez_00)
-                xi_arr.append(-xi_i * self.xi_step_size)
 
                 print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
         

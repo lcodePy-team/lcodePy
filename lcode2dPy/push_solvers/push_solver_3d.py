@@ -5,6 +5,7 @@ from lcode2dPy.plasma3d.data import Fields, Currents, Particles, Const_Arrays
 from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
 from lcode2dPy.beam3d.beam import (BeamParticles, BeamSource, BeamDrain,
                                    BeamCalculator, concatenate_beam_layers)
+from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
 
 
 class PushAndSolver3d:
@@ -23,16 +24,13 @@ class PushAndSolver3d:
     def step_dt(self, pl_fields: Fields, pl_particles: Particles,
                 pl_currents: Currents, pl_const_arrays: Const_Arrays,
                 beam_source: BeamSource, beam_drain: BeamDrain,
-                current_time, diagnostics=None):
+                current_time, diagnostics: Diagnostics3d=None):
         """
         Perform one time step of beam-plasma calculations.
         """
         self.beam_calc.start_time_step()
         beam_layer_to_move = BeamParticles(0)
         fell_size = 0
-
-        # Arrays for simple diagnostics
-        Ez_00_arr, xi_arr = [], []
 
         for xi_i in range(self.xi_steps + 1):
             beam_layer_to_layout = beam_source.get_beam_layer_to_layout(xi_i)
@@ -58,12 +56,10 @@ class PushAndSolver3d:
             # Diagnostics:
             if diagnostics:
                 xi_plasma_layer = - self.xi_step_size * xi_i
-                diagnostics.dxi(current_time, xi_plasma_layer, 
-                                pl_fields, pl_currents, ro_beam)
+                diagnostics.dxi(current_time, xi_plasma_layer,
+                                pl_particles, pl_fields, pl_currents, ro_beam)
 
             Ez_00 = pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
-            Ez_00_arr.append(Ez_00)
-            xi_arr.append(-xi_i * self.xi_step_size)
 
             print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
 
