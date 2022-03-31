@@ -51,7 +51,7 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
 
         # Every manually set parameter will overwrite default one.
         for key in beam_parameters.keys():
-            if key is not 'default':
+            if key != 'default':
                 complete_beam_parameters[key] = beam_parameters[key]
 
     # You can set 'beam_current' and 'particles_in_layer' parameters
