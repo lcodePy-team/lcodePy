@@ -1,8 +1,7 @@
-import numpy as np
 import math
-
-import matplotlib.pyplot as plt
 from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
 
 from lcode2dPy.config.config import Config
 from lcode2dPy.config.default_config import default_config
@@ -58,7 +57,7 @@ class Diagnostics_f_xi:
                     'Ez2', 'Bz2', 'nb2']
                     # 'Phi', 'ni']
                     # TODO: add them and functionality!
-    allowed_f_xi_type = ['numbers']
+    allowed_f_xi_type = ['numbers', 'pictures', 'both']
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(self, output_period=100, f_xi='Ez', f_xi_type='numbers',
@@ -139,12 +138,19 @@ class Diagnostics_f_xi:
                     self.data[name].append(ro)
 
     def dump(self, current_time):
-        time_for_save = current_time + self.time_step_size
+        time_save = current_time + self.time_step_size
 
         Path('./diagnostics').mkdir(parents=True, exist_ok=True)
         if 'numbers' in self.f_xi_type or 'both' in self.f_xi_type:
-            np.savez(f'./diagnostics/f_xi_{time_for_save:08.2f}.npz',
+            np.savez(f'./diagnostics/f_xi_{time_save:08.2f}.npz',
                      **self.data)
+
+        if 'pictures' in self.f_xi_type or 'both' in self.f_xi_type:
+            for name in self.f_xi_names:
+                plt.plot(self.data['xi'], self.data[name])
+                plt.savefig(f'./diagnostics/{name}_f_xi_{time_save:08.2f}.png')
+                            # vmin=-1, vmax=1)
+                plt.close()
 
     def dt(self, *params):
         # We use this function to clean old data:
@@ -256,17 +262,16 @@ class Diagnostics_colormaps:
     def dump(self, current_time):
         # In case of colormaps, we reshape every data list except for xi list.
         size = len(self.data['xi'])
-        for name in self.data:
-            if name != 'xi' and size != 0:
-                self.data[name] = np.reshape(np.array(self.data[name]),
-                                            (size, -1))
+        if size != 0:
+            for name in self.colormaps_names:
+                    self.data[name] = np.reshape(np.array(self.data[name]),
+                                                (size, -1))
 
         # Merging the data along r and xi axes:
         if self.merging_r > 1 or self.merging_xi > 1:
-            for name in self.data:
-                if name != 'xi':
-                    self.data[name] = conv_2d(self.data[name],
-                                              self.merging_xi, self.merging_r)
+            for name in self.colormaps_names:
+                self.data[name] = conv_2d(self.data[name],
+                                        self.merging_xi, self.merging_r)
 
         # Saving the data to a file:
         time_for_save = current_time + self.time_step_size
