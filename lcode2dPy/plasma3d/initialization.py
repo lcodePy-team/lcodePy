@@ -160,3 +160,23 @@ def init_plasma(config: Config):
     const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix, neu_matrix)
 
     return fields, particles, currents, const_arrays
+
+
+def load_plasma(config: Config, path_to_plasmastate: str):
+    fields, particles, currents, _ = init_plasma(config)
+
+    with np.load(file=path_to_plasmastate) as state:
+        fields.Ex, fields.Ey, fields.Ez =\
+             state['Ex'], state['Ey'], state['Ez']
+        fields.Bx, fields.By, fields.Bz =\
+             state['Bx'], state['By'], state['Bz']
+
+        particles.x_offt, particles.x_offt =\
+            state['x_offt'], state['y_offt']
+        particles.px, particles.py, particles.pz =\
+            state['px'], state['py'], state['pz']
+
+        currents.ro, currents.jx, currents.jy, currents.jz = \
+            state['ro'], state['jx'], state['jy'], state['jz']
+
+    return fields, particles, currents

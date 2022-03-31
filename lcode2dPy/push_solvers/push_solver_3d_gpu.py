@@ -67,6 +67,6 @@ class PushAndSolver3d:
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
                 print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
-        
+
         if diagnostics:
             diagnostics.dump(current_time)

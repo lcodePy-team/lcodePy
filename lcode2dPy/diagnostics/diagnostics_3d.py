@@ -7,6 +7,8 @@ from pathlib import Path
 from lcode2dPy.config.config import Config
 from lcode2dPy.config.default_config import default_config
 
+from lcode2dPy.plasma3d_gpu.data import GPUArraysView
+
 
 def from_str_into_list(names_str: str):
     # Makes a list of elements that it gets from a long string.
@@ -38,10 +40,17 @@ class Diagnostics3d:
                 diag.dxi(*parameters)
             except AttributeError:
                 print(f'{diag} type of diagnostics is not supported.')
-    
-    def dump(self, current_time):
+
+    def dump(self, *parameters):
         for diag in self.diag_list:
-            diag.dump(current_time)
+            diag.dump(*parameters)
+
+    def dt(self, *parameters):
+        for diag in self.diag_list:
+            try:
+                diag.dt(*parameters)
+            except AttributeError:
+                print(f'{diag} type of diagnostics is not supported.')
 
 
 class Diagnostics_f_xi:
@@ -59,7 +68,7 @@ class Diagnostics_f_xi:
         for name in self.f_xi_names:
             if name not in self.allowed_f_xi:
                 raise Exception(f'{name} value is not supported as f(xi).')
-        
+
         # Output mode for the functions of xi:
         if f_xi_type in self.allowed_f_xi_type:
             self.f_xi_type = f_xi_type
@@ -137,6 +146,12 @@ class Diagnostics_f_xi:
             np.savez(f'./diagnostics/f_xi_{time_for_save:08.2f}.npz',
                      **self.data)
 
+    def dt(self, *params):
+        # We use this function to clean old data:
+        for name in self.data:
+            self.data[name] = []
+
+
 class Diagnostics_colormaps:
     allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
                          'px', 'py', 'pz']
@@ -144,7 +159,7 @@ class Diagnostics_colormaps:
                     # TODO: add them and functionality!
     allowed_colormaps_type = ['numbers']
     #TODO: add 'pictures' and 'both' and functionality
-    
+
     def __init__(self, output_period=100,
                  colormaps='Ez', colormaps_type='numbers',
                  xi_from=float('inf'), xi_to=float('-inf'),
@@ -193,7 +208,7 @@ class Diagnostics_colormaps:
             self.r_to = self.steps
         else:
             self.r_to = int(self.r_to)
-        
+
         if self.r_from < 0:
             self.r_from = 0
         else:
@@ -237,7 +252,7 @@ class Diagnostics_colormaps:
                     val = getattr(pl_particles, name)[
                         self.steps//2, self.r_from:self.r_to]
                     self.data[name].append(val)
-    
+
     def dump(self, current_time):
         # In case of colormaps, we reshape every data list except for xi list.
         size = len(self.data['xi'])
@@ -261,8 +276,64 @@ class Diagnostics_colormaps:
             np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
                      **self.data)
 
+    def dt(self, *params):
+        # We use this function to clean old data:
+        for name in self.data:
+            self.data[name] = []
+
+class Save_run_state:
+    def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
+        self.saving_period = saving_period
+        self.save_beam = bool(save_beam)
+        self.save_plasma = bool(save_plasma)
+
+    def pull_config(self, config=default_config):
+        self.time_step_size = config.getfloat('time-step')
+
+        if self.saving_period < self.time_step_size:
+            self.saving_period = self.time_step_size
+
+        # Important for saving arrays from GPU:
+        self.pu_type = config.get('processing-unit-type').lower()
+
+    def dxi(self, *parameters):
+        pass
+
+    def dump(self, *parameeters):
+        pass
+
+    def dt(self, current_time,
+           pl_particles, pl_fields, pl_currents, beam_drain):
+        time_for_save = current_time + self.time_step_size
+
+        # The run is saved if the current_time differs from a multiple
+        # of the saving period by less then dt/2.
+        if current_time % self.saving_period <= self.time_step_size / 2:
+            Path('./run_state').mkdir(parents=True, exist_ok=True)
+
+            if self.save_beam:
+                beam_drain.beam_buffer.save(
+                    f'./run_state/beamfile_{time_for_save:08.2f}')
+
+            if self.save_plasma:
+                # Important for saving arrays from GPU (is it really?)
+                if self.pu_type == 'gpu':
+                    pl_particles = GPUArraysView(pl_particles)
+                    pl_fields    = GPUArraysView(pl_fields)
+                    pl_currents  = GPUArraysView(pl_currents)
+
+                np.savez_compressed(
+                    file=f'./run_state/plasmastate_{time_for_save:08.2f}',
+                    x_offt=pl_particles.x_offt, y_offt=pl_particles.y_offt,
+                    px=pl_particles.px, py=pl_particles.py, pz=pl_particles.pz,
+                    Ex=pl_fields.Ex, Ey=pl_fields.Ey, Ez=pl_fields.Ez,
+                    Bx=pl_fields.Bx, By=pl_fields.By, Bz=pl_fields.Bz,
+                    ro=pl_currents.ro,
+                    jx=pl_currents.jx, jy=pl_currents.jy, jz=pl_currents.jz)
+
+
 def conv_2d(arr: np.ndarray, merging_xi, merging_r):
-    """Calculate strided convolution using a mean/uniform kernel."""
+    """Calculates strided convolution using a mean/uniform kernel."""
     new_arr = []
     for i in range(0, arr.shape[0], merging_xi):
         start_i, end_i = i, i + merging_xi

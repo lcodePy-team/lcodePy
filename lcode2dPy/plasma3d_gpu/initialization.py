@@ -175,3 +175,22 @@ Details: 'reflect_padding_steps' must be bigger than 2. By default it is 5.""")
                              neumann_matrix=neu_matrix)
 
     return fields, particles, currents, const_arrays
+
+
+def load_plasma(config: Config, path_to_plasmastate: str):
+    fields, particles, currents, _ = init_plasma(config)
+
+    with np.load(file=path_to_plasmastate) as state:
+        fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
+                           Ez=state['Ez'], Bx=state['Bx'],
+                           By=state['By'], Bz=state['Bz'])
+
+        particles = GPUArrays(x_init=particles.x_init, y_init=particles.y_init,
+                              q=particles.q, m=particles.m,
+                              x_offt=state['x_offt'], y_offt=state['y_offt'],
+                              px=state['px'], py=state['py'], pz=state['pz'])
+
+        currents = GPUArrays(ro=state['ro'], jx=state['jx'],
+                             jy=state['jy'], jz=state['jz'])
+
+    return fields, particles, currents
