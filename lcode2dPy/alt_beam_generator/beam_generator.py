@@ -1,5 +1,6 @@
 import numpy as np
 
+from lcode2dPy.config.default_config import default_config
 from lcode2dPy.config.config import Config
 
 from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
@@ -25,8 +26,12 @@ def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
     return current
 
 
-def generate_beam(config, beam_parameters: dict=None,
+def generate_beam(config=default_config, beam_parameters: dict=None,
                   beam_module=beam3d_cpu_module):
+    # We check if 'config' is just a Python dictionary:
+    if type(config) == dict:
+        config = Config(config)
+
     # We create a dictionary with default beam parameters (test 1 beam).
     # First 3 parameters go to BeamShape, other - to beam_segment_shape.
     complete_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000,

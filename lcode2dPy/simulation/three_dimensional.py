@@ -1,6 +1,8 @@
 """Top-level three-dimensional simulation class."""
 # General imports
 import numpy as np
+
+# Config
 from lcode2dPy.config.default_config import default_config
 from lcode2dPy.config.config import Config
 
@@ -41,7 +43,7 @@ class Cartesian3dSimulation:
                   f"Cartesian3dSimulation, change geometry from {geometry} to",
                   "3d in config. (your_config.set('geometry', '3d'))")
             raise Exception("Please, read the text above in your window.")
-        
+
         # We set some instance variables:
         self.config = config
         self.time_limit = config.getfloat('time-limit')
