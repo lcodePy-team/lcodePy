@@ -286,6 +286,7 @@ class Diagnostics_colormaps:
         for name in self.data:
             self.data[name] = []
 
+
 class Save_run_state:
     def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
         self.saving_period = saving_period
