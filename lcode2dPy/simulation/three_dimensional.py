@@ -44,7 +44,7 @@ class Cartesian3dSimulation:
         # self.beam_particle_dtype = particle_dtype3d
 
         # We use this time as a general time value:
-        self.current_time = 0.
+        self.__current_time = 0.
 
         # We initialize a beam source and a beam drain:
         self.beam_source = None
@@ -54,12 +54,15 @@ class Cartesian3dSimulation:
         self.external_plasmastate = False
         self.path_to_plasmastate = 'plasmastate.npz'
 
-    def pull_config(self):
+        # Pull the config before the start of calculations:
+        self.__pull_config()
+
+    def __pull_config(self):
         # 0. We set __config__ as a Config class instance:
-        self.__config__ = Config(self.config)
+        self.__config = Config(self.config)
 
         # Firstly, we check that the geomtry was set right:
-        geometry = self.__config__.get('geometry').lower()
+        geometry = self.__config.get('geometry').lower()
         if geometry != '3d':
             print("Sorry, you set a wrong type of geometry. If you want to use",
                   f"Cartesian3dSimulation, change geometry from {geometry} to",
@@ -67,90 +70,96 @@ class Cartesian3dSimulation:
             raise Exception("Please, read the text above in your window.")
 
         # We set some instance variables:
-        self.time_limit = self.__config__.getfloat('time-limit')
-        self.time_step_size = self.__config__.getfloat('time-step')
-        self.rigid_beam = self.__config__.get('rigid-beam')
+        self.__time_limit = self.__config.getfloat('time-limit')
+        self.__time_step_size = self.__config.getfloat('time-step')
+        self.__rigid_beam = self.__config.get('rigid-beam')
 
         # Mode of plasma continuation:
-        self.cont_mode = self.__config__.get('continuation')
+        self.__cont_mode = self.__config.get('continuation')
 
         # Here we get information about the type of processing unit (CPU or GPU)
-        self.pu_type = self.__config__.get('processing-unit-type').lower()
+        pu_type = self.__config.get('processing-unit-type').lower()
 
-        if self.pu_type == 'cpu':
-            self.push_solver = PushAndSolver3d_cpu(self.__config__)
-            self.init_plasma = init_plasma_cpu
-            self.load_plasma = load_plasma_cpu
-            self.beam_module = beam3d_cpu
-        elif self.pu_type == 'gpu':
-            self.push_solver = PushAndSolver3d_gpu(self.__config__)
-            self.init_plasma = init_plasma_gpu
-            self.load_plasma = load_plasma_gpu
-            self.beam_module = beam3d_gpu
+        if pu_type == 'cpu':
+            self.__push_solver = PushAndSolver3d_cpu(self.__config)
+            self.__init_plasma = init_plasma_cpu
+            self.__load_plasma = load_plasma_cpu
+            self.__beam_module = beam3d_cpu
+        elif pu_type == 'gpu':
+            self.__push_solver = PushAndSolver3d_gpu(self.__config)
+            self.__init_plasma = init_plasma_gpu
+            self.__load_plasma = load_plasma_gpu
+            self.__beam_module = beam3d_gpu
 
         # Finally, we set the diagnostics.
         if type(self.diagnostics) != list and self.diagnostics is not None:
             # If a user set only one diag. class:
             self.diagnostics = [self.diagnostics]
-        self.__diagnostics__ = Diagnostics3d(self.__config__, self.diagnostics)
+        self.__diagnostics = Diagnostics3d(config=self.__config,
+                                           diag_list=self.diagnostics)
 
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
-        beam_particles = self.beam_module.BeamParticles()
+        beam_particles = self.__beam_module.BeamParticles()
         beam_particles.load(path_to_beamfile)
 
-        self.beam_source = self.beam_module.BeamSource(self.__config__,
+        self.beam_source = self.__beam_module.BeamSource(self.__config,
                                                        beam_particles)
-        self.beam_drain  = self.beam_module.BeamDrain()
+        self.beam_drain  = self.__beam_module.BeamDrain()
 
-    def load_plasmastate(self):
-        self.loaded_fields, self.loaded_particles, self.loaded_currents =\
-            self.load_plasma(self.__config__, self.path_to_plasmastate)
-    
-    def init_plasmastate(self):
+    # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
+    #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
+    #     """
+    #     pass
+
+    def __load_plasmastate(self):
+        self.__loaded_fields, self.__loaded_particles, self.__loaded_currents =\
+            self.__load_plasma(self.__config, self.path_to_plasmastate)
+
+    def __init_plasmastate(self):
         # Initializes a plasma state:
         pl_fields, pl_particles, pl_currents, pl_const_arrays =\
-            self.init_plasma(self.__config__)
+            self.__init_plasma(self.__config)
 
         # In case of an external plasma state, we set values
         # as the loaded values:
         if self.external_plasmastate:
-            pl_fields, pl_particles, pl_currents =\
-                self.loaded_fields, self.loaded_particles, self.loaded_currents
+            pl_fields, pl_particles, pl_currents = (self.__loaded_fields,
+                           self.__loaded_particles, self.__loaded_currents)
 
         return pl_fields, pl_particles, pl_currents, pl_const_arrays
 
     def step(self, N_steps=None):
         """Compute N time steps."""
         # 0. It analyzes config values:
-        self.pull_config()
+        self.__pull_config()
 
         # 1. If we use an external plasma state, we load it:
         if self.external_plasmastate:
-            self.load_plasmastate()
+            self.__load_plasmastate()
 
         # t step function, makes N_steps time steps.
         if N_steps is None:
-            N_steps = int(self.time_limit / self.time_step_size)
+            N_steps = int(self.__time_limit / self.__time_step_size)
             print("Since the number of time steps hasn't been set explicitly,",
                   f"the code will simulate {N_steps} time steps with a time",
-                  f"step size = {self.time_step_size}.")
+                  f"step size = {self.__time_step_size}.")
 
         # 2. Checks for plasma continuation mode:
-        if self.cont_mode == 'n' or self.cont_mode == 'no':
+        if self.__cont_mode == 'n' or self.__cont_mode == 'no':
             # 3. If a beam source is empty (None), we generate
             #    a new beam according to set parameters:
             if self.beam_source is None:
                 # Check for a beam being not rigid.
-                if self.rigid_beam == 'n' or self.rigid_beam == 'no':
+                if self.__rigid_beam == 'n' or self.__rigid_beam == 'no':
                     # Generate all parameters for a beam:
-                    beam_particles = generate_beam(self.__config__,
+                    beam_particles = generate_beam(self.__config,
                                                    self.beam_parameters,
-                                                   self.beam_module)
+                                                   self.__beam_module)
 
                     # Here we create a beam source and a beam drain:
-                    self.beam_source = self.beam_module.BeamSource(
-                                                self.__config__, beam_particles)
-                    self.beam_drain  = self.beam_module.BeamDrain()
+                    self.beam_source = self.__beam_module.BeamSource(
+                                                self.__config, beam_particles)
+                    self.beam_drain  = self.__beam_module.BeamDrain()
 
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
@@ -163,26 +172,26 @@ class Cartesian3dSimulation:
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
                 pl_fields, pl_particles, pl_currents, pl_const_arrays =\
-                    self.init_plasmastate()
+                    self.__init_plasmastate()
 
                 # Calculates one time step:
-                self.push_solver.step_dt(pl_fields, pl_particles,
+                self.__push_solver.step_dt(pl_fields, pl_particles,
                                         pl_currents, pl_const_arrays,
                                         self.beam_source, self.beam_drain,
-                                        self.current_time, self.__diagnostics__)
+                                        self.__current_time, self.__diagnostics)
 
                 # Perform diagnostics
-                self.__diagnostics__.dt(self.current_time,
+                self.__diagnostics.dt(self.__current_time,
                     pl_particles, pl_fields, pl_currents, self.beam_drain)
 
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                self.beam_source = self.beam_module.BeamSource(self.__config__,
+                self.beam_source = self.__beam_module.BeamSource(self.__config,
                                                     self.beam_drain.beam_buffer)
-                self.beam_drain  = self.beam_module.BeamDrain()
+                self.beam_drain  = self.__beam_module.BeamDrain()
 
-                self.current_time = self.current_time + self.time_step_size
+                self.__current_time = self.__current_time + self.__time_step_size
                 print()
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
@@ -193,6 +202,6 @@ class Cartesian3dSimulation:
         # If you are writing these modes, just change where you put
         # init_plasma(...) and generate_beam(...)
         else:
-            print("Sorry, for now, only 'no' mode of plasma continuation is", 
+            print("Sorry, for now, only 'no' mode of plasma continuation is",
                   "supported.")
             raise Exception("Please, read the text above in your window.")
