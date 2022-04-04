@@ -17,8 +17,7 @@ def from_str_into_list(names_str: str):
 
 
 class Diagnostics3d:
-    def __init__(self, config: Config=default_config,
-                 diag_list: list=None):
+    def __init__(self, config: Config, diag_list=None):
         """The main class of 3d diagnostics."""
         self.config = config
         if diag_list is None:
@@ -75,9 +74,9 @@ class Diagnostics_f_xi:
             raise Exception(f'{f_xi_type} type of f(xi) diagnostics is not supported.')
 
         # The position of a `probe' line 1 from the center:
-        self.ax_x, self.ax_y = axis_x, axis_y
+        self.axis_x, self.axis_y = axis_x, axis_y
         # THe position of a `probe' line 2 from the center:
-        self.aux_x, self.aux_y = auxiliary_x, auxiliary_y
+        self.auxiliary_x, self.auxiliary_y = auxiliary_x, auxiliary_y
 
         # Set time periodicity of detailed output:
         self.period = output_period
@@ -87,16 +86,16 @@ class Diagnostics_f_xi:
         self.data = {name: [] for name in self.f_xi_names}
         self.data['xi'] = []
 
-    def pull_config(self, config=default_config):
+    def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         self.steps = config.getint('window-width-steps')
         self.step_size = config.getfloat('window-width-step-size')
 
         # We change how we store the positions of the 'probe' lines:
-        self.ax_x  = self.steps // 2 + int(self.ax_x / self.step_size)
-        self.ax_y  = self.steps // 2 + int(self.ax_y / self.step_size)
-        self.aux_x = self.steps // 2 + int(self.aux_x / self.step_size)
-        self.aux_y = self.steps // 2 + int(self.aux_y / self.step_size)
+        self.ax_x  = self.steps // 2 + int(self.axis_x / self.step_size)
+        self.ax_y  = self.steps // 2 + int(self.axis_y / self.step_size)
+        self.aux_x = self.steps // 2 + int(self.auxiliary_x / self.step_size)
+        self.aux_y = self.steps // 2 + int(self.auxiliary_y / self.step_size)
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
@@ -199,26 +198,26 @@ class Diagnostics_colormaps:
         self.data = {name: [] for name in self.colormaps_names}
         self.data['xi'] = []
 
-    def pull_config(self, config=default_config):
+    def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         self.steps = config.getint('window-width-steps')
         self.step_size = config.getfloat('window-width-step-size')
 
         # Here we define subwindow borders in terms of number of steps:
-        self.r_from = self.steps // 2 + self.r_from / self.step_size
-        self.r_to   = self.steps // 2 + self.r_to   / self.step_size
+        self.r_f = self.steps // 2 + self.r_from / self.step_size
+        self.r_t = self.steps // 2 + self.r_to   / self.step_size
 
-        # We check that r_from and r_to are in the borders of window.
+        # We check that r_f and r_t are in the borders of window.
         # Otherwise, we make them equal to the size of the window.
-        if self.r_to > self.steps:
-            self.r_to = self.steps
+        if self.r_t > self.steps:
+            self.r_t = self.steps
         else:
-            self.r_to = int(self.r_to)
+            self.r_t = int(self.r_t)
 
-        if self.r_from < 0:
-            self.r_from = 0
+        if self.r_f < 0:
+            self.r_f = 0
         else:
-            self.r_from = int(self.r_from)
+            self.r_f = int(self.r_f)
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
@@ -227,7 +226,7 @@ class Diagnostics_colormaps:
         self.time_step_size = config.getfloat('time-step')
 
         if self.period < self.time_step_size:
-            self.period = self.time_step_size   
+            self.period = self.time_step_size
 
         if self.period % self.time_step_size != 0:
             print("The diagnostics will not work because",
@@ -242,21 +241,21 @@ class Diagnostics_colormaps:
             for name in self.colormaps_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz']:
                     val = getattr(pl_fields, name)[
-                        self.steps//2, self.r_from:self.r_to]
+                        self.steps//2, self.r_f:self.r_t]
                     self.data[name].append(val)
 
                 if name == 'ne':
                     val = getattr(pl_currents, 'ro')[
-                        self.steps//2, self.r_from:self.r_to]
+                        self.steps//2, self.r_f:self.r_t]
                     self.data[name].append(val)
 
                 if name == 'nb':
-                    val = ro_beam[self.steps//2, self.r_from:self.r_to]
+                    val = ro_beam[self.steps//2, self.r_f:self.r_t]
                     self.data[name].append(val)
 
                 if name in ['px', 'py', 'pz']:
                     val = getattr(pl_particles, name)[
-                        self.steps//2, self.r_from:self.r_to]
+                        self.steps//2, self.r_f:self.r_t]
                     self.data[name].append(val)
 
     def dump(self, current_time):
@@ -293,7 +292,7 @@ class Save_run_state:
         self.save_beam = bool(save_beam)
         self.save_plasma = bool(save_plasma)
 
-    def pull_config(self, config=default_config):
+    def pull_config(self, config: Config):
         self.time_step_size = config.getfloat('time-step')
 
         if self.saving_period < self.time_step_size:
