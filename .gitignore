@@ -3,4 +3,5 @@ __pycache__/
 beamfile*
 venv
 *npz
+*png
 # *.ipynb

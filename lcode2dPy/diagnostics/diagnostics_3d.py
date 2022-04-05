@@ -1,4 +1,4 @@
-import math
+from math import inf, ceil
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,7 +54,7 @@ class Diagnostics3d:
 
 class Diagnostics_f_xi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                    'Ez2', 'Bz2', 'nb2']
+                      'Ez2', 'Bz2', 'nb2']
                     # 'Phi', 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
@@ -72,7 +72,8 @@ class Diagnostics_f_xi:
         if f_xi_type in self.__allowed_f_xi_type:
             self.__f_xi_type = f_xi_type
         else:
-            raise Exception(f'{f_xi_type} type of f(xi) diagnostics is not supported.')
+            raise Exception(f"{f_xi_type} type of f(xi) diagnostics is" +
+                             "not supported.")
 
         # The position of a `probe' line 1 from the center:
         self.__axis_x, self.__axis_y = axis_x, axis_y
@@ -86,6 +87,13 @@ class Diagnostics_f_xi:
         # But I'm not sure this is the best way to handle data storing!
         self.__data = {name: [] for name in self.__f_xi_names}
         self.__data['xi'] = []
+
+    def __repr__(self):
+        return (f"Diagnostics_f_xi(output_period={self.__period}, " +
+            f"f_xi='{','.join(self.__f_xi_names)}', " +
+            f"f_xi_type='{self.__f_xi_type}', " +
+            f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
+            f"auxiliary_x={self.__auxiliary_x}, auxiliary_y={self.__auxiliary_y})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -113,7 +121,7 @@ class Diagnostics_f_xi:
 
     def dxi(self, current_time, xi_plasma_layer,
             pl_particles, pl_fields, pl_currents, ro_beam):
-        if self.dxi_conditions_check(current_time, xi_plasma_layer)
+        if self.dxi_conditions_check(current_time, xi_plasma_layer):
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
@@ -137,9 +145,9 @@ class Diagnostics_f_xi:
                 if name == 'nb2':
                     ro = ro_beam[self.__aux_x, self.__aux_y]
                     self.__data[name].append(ro)
-    
+
     def dxi_conditions_check(self, current_time, xi_pl_layer):
-        return (current_time % self.__period == 0)
+        return current_time % self.__period == 0
 
     def dump(self, current_time):
         time_save = current_time + self.__time_step_size
@@ -164,7 +172,7 @@ class Diagnostics_f_xi:
 
 class Diagnostics_colormaps:
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                         'px', 'py', 'pz']
+                           'px', 'py', 'pz']
                         # 'Phi', 'ni']
                     # TODO: add them and functionality!
     __allowed_colormaps_type = ['numbers']
@@ -172,8 +180,7 @@ class Diagnostics_colormaps:
 
     def __init__(self, output_period=100,
                  colormaps='Ez', colormaps_type='numbers',
-                 xi_from=float('inf'), xi_to=float('-inf'),
-                 r_from=0, r_to=float('inf'),
+                 xi_from=inf, xi_to=-inf, r_from=0, r_to=inf,
                  output_merging_r: int=1, output_merging_xi: int=1):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
@@ -185,7 +192,8 @@ class Diagnostics_colormaps:
         if colormaps_type in self.__allowed_colormaps_type:
             self.__colormaps_type = colormaps_type
         else:
-            raise Exception(f'{colormaps_type} type of colormap diagnostics is not supported.')
+            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+                             "is not supported.")
 
         # Set time periodicity of detailed output:
         self.__period = output_period
@@ -202,6 +210,14 @@ class Diagnostics_colormaps:
         # data. I'm not sure this is the best way to handle data storing.
         self.__data = {name: [] for name in self.__colormaps_names}
         self.__data['xi'] = []
+
+    def __repr__(self) -> str:
+        return (f"Diagnostics_colormaps(output_period={self.__period}, " +
+            f"colormaps='{','.join(self.__colormaps_names)}', " +
+            f"f_xi_type='{self.__colormaps_type}', xi_from={self.__xi_from}, " +
+            f"xi_to={self.__xi_to}, r_from={self.__r_from}, " +
+            f"r_to={self.__r_to}, output_merging_r={self.__merging_r}, " +
+            f"output_merging_xi={self.__merging_xi})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -298,8 +314,12 @@ class Diagnostics_colormaps:
 class Save_run_state:
     def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
         self.__saving_period = saving_period
-        self.__saving_beam = bool(save_beam)
-        self.__saving_plasma = bool(save_plasma)
+        self.__save_beam = bool(save_beam)
+        self.__save_plasma = bool(save_plasma)
+
+    def __repr__(self) -> str:
+        return(f"Save_run_state(saving_period={self.__saving_period}, " +
+            f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma})")
 
     def pull_config(self, config: Config):
         self.__time_step_size = config.getfloat('time-step')
@@ -323,13 +343,13 @@ class Save_run_state:
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__saving_period <= self.__time_step_size / 2:
-            Path('./run_state').mkdir(parents=True, exist_ok=True)
+            Path('./run_states').mkdir(parents=True, exist_ok=True)
 
-            if self.__saving_beam:
+            if self.__save_beam:
                 beam_drain.beam_buffer.save(
-                    f'./run_state/beamfile_{time_for_save:08.2f}')
+                    f'./run_states/beamfile_{time_for_save:08.2f}')
 
-            if self.__saving_plasma:
+            if self.__save_plasma:
                 # Important for saving arrays from GPU (is it really?)
                 if self.__pu_type == 'gpu':
                     pl_particles = GPUArraysView(pl_particles)
@@ -337,7 +357,7 @@ class Save_run_state:
                     pl_currents  = GPUArraysView(pl_currents)
 
                 np.savez_compressed(
-                    file=f'./run_state/plasmastate_{time_for_save:08.2f}',
+                    file=f'./run_states/plasmastate_{time_for_save:08.2f}',
                     x_offt=pl_particles.x_offt, y_offt=pl_particles.y_offt,
                     px=pl_particles.px, py=pl_particles.py, pz=pl_particles.pz,
                     Ex=pl_fields.Ex, Ey=pl_fields.Ey, Ez=pl_fields.Ez,
@@ -362,4 +382,4 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
             new_arr.append(np.mean(arr[start_i:end_i, start_j:end_j]))
 
     return np.reshape(np.array(new_arr),
-                      math.ceil(arr.shape[0] / merging_xi, -1))
+                      ceil(arr.shape[0] / merging_xi, -1))
