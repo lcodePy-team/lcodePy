@@ -133,11 +133,14 @@ def init_plasma(config: Config):
     plasma_fineness       = config.getint('plasma-fineness')
     solver_trick          = config.getint('field-solver-subtraction-trick')
 
-    # for convenient diagnostics, a cell should be in the center of the grid 
+    # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
-    
+
     # particles should not reach the window pre-boundary cells
-    assert reflect_padding_steps > 2
+    if reflect_padding_steps <= 2:
+        raise Exception("'reflect_padding_steps' parameter is too low.\n" +
+                        "Details: 'reflect_padding_steps' must be bigger than" +
+                        " 2. By default it is 5.")
     
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,

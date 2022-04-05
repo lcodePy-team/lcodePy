@@ -64,10 +64,10 @@ class Cartesian3dSimulation:
         # Firstly, we check that the geomtry was set right:
         geometry = self.__config.get('geometry').lower()
         if geometry != '3d':
-            print("Sorry, you set a wrong type of geometry. If you want to use",
-                  f"Cartesian3dSimulation, change geometry from {geometry} to",
-                  "3d in config. (your_config.set('geometry', '3d'))")
-            raise Exception("Please, read the text above in your window.")
+            raise Exception("Sorry, you set a wrong type of geometry. If you" +
+                            "want to use Cartesian3dSimulation, change" +
+                            f"geometry from {geometry} to 3d in your config." +
+                            "(your_config['geometry'] = '3d')")
 
         # We set some instance variables:
         self.__time_limit = self.__config.getfloat('time-limit')
@@ -165,9 +165,8 @@ class Cartesian3dSimulation:
                 # writing rigid beam mode, just use rigid_beam_current(...) from
                 # lcode2dPy.alt_beam_generator.beam_generator
                 else:
-                    print("Sorry, for now, only 'no' mode of rigid-beam is",
-                          "supported.")
-                    raise Exception("Please, read the text above in your window.")
+                    raise Exception("Sorry, for now, only 'no' mode of" +
+                                    "rigid-beam is supported.")
 
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
@@ -202,6 +201,5 @@ class Cartesian3dSimulation:
         # If you are writing these modes, just change where you put
         # init_plasma(...) and generate_beam(...)
         else:
-            print("Sorry, for now, only 'no' mode of plasma continuation is",
-                  "supported.")
-            raise Exception("Please, read the text above in your window.")
+            raise Exception("Sorry, for now, only 'no' mode of plasma" +
+                            "continuation is supported.")
