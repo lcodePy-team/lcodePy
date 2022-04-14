@@ -5,7 +5,7 @@ from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.data import GPUArrays, fields_average
 
 
-# Solving Laplace equation with Dirichlet boundary conditions (Ez) #
+# Solving Laplace equation with Dirichlet boundary conditions (Ez and Phi) #
 
 def dst2d(a):
     """
@@ -54,6 +54,24 @@ def calculate_Ez(grid_step_size, const, currents):
     Ez = cp.pad(Ez_inner, 1, 'constant', constant_values=0)
 
     return Ez
+
+
+def calculate_Phi(const, currents):
+    """
+    Calculates Phi as iDST2D(dirichlet_matrix * DST2D(-ro + jz)).
+    """
+    ro, jz = currents.ro, currents.jz
+
+    rhs_inner = (ro - jz)[1:-1, 1:-1]
+
+    f = dst2d(rhs_inner)
+
+    f *= const.dirichlet_matrix
+
+    Phi_inner = dst2d(f)
+    Phi = cp.pad(Phi_inner, 1, 'constant', constant_values=0)
+
+    return Phi
 
 
 # Solving Laplace or Helmholtz equation with mixed boundary conditions #
@@ -230,7 +248,7 @@ class FieldComputer(object):
                             self.grid_step_size, self.xi_step_size,
                             self.trick, self.variant_A, const,
                             fields, rho_beam, currents, currents_prev)
-                                            
+
         if self.variant_A:
             Ex = 2 * Ex - fields_prev.Ex
             Ey = 2 * Ey - fields_prev.Ey
@@ -240,7 +258,10 @@ class FieldComputer(object):
         Ez = calculate_Ez(self.grid_step_size, const, currents)
         Bz = calculate_Bz(self.grid_step_size, const, currents)
 
+        Phi = calculate_Phi(const, currents)
+
         new_fields = GPUArrays(Ex=Ex, Ey=Ey, Ez=Ez,
-                               Bx=Bx, By=By, Bz=Bz)
+                               Bx=Bx, By=By, Bz=Bz,
+                               Phi=Phi)
 
         return new_fields, fields_average(new_fields, fields_prev)

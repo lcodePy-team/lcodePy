@@ -54,8 +54,8 @@ class Diagnostics3d:
 
 class Diagnostics_f_xi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                      'Ez2', 'Bz2', 'nb2']
-                    # 'Phi', 'ni']
+                      'Ez2', 'Bz2', 'nb2', 'Phi']
+                    # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
     #TODO: add 'pictures' and 'both' and functionality
@@ -125,7 +125,7 @@ class Diagnostics_f_xi:
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
-                if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz']:
+                if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                     field = getattr(pl_fields, name)[self.__ax_x, self.__ax_y]
                     self.__data[name].append(field)
 
@@ -172,8 +172,8 @@ class Diagnostics_f_xi:
 
 class Diagnostics_colormaps:
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                           'px', 'py', 'pz']
-                        # 'Phi', 'ni']
+                           'px', 'py', 'pz', 'Phi']
+                        # 'ni']
                     # TODO: add them and functionality!
     __allowed_colormaps_type = ['numbers']
     #TODO: add 'pictures' and 'both' and functionality
@@ -260,7 +260,7 @@ class Diagnostics_colormaps:
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__colormaps_names:
-                if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz']:
+                if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                     val = getattr(pl_fields, name)[
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
@@ -362,7 +362,7 @@ class Save_run_state:
                     px=pl_particles.px, py=pl_particles.py, pz=pl_particles.pz,
                     Ex=pl_fields.Ex, Ey=pl_fields.Ey, Ez=pl_fields.Ez,
                     Bx=pl_fields.Bx, By=pl_fields.By, Bz=pl_fields.Bz,
-                    ro=pl_currents.ro,
+                    Phi=pl_fields.Phi, ro=pl_currents.ro,
                     jx=pl_currents.jx, jy=pl_currents.jy, jz=pl_currents.jz)
 
 

@@ -163,7 +163,8 @@ def init_plasma(config: Config):
         return cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
 
     fields = GPUArrays(Ex=zeros(), Ey=zeros(), Ez=zeros(),
-                       Bx=zeros(), By=zeros(), Bz=zeros())
+                       Bx=zeros(), By=zeros(), Bz=zeros(),
+                       Phi=zeros())
 
     particles = GPUArrays(x_init=x_init, y_init=y_init,
                           x_offt=x_offt, y_offt=y_offt,
@@ -184,7 +185,8 @@ def load_plasma(config: Config, path_to_plasmastate: str):
     with np.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
                            Ez=state['Ez'], Bx=state['Bx'],
-                           By=state['By'], Bz=state['Bz'])
+                           By=state['By'], Bz=state['Bz'],
+                           Phi=state['Phi'])
 
         particles = GPUArrays(x_init=particles.x_init, y_init=particles.y_init,
                               q=particles.q, m=particles.m,

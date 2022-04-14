@@ -83,5 +83,6 @@ def fields_average(fields1: GPUArrays, fields2: GPUArrays):
             Ez = (fields1.Ez + fields2.Ez) / 2,
             Bx = (fields1.Bx + fields2.Bx) / 2,
             By = (fields1.By + fields2.By) / 2,
-            Bz = (fields1.Bz + fields2.Bz) / 2
+            Bz = (fields1.Bz + fields2.Bz) / 2,
+            Phi = (fields1.Phi + fields2.Phi) / 2
         )

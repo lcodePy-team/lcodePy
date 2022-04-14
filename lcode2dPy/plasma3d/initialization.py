@@ -173,6 +173,7 @@ def load_plasma(config: Config, path_to_plasmastate: str):
              state['Ex'], state['Ey'], state['Ez']
         fields.Bx, fields.By, fields.Bz =\
              state['Bx'], state['By'], state['Bz']
+        fields.Phi = state['Phi']
 
         particles.x_offt, particles.x_offt =\
             state['x_offt'], state['y_offt']

@@ -7,7 +7,7 @@ from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d.data import Fields, Currents, Const_Arrays
 
 
-# Solving Laplace equation with Dirichlet boundary conditions (Ez) #
+# Solving Laplace equation with Dirichlet boundary conditions (Ez and Phi) #
 
 def calculate_Ez(grid_step_size, const: Const_Arrays, currents: Currents):
     """
@@ -32,10 +32,28 @@ def calculate_Ez(grid_step_size, const: Const_Arrays, currents: Currents):
     #    unnormalized DST-Type1 is its own inverse, up to a factor 2(N+1)
     #    and we take all scaling matters into account with a single factor
     #    hidden inside dirichlet_matrix.
-    
+
     Ez_inner = scipy.fftpack.dstn(f, type=1)
     Ez = np.pad(Ez_inner, 1, 'constant', constant_values=0)
     return Ez
+
+
+def calculate_Phi(const: Const_Arrays, currents: Currents):
+    """
+    Calculates Phi as iDST2D(dirichlet_matrix * DST2D(-ro + jz)).
+    """
+    ro, jz = currents.ro, currents.jz
+
+    rhs_inner = (ro - jz)[1:-1, 1:-1]
+
+    f = scipy.fftpack.dstn(rhs_inner, type=1)
+
+    f *= const.dirichlet_matrix
+
+    Phi_inner = scipy.fftpack.dstn(f, type=1)
+    Phi = np.pad(Phi_inner, 1, 'constant', constant_values=0)
+
+    return Phi
 
 
 # Solving Laplace or Helmholtz equation with mixed boundary conditions #
@@ -178,7 +196,7 @@ class FieldComputer(object):
                        curr_prev: Currents, curr: Currents):
         # Looks terrible! TODO: rewrite this function entirely
         new_flds = Fields((flds.Ex).shape[0])
-        
+
         (new_flds.Ex,
          new_flds.Ey,
          new_flds.Bx,
@@ -186,7 +204,7 @@ class FieldComputer(object):
                                               self.xi_step_size,
                                               self.trick, self.variant_A, const,
                                               flds, rho_beam, curr, curr_prev)
-                                                               
+
         if self.variant_A:
             new_flds.Ex = 2 * new_flds.Ex - flds_prev.Ex
             new_flds.Ey = 2 * new_flds.Ey - flds_prev.Ey
@@ -195,5 +213,7 @@ class FieldComputer(object):
 
         new_flds.Ez = calculate_Ez(self.grid_step_size, const, curr)
         new_flds.Bz = calculate_Bz(self.grid_step_size, const, curr)
-        
+
+        new_flds.Phi = calculate_Phi(const, curr)
+
         return new_flds, new_flds.average(flds_prev)
