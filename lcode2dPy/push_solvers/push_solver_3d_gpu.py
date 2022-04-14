@@ -60,7 +60,7 @@ class PushAndSolver3d:
                     xi_plasma_layer = - self.xi_step_size * xi_i
                     diagnostics.dxi(current_time, xi_plasma_layer,
                         GPUArraysView(pl_particles), GPUArraysView(pl_fields),
-                        GPUArraysView(pl_currents), GPUArraysView(ro_beam))
+                        GPUArraysView(pl_currents), ro_beam.get())
 
                 # # Some diagnostics:
                 view_pl_fields = GPUArraysView(pl_fields)
