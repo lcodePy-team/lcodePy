@@ -52,7 +52,7 @@ class Diagnostics3d:
                 print(f'{diag} type of diagnostics is not supported.')
 
 
-class Diagnostics_f_xi:
+class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
                       'Ez2', 'Bz2', 'nb2', 'Phi']
                     # 'ni']
@@ -170,7 +170,7 @@ class Diagnostics_f_xi:
             self.__data[name] = []
 
 
-class Diagnostics_colormaps:
+class DiagnosticsColormaps:
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
                            'px', 'py', 'pz', 'Phi']
                         # 'ni']
@@ -311,7 +311,7 @@ class Diagnostics_colormaps:
             self.__data[name] = []
 
 
-class Save_run_state:
+class SaveRunState:
     def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
         self.__saving_period = saving_period
         self.__save_beam = bool(save_beam)

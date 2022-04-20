@@ -15,12 +15,12 @@ from lcode2dPy.alt_beam_generator.beam_generator import particle_dtype3d
 from lcode2dPy.alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
 
 # Imports for 3d simulation
-from lcode2dPy.push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3d_cpu
+from lcode2dPy.push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3dCPU
 from lcode2dPy.beam3d import beam as beam3d_cpu
 from lcode2dPy.plasma3d.initialization import init_plasma as init_plasma_cpu
 from lcode2dPy.plasma3d.initialization import load_plasma as load_plasma_cpu
 
-from lcode2dPy.push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3d_gpu
+from lcode2dPy.push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
 from lcode2dPy.beam3d_gpu import beam as beam3d_gpu
 from lcode2dPy.plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
 from lcode2dPy.plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
@@ -60,6 +60,7 @@ class Cartesian3dSimulation:
     def __pull_config(self):
         # 0. We set __config__ as a Config class instance:
         self.__config = Config(self.config)
+        self.full_config = self.__config.config_values
 
         # Firstly, we check that the geomtry was set right:
         geometry = self.__config.get('geometry').lower()
@@ -81,12 +82,12 @@ class Cartesian3dSimulation:
         pu_type = self.__config.get('processing-unit-type').lower()
 
         if pu_type == 'cpu':
-            self.__push_solver = PushAndSolver3d_cpu(self.__config)
+            self.__push_solver = PushAndSolver3dCPU(self.__config)
             self.__init_plasma = init_plasma_cpu
             self.__load_plasma = load_plasma_cpu
             self.__beam_module = beam3d_cpu
         elif pu_type == 'gpu':
-            self.__push_solver = PushAndSolver3d_gpu(self.__config)
+            self.__push_solver = PushAndSolver3dGPU(self.__config)
             self.__init_plasma = init_plasma_gpu
             self.__load_plasma = load_plasma_gpu
             self.__beam_module = beam3d_gpu
