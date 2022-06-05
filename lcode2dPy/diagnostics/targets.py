@@ -1,3 +1,8 @@
+
+"""
+    Outdate, check openpmd.py
+"""
+
 import numpy as np
 #import openpmd_api as io
 import shutil
@@ -24,7 +29,7 @@ class MyDiagnostics:
         for diag in self.diag_list:
             diag.dump()
 
-class FieldDiagnostics:
+class FieldDiagnostics1:
     def __init__(self, name, r=0, 
                  t_start=None, t_end=None, period=100, 
                  cl_mem = False, 
@@ -127,7 +132,7 @@ class FieldDiagnostics:
     #             writer.append_data(image)
     #     shutil.rmtree(path)
         
-class BeamDiagnostics:
+class BeamDiagnostics1:
     def __init__(self, t_start=0, t_end=None, period=100, 
                  cl_mem = False, 
                  output_type = 'i f', img_format = 'png',
@@ -165,7 +170,7 @@ class BeamDiagnostics:
             #self.lost[t] = np.append(self.data[t], lost_slice.particles)
             #self.test[t].append(rho_beam.tolist())
             
-class PlasmaDiagnostics:
+class PlasmaDiagnostics1:
     def __init__(self, t_start=0, t_end=None, period=100, 
                  cl_mem = False, 
                  output_type = 'i f', img_format = 'png',

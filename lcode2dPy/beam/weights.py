@@ -11,7 +11,7 @@ def add_at(out, idx, value):
 @nb.njit(parallel=True)
 def particles_weights(r, xi, xi_end, r_step, xi_step_p):
     j = np.floor(r / r_step).astype(np.int_)
-    dxi = (xi_end - xi) / xi_step_p + 1
+    dxi = (xi_end - xi) / xi_step_p - 1
     dr = r / r_step - j
     a0_xi = dxi
     a1_xi = (1 - dxi)
@@ -42,11 +42,14 @@ def single_particle_weights(r, xi, xi_end, r_step, xi_step_p):
 
 @nb.njit(cache=True)
 def deposit_particles(value, out0, out1, j, a00, a01, a10, a11):
-    add_at(out0, j + 0, a00 * value)
-    add_at(out0, j + 1, a01 * value)
-    add_at(out1, j + 0, a10 * value)
-    add_at(out1, j + 1, a11 * value)
-
+    # add_at(out0, j + 0, a00 * value)
+    # add_at(out0, j + 1, a01 * value)
+    # add_at(out1, j + 0, a10 * value)
+    # add_at(out1, j + 1, a11 * value)
+    add_at(out0, j + 0, a11 * value)
+    add_at(out0, j + 1, a10 * value)
+    add_at(out1, j + 0, a01 * value)
+    add_at(out1, j + 1, a00 * value)
 
 @nb.njit(cache=True)
 def interpolate_particle(value0, value1, j, a00, a01, a10, a11):

@@ -50,6 +50,15 @@ class BeamSlice:
         self.nlost = 0
         self.lost = np.zeros(size, dtype=np.bool8)
 
+    def __getitem__(self, idx):
+        new_particles = self.particles[idx]
+        new_slice = BeamSlice(new_particles.size, new_particles)
+        new_slice.dt[:] = self.dt[idx]
+        new_slice.remaining_steps[:] = self.remaining_steps[idx]
+        new_slice.lost[:] = self.lost[idx]
+        new_slice.nlost = new_slice.lost.sum()
+        return new_slice
+
     def swap_particles(self, i, j):
         self.particles[i], self.particles[j] = self.particles[j], self.particles[i]
         self.dt[i], self.dt[j] = self.dt[j], self.dt[i]
@@ -58,12 +67,28 @@ class BeamSlice:
         self.lost[i], self.lost[j] = self.lost[j], self.lost[i]
 
     def get_subslice(self, begin, end):
-        temp_particles = self.particles[begin:end]
-        sub_slice = BeamSlice(len(temp_particles), temp_particles)
-        sub_slice.dt[:] = self.dt[begin:end]
-        sub_slice.remaining_steps[:] = self.remaining_steps[begin:end]
-        sub_slice.lost[:] = self.lost[begin:end]
-        return sub_slice
+        return self[begin:end]
+
+    def concat(self, other_slice):
+        
+        new_slice = BeamSlice(0, None)
+        new_slice.size = self.size + other_slice.size
+        new_slice.particles = np.concatenate((self.particles, other_slice.particles))
+        new_slice.xi = new_slice.particles['xi']
+        new_slice.r = new_slice.particles['r']
+        new_slice.p_z = new_slice.particles['p_z']
+        new_slice.p_r = new_slice.particles['p_r']
+        new_slice.M = new_slice.particles['M']
+        new_slice.q_m = new_slice.particles['q_m']
+        new_slice.q_norm = new_slice.particles['q_norm']
+        new_slice.id = new_slice.particles['id']
+        # Additional particle properties for substepping, not stored in beam
+        new_slice.dt =  np.concatenate((self.dt, other_slice.dt))
+        new_slice.remaining_steps = np.concatenate((self.remaining_steps, other_slice.remaining_steps))
+
+        new_slice.nlost = self.nlost + other_slice.nlost
+        new_slice.lost = np.concatenate((self.lost, other_slice.lost))
+        return new_slice
 
     def concatenate(self, other_slice):
         self.particles = np.concatenate((
