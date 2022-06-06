@@ -57,8 +57,8 @@ def make_beam(config, xi_distr, pz_distr, Ipeak_kA,
             xi = xi[(xi >= -config.getfloat('window-length')) & (xi <= 0)]
             N = len(xi)
         partic_in_mid_layer = np.sum((xi > xi_distr.med - config.getfloat('xi-step')/2) & (xi < xi_distr.med + config.getfloat('xi-step')/2))
-        print('Number of particles:', N)
-        print('Number of particles in the middle layer:', partic_in_mid_layer)
+        # print('Number of particles:', N)
+        # print('Number of particles in the middle layer:', partic_in_mid_layer)
         xi = np.sort(xi)[::-1]
 
         if config.get('geometry') == 'c' or config.get('geometry') == 'circ':

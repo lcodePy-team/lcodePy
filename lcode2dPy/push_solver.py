@@ -101,8 +101,5 @@ class PusherAndSolver:
             beam_drain.push_beam_slice(stable_slice)
             beam_drain.finish_layer((layer_idx + 1) * -self.xi_step_p)
 
-            with open(f'worker_{MPI.COMM_WORLD.rank:04}', 'w') as f:
-                f.write(f"t: {t}, xi: {layer_idx * self.xi_step_p}")
-
         diagnostics.after()
         return plasma_particles, plasma_fields

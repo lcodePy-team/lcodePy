@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import time
 from lcode2dPy.push_solver import PusherAndSolver
 from lcode2dPy.beam.beam_slice import BeamSlice
 from lcode2dPy.beam.beam_io import MemoryBeamSource, MemoryBeamDrain
@@ -58,10 +59,14 @@ class Simulation:
                 beam_slice = BeamSlice(0, particles=np.zeros(0, dtype=pdtype))
         rank = MPI.COMM_WORLD.rank
         size = MPI.COMM_WORLD.size
-        for t_i in range(N_steps//size + (1 if N_steps % size != 0 else 0)):
+        steps = N_steps//size + (1 if N_steps % size != 0 else 0)
+        for t_i in range(steps):
+            n = min(size, N_steps - t_i * size)
+            if rank == 0:
+                t_start = time.time()
+                print(f"Start of round {t_i}, {n} workers")
             if rank >= N_steps - t_i * size:
                 return
-            n = min(size, N_steps - t_i * size)
             self.beam_source = MPIBeamSource(n, MemoryBeamSource(beam_slice))
             self.beam_drain = MPIBeamDrain(n, MemoryBeamDrain())
 
@@ -73,3 +78,8 @@ class Simulation:
                 return
             self.current_time += self.t_step*size
             beam_slice = self.beam_drain.refresh()
+            if rank == 0:
+                t_end = time.time()
+                diff = (t_end-t_start)/60
+                print(f"Round time: {diff:.2f} minutes")
+                print(f"Estimate {diff*(steps-t_i+1):.2f} minutes\n")
