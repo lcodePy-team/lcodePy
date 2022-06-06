@@ -74,7 +74,6 @@ class MemoryBeamSource(BeamSource):
             self._beam_slice.particles = self._beam_slice.particles[:-1]
         self._beam_slice.dt.fill(0.0)
         self._beam_slice.remaining_steps.fill(1.0)
-        
 
     def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
         assert xi_min < xi_max
@@ -86,7 +85,7 @@ class MemoryBeamSource(BeamSource):
                 break
             if self._beam_slice.xi[i] - xi_max > 0:
                 end = start
-                logging.debug(f'Wrong order of the particles')
+                logging.debug('Wrong order of the particles')
                 break
         self._used_count += end - start
         logging.debug(f'MemoryBeamSource: sourced {end - start} particles')
@@ -112,7 +111,7 @@ class MemoryBeamDrain(BeamDrain):
             self._beam_buffer_lost.append(beam_slice)
 
     def beam_slice(self):
-        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
+        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer]) if len(self._beam_buffer) > 0 else np.array([], dtype=particle_dtype)
 
 
 class DebugSource(BeamSource):

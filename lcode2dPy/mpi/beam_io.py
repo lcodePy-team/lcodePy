@@ -1,5 +1,4 @@
 import logging
-
 import numpy as np
 from mpi4py import MPI
 
@@ -8,6 +7,7 @@ from lcode2dPy.beam.beam_io import BeamSource, BeamDrain
 from lcode2dPy.mpi.util import MPIWorker, particle_dtype
 
 MPI_TAG_PARTICLES = 1
+MPI_TAG_PARTICLES_SIZE = 2
 
 finish_layer_particle = BeamSlice(1, particles=np.zeros(1, dtype=particle_dtype))
 
@@ -68,7 +68,7 @@ class MPIBeamDrain(BeamDrain, MPIWorker):
 
     def finish_layer(self, xi: float) -> None:
         if xi >= self.xi_finished:
-            logging.debug(f'MPIBeamDrain: repeated finish_layer')
+            logging.debug('MPIBeamDrain: repeated finish_layer')
             return
         if self.last_step:
             self._final_drain.finish_layer(xi)
@@ -76,15 +76,30 @@ class MPIBeamDrain(BeamDrain, MPIWorker):
         finish_xi_particle = np.zeros(1, dtype=particle_dtype)
         finish_xi_particle[0]['xi'] = xi
         logging.debug(f'MPIBeamDrain: finish_layer {xi:.4}')
-        self._comm.Send([finish_xi_particle, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
+        self._comm.Send([finish_xi_particle, self.particles_type],
+                        self.next_node, MPI_TAG_PARTICLES)
         self.xi_finished = xi
 
     def push_beam_slice(self, beam_slice: BeamSlice):
         if self.last_step:
             self._final_drain.push_beam_slice(beam_slice)
             return
-        self._comm.Send([beam_slice.particles, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
+        self._comm.Send([beam_slice.particles, self.particles_type],
+                        self.next_node, MPI_TAG_PARTICLES)
         logging.debug(f'MPIBeamDrain: sent {len(beam_slice.particles)} particles')
 
     def push_lost(self, time: float, beam_slice: BeamSlice):
         pass
+
+    def refresh(self):
+        bp = self._final_drain.beam_slice()
+        if bp.size > 0 and self._rank != 0:
+            self._comm.send(bp.size, dest=0, tag=MPI_TAG_PARTICLES_SIZE)
+            self._comm.Send([bp, self.particles_type], 0, MPI_TAG_PARTICLES)
+        if bp.size == 0 and self._rank == 0:
+            particles_bufsize = self._comm.recv(source=self._size-1, tag=MPI_TAG_PARTICLES_SIZE)
+            particles_buf = np.zeros(particles_bufsize, dtype=particle_dtype)
+            self._comm.Recv([particles_buf, MPIWorker.particles_type], source=self.prev_node, tag=MPI_TAG_PARTICLES)
+            return BeamSlice(particles_bufsize,
+                             particles_buf)
+        return BeamSlice(bp.size, bp)

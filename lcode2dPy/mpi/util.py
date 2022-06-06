@@ -58,8 +58,6 @@ class MPIWorker:
         self._total_steps: int = steps
         self._processed_steps: int = 0
         self._remaining_steps: int = steps // self._size + (1 if steps % self._size > self._rank else 0)
-        if self._size == 1:
-            print('Single process available')
 
     @property
     def single_process(self):

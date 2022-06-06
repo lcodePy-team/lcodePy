@@ -4,3 +4,4 @@ beamfile*
 venv
 *.ipynb
 .vscode
+diagnostics/
