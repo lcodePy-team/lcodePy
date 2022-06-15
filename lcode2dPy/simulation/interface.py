@@ -30,8 +30,7 @@ class Simulation:
         # Here we get information about the geometry of the simulation window
         # and the type of processing unit (CPU or GPU)
         geometry = config.get('geometry').lower()
-        self.PU_type = config.get('processing-unit-type').lower()
-
+        
         if geometry == 'circ' or geometry == 'c':
             self.push_solver = PusherAndSolver(self.config) # circ
             self.init_plasma = init_plasma_2d
@@ -59,7 +58,7 @@ class Simulation:
         self.beam_drain = None
         
         # Finally, we set the diagnostics.
-        self.diagnostics = MyDiagnostics(config, diagnostics)
+        self.diagnostics = diagnostics
 
     def step(self, N_steps):
         """Compute N time steps."""
@@ -68,7 +67,6 @@ class Simulation:
             N_steps = int(self.time_limit / self.time_step_size)
 
         # Beam generation
-        self.diagnostics.config()
         if self.beam_source is None:
             beam_particles = self.beam_generator(self.config,
                                                     **self.beam_pars)
@@ -78,8 +76,8 @@ class Simulation:
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
             self.beam_source = MemoryBeamSource(beam_slice) #TODO mpi_beam_source
             self.beam_drain = MemoryBeamDrain()
-        if self.diagnostics:
-            self.diagnostics.config = self.config
+#         if self.diagnostics:
+#             self.diagnostics.sim = self
         # Time loop
         for t_i in range(N_steps):
             fields, plasma_particles = self.init_plasma(self.config)
@@ -98,17 +96,17 @@ class Simulation:
             #     self.diagnostics.every_dt()
 
 
-class Diagnostics2d:
-    def __init__(self, dt_diag, dxi_diag):
-        self.config = None
-        self.dt_diag = dt_diag
-        self.dxi_diag = dxi_diag
+# class Diagnostics2d:
+#     def __init__(self, dt_diag, dxi_diag):
+#         self.config = None
+#         self.dt_diag = dt_diag
+#         self.dxi_diag = dxi_diag
 
-    def every_dt(self):
-        pass # TODO
+#     def every_dt(self):
+#         pass # TODO
 
-    def every_dxi(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice):
-        for diag_name in self.dxi_diag.keys():
-            diag, pars = self.dxi_diag[diag_name]
-            diag(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice, **pars)
-        return None
+#     def every_dxi(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice):
+#         for diag_name in self.dxi_diag.keys():
+#             diag, pars = self.dxi_diag[diag_name]
+#             diag(self, t, layer_idx, plasma_particles, plasma_fields, rho_beam, beam_slice, **pars)
+#         return None

@@ -109,9 +109,6 @@ class PusherAndSolver:
             
             # Every xi step diagnostics
             if diagnostics:
-                diagnostics.dxi(t + self.config.getfloat('time-step'), layer_idx, plasma_particles, plasma_fields, rho_beam, stable_slice)
-            else:
-                if layer_idx % 100 == 0:
-                    print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
-            print('xi={xi:.6f} Ez={Ez:e} N={N}'.format(xi=layer_idx * -self.xi_step_p, Ez=plasma_fields.E_z[0], N=steps))
+                for diagnostic in diagnostics:
+                    diagnostic.process(self.config, t + self.config.getfloat('time-step'), layer_idx, steps, plasma_particles, plasma_fields, rho_beam, stable_slice)
         return plasma_particles, plasma_fields
