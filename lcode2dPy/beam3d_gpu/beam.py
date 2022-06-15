@@ -237,19 +237,27 @@ def weights(x, y, xi_loc, grid_steps, grid_step_size):
     x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
     # xi_loc = dxi = (xi_prev - xi) / D_XIP
 
+    # First order core along xi axis
     wxi0 = xi_loc
     wxiP = (1 - xi_loc)
-    wx0 = x_loc
-    wxP = (1 - x_loc)
-    wy0 = y_loc
-    wyP = (1 - y_loc)
 
-    w000, w00P = wxi0 * wx0 * wy0, wxi0 * wx0 * wyP
-    w0P0, w0PP = wxi0 * wxP * wy0, wxi0 * wxP * wyP
-    wP00, wP0P = wxiP * wx0 * wy0, wxiP * wx0 * wyP
-    wPP0, wPPP = wxiP * wxP * wy0, wxiP * wxP * wyP
+    # Second order core along x and y axes
+    wx0, wy0 = .75 - x_loc**2, .75 - y_loc**2
+    wxP, wyP = (.5 + x_loc)**2 / 2, (.5 + y_loc)**2 / 2
+    wxM, wyM = (.5 - x_loc)**2 / 2, (.5 - y_loc)**2 / 2
 
-    return i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP
+    w0MP, w00P, w0PP = wxi0 * wxM * wyP, wxi0 * wx0 * wyP, wxi0 * wxP * wyP
+    w0M0, w000, w0P0 = wxi0 * wxM * wy0, wxi0 * wx0 * wy0, wxi0 * wxP * wy0
+    w0MM, w00M, w0PM = wxi0 * wxM * wyM, wxi0 * wx0 * wyM, wxi0 * wxP * wyM
+
+    wPMP, wP0P, wPPP = wxiP * wxM * wyP, wxiP * wx0 * wyP, wxiP * wxP * wyP
+    wPM0, wP00, wPP0 = wxiP * wxM * wy0, wxiP * wx0 * wy0, wxiP * wxP * wy0
+    wPMM, wP0M, wPPM = wxiP * wxM * wyM, wxiP * wx0 * wyM, wxiP * wxP * wyM
+
+    return (i, j,
+            w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+            wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+    )
 
 
 # Deposition and field interpolation #
@@ -266,18 +274,32 @@ def deposit_kernel(grid_steps, grid_step_size,
         return
 
     # Calculate the weights for a particle
-    i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = weights(
+    (i, j,
+    w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+    wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+    ) = weights(
         x[k], y[k], xi_loc[k], grid_steps, grid_step_size
     )
-    
-    numba.cuda.atomic.add(rho_layout_0, (i + 0, j + 0), q_norm[k] * w000)
+
+    numba.cuda.atomic.add(rho_layout_0, (i - 1, j + 1), q_norm[k] * w0MP)
     numba.cuda.atomic.add(rho_layout_0, (i + 0, j + 1), q_norm[k] * w00P)
-    numba.cuda.atomic.add(rho_layout_0, (i + 1, j + 0), q_norm[k] * w0P0)
     numba.cuda.atomic.add(rho_layout_0, (i + 1, j + 1), q_norm[k] * w0PP)
-    numba.cuda.atomic.add(rho_layout_1, (i + 0, j + 0), q_norm[k] * wP00)
+    numba.cuda.atomic.add(rho_layout_0, (i - 1, j + 0), q_norm[k] * w0M0)
+    numba.cuda.atomic.add(rho_layout_0, (i + 0, j + 0), q_norm[k] * w000)
+    numba.cuda.atomic.add(rho_layout_0, (i + 1, j + 0), q_norm[k] * w0P0)
+    numba.cuda.atomic.add(rho_layout_0, (i - 1, j - 1), q_norm[k] * w0MM)
+    numba.cuda.atomic.add(rho_layout_0, (i + 0, j - 1), q_norm[k] * w00M)
+    numba.cuda.atomic.add(rho_layout_0, (i + 1, j - 1), q_norm[k] * w0PM)
+
+    numba.cuda.atomic.add(rho_layout_1, (i - 1, j + 1), q_norm[k] * wPMP)
     numba.cuda.atomic.add(rho_layout_1, (i + 0, j + 1), q_norm[k] * wP0P)
-    numba.cuda.atomic.add(rho_layout_1, (i + 1, j + 0), q_norm[k] * wPP0)
     numba.cuda.atomic.add(rho_layout_1, (i + 1, j + 1), q_norm[k] * wPPP)
+    numba.cuda.atomic.add(rho_layout_1, (i - 1, j + 0), q_norm[k] * wPM0)
+    numba.cuda.atomic.add(rho_layout_1, (i + 0, j + 0), q_norm[k] * wP00)
+    numba.cuda.atomic.add(rho_layout_1, (i + 1, j + 0), q_norm[k] * wPP0)
+    numba.cuda.atomic.add(rho_layout_1, (i - 1, j - 1), q_norm[k] * wPMM)
+    numba.cuda.atomic.add(rho_layout_1, (i + 0, j - 1), q_norm[k] * wP0M)
+    numba.cuda.atomic.add(rho_layout_1, (i + 1, j - 1), q_norm[k] * wPPM)
 
 
 def deposit(grid_steps, grid_step_size,
@@ -296,20 +318,31 @@ def deposit(grid_steps, grid_step_size,
 
 @numba.njit
 def interp(value_0, value_1, i, j,
-                w000, w00P, w0P0, w0PP,
-                wP00, wP0P, wPP0, wPPP):
+           w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+           wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM):
     """
     Collect value from a cell and surrounding cells (using `weights` output).
     """
     return (
-        w000 * value_0[i + 0, j + 0] +
-        w00P * value_0[i + 0, j + 1] +
-        w0P0 * value_0[i + 1, j + 0] +
-        w0PP * value_0[i + 1, j + 1] +
-        wP00 * value_1[i + 0, j + 0] +
-        wP0P * value_1[i + 0, j + 1] +
-        wPP0 * value_1[i + 1, j + 0] +
-        wPPP * value_1[i + 1, j + 1]
+        value_0[i - 1, j + 1] * w0MP +
+        value_0[i + 0, j + 1] * w00P +
+        value_0[i + 1, j + 1] * w0PP +
+        value_0[i - 1, j + 0] * w0M0 +
+        value_0[i + 0, j + 0] * w000 +
+        value_0[i + 1, j + 0] * w0P0 +
+        value_0[i - 1, j - 1] * w0MM +
+        value_0[i + 0, j - 1] * w00M +
+        value_0[i + 1, j - 1] * w0PM +
+    
+        value_1[i - 1, j + 1] * wPMP +
+        value_1[i + 0, j + 1] * wP0P +
+        value_1[i + 1, j + 1] * wPPP +
+        value_1[i - 1, j + 0] * wPM0 +
+        value_1[i + 0, j + 0] * wP00 +
+        value_1[i + 1, j + 0] * wPP0 +
+        value_1[i - 1, j - 1] * wPMM +
+        value_1[i + 0, j - 1] * wP0M +
+        value_1[i + 1, j - 1] * wPPM
     )
 
 
@@ -319,22 +352,31 @@ def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
                     Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
     xi_loc = (xi_k - xi) / xi_step_size
 
-    i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = weights(
+    (i, j,
+    w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+    wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+    ) = weights(
         x, y, xi_loc, grid_steps, grid_step_size
     )
 
-    Ex = interp(Ex_k, Ex_k_1, i, j, 
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Ex = interp(Ex_k, Ex_k_1, i, j,
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Ey = interp(Ey_k, Ey_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Ez = interp(Ez_k, Ez_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Bx = interp(Bx_k, Bx_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     By = interp(By_k, By_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Bz = interp(Bz_k, Bz_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
 
     return Ex, Ey, Ez, Bx, By, Bz
 
