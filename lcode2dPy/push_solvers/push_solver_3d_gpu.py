@@ -32,24 +32,40 @@ class PushAndSolver3d:
         beam_layer_to_move = BeamParticles(0)
         fell_size = 0
 
+        # TODO: Not sure this is right if we start from a saved plasma state and
+        #       with a saved beamfile.
+        pl_currents_prev = pl_currents.copy()
+        ro_beam_prev  = cp.zeros(
+            (self.grid_steps, self.grid_steps), dtype=cp.float64
+        )
+
         gpu_index = 0
         with cp.cuda.Device(gpu_index):
             for xi_i in range(self.xi_steps + 1):
-                beam_layer_to_layout = beam_source.get_beam_layer_to_layout(xi_i)
-                ro_beam = (
-                    self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i))
+                beam_layer_to_layout = \
+                    beam_source.get_beam_layer_to_layout(xi_i)
+                ro_beam = \
+                    self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i)
 
                 prev_pl_fields = pl_fields.copy()
 
-                pl_particles, pl_fields, pl_currents = self.pl_solver.step_dxi(
-                    pl_particles, pl_fields, pl_currents, pl_const_arrays, ro_beam)
+                pl_particles, pl_fields, pl_currents, pl_currents_prev = \
+                    self.pl_solver.step_dxi(
+                    pl_particles, pl_fields, pl_currents, pl_currents_prev,
+                    pl_const_arrays, ro_beam, ro_beam_prev
+                )
 
                 lost, moved, fell_to_next_layer = self.beam_calc.move_beam_layer(
-                    beam_layer_to_move, fell_size, xi_i, pl_fields, prev_pl_fields)
+                    beam_layer_to_move, fell_size, xi_i, pl_fields,
+                    prev_pl_fields
+                )
+
+                ro_beam_prev = ro_beam
 
                 # Beam layers operations:
-                beam_layer_to_move = concatenate_beam_layers(beam_layer_to_layout,
-                                                            fell_to_next_layer)
+                beam_layer_to_move = concatenate_beam_layers(
+                    beam_layer_to_layout, fell_to_next_layer
+                )
                 fell_size = fell_to_next_layer.size
 
                 beam_drain.push_beam_layer(moved)
@@ -60,7 +76,8 @@ class PushAndSolver3d:
                     xi_plasma_layer = - self.xi_step_size * xi_i
                     diagnostics.dxi(current_time, xi_plasma_layer,
                         GPUArraysView(pl_particles), GPUArraysView(pl_fields),
-                        GPUArraysView(pl_currents), ro_beam.get())
+                        GPUArraysView(pl_currents), ro_beam.get()
+                    )
 
                 # # Some diagnostics:
                 view_pl_fields = GPUArraysView(pl_fields)

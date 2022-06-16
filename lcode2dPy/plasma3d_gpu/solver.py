@@ -11,31 +11,50 @@ class Plane2d3vPlasmaSolver(object):
         self.PMover = ParticleMover(config)
         self.CComputer = RhoJComputer(config)
 
-    # Perfoms one full step along xi
-    def step_dxi(self, particles_prev: GPUArrays, fields_prev: GPUArrays,
-                 currents_prev: GPUArrays, const_arrays: GPUArrays, rho_beam):
-        particles = self.PMover.move_particles_wo_fields(particles_prev)
+    # Perfoms one full step along xi.
+    # To understand the numerical scheme, read values as following:
+    # *_prev = * on the previous xi step, an index number = k
+    # *_half = * on the halfstep, an index number = k + 1/2
+    # *_full = * on the next xi step (fullstep), an index number = k + 1
+    # *_prevprev = * on the xi step with an index number k - 1
+    def step_dxi(
+        self, particles_prev: GPUArrays, fields_prev: GPUArrays,
+        currents_prev: GPUArrays, currents_prevprev: GPUArrays,
+        const_arrays: GPUArrays, rho_beam, rho_beam_prev
+    ):
+        particles_full = self.PMover.move_particles_wo_fields(particles_prev)
 
 
-        particles = self.PMover.move_particles(fields_prev,
-                                               particles_prev, particles)
-        currents = self.CComputer.compute_rhoj(particles, const_arrays)
+        particles_full = self.PMover.move_particles(
+            fields_prev, particles_prev, particles_full
+        )
+        currents_full = self.CComputer.compute_rhoj(
+            particles_full, const_arrays
+        )
 
-        _, fields_avg = self.FComputer.compute_fields(fields_prev, fields_prev,
-                                               const_arrays, rho_beam,
-                                               currents_prev, currents)
+        fields_full, fields_half= self.FComputer.compute_fields_predictor(
+            fields_prev, const_arrays, rho_beam, rho_beam_prev, currents_prev,
+            currents_full
+        )
 
 
-        particles = self.PMover.move_particles(fields_avg,
-                                               particles_prev, particles)
-        currents = self.CComputer.compute_rhoj(particles, const_arrays)
+        particles_full = self.PMover.move_particles(
+            fields_half, particles_prev, particles_full
+        )
+        currents_full = self.CComputer.compute_rhoj(
+            particles_full, const_arrays
+        )
 
-        fields, fields_avg = self.FComputer.compute_fields(fields_avg, fields_prev,
-                                               const_arrays, rho_beam,
-                                               currents_prev, currents)
+        fields, fields_avg = self.FComputer.compute_fields_corrector(
+            fields_full, fields_prev, const_arrays, rho_beam, currents_prevprev,
+            currents_prev, currents_full
+        )
 
-        particles = self.PMover.move_particles(fields_avg,
-                                               particles_prev, particles)
-        currents = self.CComputer.compute_rhoj(particles, const_arrays)
+        particles_full = self.PMover.move_particles(
+            fields_half, particles_prev, particles_full
+        )
+        currents_full = self.CComputer.compute_rhoj(
+            particles_full, const_arrays
+        )
 
-        return particles, fields, currents
+        return particles_full, fields_full, currents_full, currents_prev

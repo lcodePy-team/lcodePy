@@ -111,9 +111,10 @@ def dx_dy(arr, grid_step_size):
     return dx / (grid_step_size * 2), dy / (grid_step_size * 2)
 
 
-def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
-                          const, fields_avg,
-                          beam_ro, currents, currents_prev):
+def calculate_Ex_Ey_Bx_By_predictor(
+    grid_step_size, xi_step_size, const, fields_prev, ro_beam_full, ro_beam_prev,
+    currents_full, currents_prev
+):
     """
     Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
     with and without transposition depending on the field component.
@@ -123,22 +124,24 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
            minus the coarse plasma particle cloud width).
     """
     jx_prev, jy_prev = currents_prev.jx, currents_prev.jy
-    jx,      jy      = currents.jx,      currents.jy
-
-    ro = currents.ro if not variant_A else (currents.ro + currents_prev.ro) / 2
-    jz = currents.jz if not variant_A else (currents.jz + currents_prev.jz) / 2
+    jx_full, jy_full = currents_full.jx, currents_full.jy
+    
+    ro_half = (currents_full.ro + ro_beam_full +
+               currents_prev.ro + ro_beam_prev) / 2
+    jz_half = (currents_full.jz + ro_beam_full +
+               currents_prev.jz + ro_beam_prev) / 2
 
     # 0. Calculate gradients and RHS.
-    dro_dx, dro_dy = dx_dy(ro + beam_ro, grid_step_size)
-    djz_dx, djz_dy = dx_dy(jz + beam_ro, grid_step_size)
-    djx_dxi = (jx_prev - jx) / xi_step_size  # - ?
-    djy_dxi = (jy_prev - jy) / xi_step_size  # - ?
+    dro_dx, dro_dy = dx_dy(ro_half, grid_step_size)
+    djz_dx, djz_dy = dx_dy(jz_half, grid_step_size)
+    djx_dxi = (jx_prev - jx_full) / xi_step_size  # - ?
+    djy_dxi = (jy_prev - jy_full) / xi_step_size  # - ?
 
-    # Are we solving a Laplace equation or a Helmholtz one?
-    Ex_rhs = -((dro_dx - djx_dxi) - fields_avg.Ex * trick)  # -?
-    Ey_rhs = -((dro_dy - djy_dxi) - fields_avg.Ey * trick)
-    Bx_rhs = +((djz_dy - djy_dxi) + fields_avg.Bx * trick)
-    By_rhs = -((djz_dx - djx_dxi) - fields_avg.By * trick)
+    # We are solving a Helmholtz equation
+    Ex_rhs = -(dro_dx - djx_dxi - fields_prev.Ex)  # -?
+    Ey_rhs = -(dro_dy - djy_dxi - fields_prev.Ey)
+    Bx_rhs = +(djz_dy - djy_dxi + fields_prev.Bx)
+    By_rhs = -(djz_dx - djx_dxi - fields_prev.By)
 
     # Boundary conditions application (for future reference, ours are zero):
     # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
@@ -152,14 +155,68 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
     Ey_f *= mix_mat
 
     # 3. Apply our mixed DCT-DST transform again.
-    Ey = mix2d(Ey_f)
+    Ey_half = mix2d(Ey_f)
 
     # Likewise for other fields:
-    Bx = mix2d(mix_mat * mix2d(Bx_rhs[1:-1, :])[1:-1, :])
-    By = mix2d(mix_mat * mix2d(By_rhs.T[1:-1, :])[1:-1, :]).T
-    Ex = mix2d(mix_mat * mix2d(Ex_rhs.T[1:-1, :])[1:-1, :]).T
+    Bx_half = mix2d(mix_mat * mix2d(Bx_rhs[1:-1, :])[1:-1, :])
+    By_half = mix2d(mix_mat * mix2d(By_rhs.T[1:-1, :])[1:-1, :]).T
+    Ex_half = mix2d(mix_mat * mix2d(Ex_rhs.T[1:-1, :])[1:-1, :]).T
 
-    return Ex, Ey, Bx, By
+    return Ex_half, Ey_half, Bx_half, By_half
+
+
+def calculate_Ex_Ey_Bx_By_corrector(
+    grid_step_size, xi_step_size, const, fields_full, ro_beam_full,
+    currents_full, currents_prev, currents_prevprev
+):
+    """
+    Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
+    with and without transposition depending on the field component.
+    NOTE: density and currents are assumed to be zero on the perimeter
+          (no plasma particles must reach the wall, so the reflection boundary
+           must be closer to the center than the simulation window boundary
+           minus the coarse plasma particle cloud width).
+    """
+    jx_prevprev, jy_prevprev = currents_prevprev.jx, currents_prevprev.jy
+    jx_prev,     jy_prev     = currents_prev.jx,     currents_prev.jy
+    jx_full,     jy_full     = currents_full.jx,     currents_full.jy
+
+    ro_full = currents_full.ro
+    jz_full = currents_full.jz
+
+    # 0. Calculate gradients and RHS.
+    dro_dx, dro_dy = dx_dy(ro_full + ro_beam_full, grid_step_size)
+    djz_dx, djz_dy = dx_dy(jz_full + ro_beam_full, grid_step_size)
+
+    djx_dxi = (- jx_prevprev + 4 * jx_prev - 3 * jx_full) / (2 * xi_step_size)
+    djy_dxi = (- jy_prevprev + 4 * jy_prev - 3 * jy_full) / (2 * xi_step_size)
+
+    # We are solving a Helmholtz equation
+    Ex_rhs = -(dro_dx - djx_dxi - fields_full.Ex)  # -?
+    Ey_rhs = -(dro_dy - djy_dxi - fields_full.Ey)
+    Bx_rhs = +(djz_dy - djy_dxi + fields_full.Bx)
+    By_rhs = -(djz_dx - djx_dxi - fields_full.By)
+
+    # Boundary conditions application (for future reference, ours are zero):
+    # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
+    # rhs[:, -1] += bound_top[:] * (2 / grid_step_size)
+
+    # 1. Apply our mixed DCT-DST transform to RHS.
+    Ey_f = mix2d(Ey_rhs[1:-1, :])[1:-1, :]
+
+    # 2. Multiply f by the magic matrix.
+    mix_mat = const.field_mixed_matrix
+    Ey_f *= mix_mat
+
+    # 3. Apply our mixed DCT-DST transform again.
+    Ey_full = mix2d(Ey_f)
+
+    # Likewise for other fields:
+    Bx_full = mix2d(mix_mat * mix2d(Bx_rhs[1:-1, :])[1:-1, :])
+    By_full = mix2d(mix_mat * mix2d(By_rhs.T[1:-1, :])[1:-1, :]).T
+    Ex_full = mix2d(mix_mat * mix2d(Ex_rhs.T[1:-1, :])[1:-1, :]).T
+
+    return Ex_full, Ey_full, Bx_full, By_full
 
 
 # Pushing particles without any fields (used for initial halfstep estimation) #
@@ -240,28 +297,62 @@ class FieldComputer(object):
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')
 
-    def compute_fields(self, fields, fields_prev, const,
-                       rho_beam, currents_prev, currents):
+    def compute_fields_predictor(
+        self, fields_prev, const, rho_beam, rho_beam_prev, currents_prev,
+        currents_full
+    ):
         # Looks terrible! TODO: rewrite this function entirely
 
-        Ex, Ey, Bx, By = calculate_Ex_Ey_Bx_By(
-                            self.grid_step_size, self.xi_step_size,
-                            self.trick, self.variant_A, const,
-                            fields, rho_beam, currents, currents_prev)
+        Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By_predictor(
+            self.grid_step_size, self.xi_step_size, const, fields_prev,
+            rho_beam, rho_beam_prev, currents_full, currents_prev
+        )
 
-        if self.variant_A:
-            Ex = 2 * Ex - fields_prev.Ex
-            Ey = 2 * Ey - fields_prev.Ey
-            Bx = 2 * Bx - fields_prev.Bx
-            By = 2 * By - fields_prev.By
+        Ex_full = 2 * Ex_half - fields_prev.Ex
+        Ey_full = 2 * Ey_half - fields_prev.Ey
+        Bx_full = 2 * Bx_half - fields_prev.Bx
+        By_full = 2 * By_half - fields_prev.By
 
-        Ez = calculate_Ez(self.grid_step_size, const, currents)
-        Bz = calculate_Bz(self.grid_step_size, const, currents)
+        Ez_full  = calculate_Ez(self.grid_step_size, const, currents_full)
+        Bz_full  = calculate_Bz(self.grid_step_size, const, currents_full)
+        Phi_full = calculate_Phi(const, currents_full)
 
-        Phi = calculate_Phi(const, currents)
+        fields_full = GPUArrays(
+            Ex=Ex_full, Ey=Ey_full, Ez=Ez_full,
+            Bx=Bx_full, By=By_full, Bz=Bz_full,
+            Phi=Phi_full
+        )
+        
+        Ez_half  = (Ez_full  + fields_prev.Ez) / 2
+        Bz_half  = (Bz_full  + fields_prev.Bz) / 2
+        Phi_half = (Phi_full + fields_prev.Phi) / 2
 
-        new_fields = GPUArrays(Ex=Ex, Ey=Ey, Ez=Ez,
-                               Bx=Bx, By=By, Bz=Bz,
-                               Phi=Phi)
+        fields_half = GPUArrays(
+            Ex=Ex_half, Ey=Ey_half, Ez=Ez_half,
+            Bx=Bx_half, By=By_half, Bz=Bz_half,
+            Phi=Phi_half
+        )
 
-        return new_fields, fields_average(new_fields, fields_prev)
+        return fields_full, fields_half
+
+    def compute_fields_corrector(
+        self, fields_full, fields_prev, const, rho_beam, currents_prevprev,
+        currents_prev, currents_full
+    ):
+
+        Ex_full, Ey_full, Bx_full, By_full = calculate_Ex_Ey_Bx_By_corrector(
+            self.grid_step_size, self.xi_step_size, const, fields_full,
+            rho_beam, currents_full, currents_prev, currents_prevprev
+        )
+
+        Ez_full  = calculate_Ez(self.grid_step_size, const, currents_full)
+        Bz_full  = calculate_Bz(self.grid_step_size, const, currents_full)
+        Phi_full = calculate_Phi(const, currents_full)
+
+        fields_full = GPUArrays(
+            Ex=Ex_full, Ey=Ey_full, Ez=Ez_full,
+            Bx=Bx_full, By=By_full, Bz=Bz_full,
+            Phi=Phi_full
+        )
+
+        return fields_full, fields_average(fields_full, fields_prev)
