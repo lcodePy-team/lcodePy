@@ -181,7 +181,7 @@ class Cartesian3dSimulation:
                                         self.__current_time, self.__diagnostics)
 
                 # Perform diagnostics
-                self.__diagnostics.dt(self.__current_time,
+                self.__diagnostics.after_step_dt(self.__current_time,
                     pl_particles, pl_fields, pl_currents, self.beam_drain)
 
                 # Here we transfer beam particles from beam_buffer to

@@ -31,25 +31,37 @@ class Diagnostics3d:
             try:
                 diag.pull_config(self.config)
             except AttributeError:
-                print(f'{diag} type of diagnostics is not supported.')
+                print(
+                    f'{diag} type of diagnostics is not supported because' + 
+                    'it does not have attribute called pull_config(...) or' +
+                    'this attribute does not work correctly.'
+                )
 
-    def dxi(self, *parameters):
+    def after_step_dxi(self, *parameters):
         for diag in self.diag_list:
-            try:
-                diag.dxi(*parameters)
-            except AttributeError:
-                print(f'{diag} type of diagnostics is not supported.')
+            # try:
+            diag.after_step_dxi(*parameters)
+            # except AttributeError:
+            #     print(
+            #         f'{diag} type of diagnostics is not supported because' + 
+            #         'it does not have attribute called after_step_dxi(...).' +
+                    # 'this attribute does not work correctly.'
+            #     )
 
     def dump(self, *parameters):
         for diag in self.diag_list:
             diag.dump(*parameters)
 
-    def dt(self, *parameters):
+    def after_step_dt(self, *parameters):
         for diag in self.diag_list:
             try:
-                diag.dt(*parameters)
+                diag.after_step_dt(*parameters)
             except AttributeError:
-                print(f'{diag} type of diagnostics is not supported.')
+                print(
+                    f'{diag} type of diagnostics is not supported because' + 
+                    'it does not have attribute called after_step_dt(...).' +
+                    'this attribute does not work correctly.'
+                )
 
 
 class DiagnosticsFXi:
@@ -60,8 +72,10 @@ class DiagnosticsFXi:
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
     #TODO: add 'pictures' and 'both' and functionality
 
-    def __init__(self, output_period=100, f_xi='Ez', f_xi_type='numbers',
-                 axis_x=0, axis_y=0, auxiliary_x=1, auxiliary_y=1):
+    def __init__(
+        self, output_period=100, saving_xi_period=1000, f_xi='Ez',
+        f_xi_type='numbers', axis_x=0, axis_y=0, auxiliary_x=1, auxiliary_y=1
+    ):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__f_xi_names = from_str_into_list(f_xi)
         for name in self.__f_xi_names:
@@ -80,8 +94,9 @@ class DiagnosticsFXi:
         # THe position of a `probe' line 2 from the center:
         self.__auxiliary_x, self.__auxiliary_y = auxiliary_x, auxiliary_y
 
-        # Set time periodicity of detailed output:
-        self.__period = output_period
+        # Set time periodicity of detailed output and safving into a file:
+        self.__output_period = output_period
+        self.__saving_period = saving_xi_period
 
         # We store data as a simple Python dictionary of lists for f(xi) data.
         # But I'm not sure this is the best way to handle data storing!
@@ -89,7 +104,7 @@ class DiagnosticsFXi:
         self.__data['xi'] = []
 
     def __repr__(self):
-        return (f"Diagnostics_f_xi(output_period={self.__period}, " +
+        return (f"Diagnostics_f_xi(output_period={self.__output_period}, " +
             f"f_xi='{','.join(self.__f_xi_names)}', " +
             f"f_xi_type='{self.__f_xi_type}', " +
             f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
@@ -108,19 +123,25 @@ class DiagnosticsFXi:
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if period % time_step_size = 0,
+        # always diagnosed. And we check if output_period % time_step_size = 0,
         # because otherwise it won't diagnosed anything.
         self.__time_step_size = config.getfloat('time-step')
+        self.__xi_step_size   = config.getfloat('xi-step')
 
-        if self.__period < self.__time_step_size:
-            self.__period = self.__time_step_size
+        if self.__output_period < self.__time_step_size:
+            self.__output_period = self.__time_step_size
 
-        if self.__period % self.__time_step_size != 0:
+        if self.__saving_period < self.__time_step_size:
+            self.__saving_period = self.__time_step_size
+
+        if self.__output_period % self.__time_step_size != 0:
             print("The diagnostics will not work because",
-                  f"{self.__period} % {self.__time_step_size} != 0")
+                  f"{self.__output_period} % {self.__time_step_size} != 0")
 
-    def dxi(self, current_time, xi_plasma_layer,
-            pl_particles, pl_fields, pl_currents, ro_beam):
+    def after_step_dxi(
+        self, current_time, xi_plasma_layer, pl_particles, pl_fields,
+        pl_currents, ro_beam
+    ):
         if self.dxi_conditions_check(current_time, xi_plasma_layer):
             self.__data['xi'].append(xi_plasma_layer)
 
@@ -145,9 +166,14 @@ class DiagnosticsFXi:
                 if name == 'nb2':
                     ro = ro_beam[self.__aux_x, self.__aux_y]
                     self.__data[name].append(ro)
+        
+        # We use dump here to save data not only at the end of the simulation
+        # window, but with some period too.
+        if xi_plasma_layer % self.__saving_period <= self.__xi_step_size / 2:
+            self.dump(current_time)
 
     def dxi_conditions_check(self, current_time, xi_pl_layer):
-        return current_time % self.__period == 0
+        return current_time % self.__output_period == 0
 
     def dump(self, current_time):
         time_save = current_time + self.__time_step_size
@@ -164,7 +190,7 @@ class DiagnosticsFXi:
                             # vmin=-1, vmax=1)
                 plt.close()
 
-    def dt(self, *params):
+    def after_step_dt(self, *params):
         # We use this function to clean old data:
         for name in self.__data:
             self.__data[name] = []
@@ -178,10 +204,11 @@ class DiagnosticsColormaps:
     __allowed_colormaps_type = ['numbers']
     #TODO: add 'pictures' and 'both' and functionality
 
-    def __init__(self, output_period=100,
-                 colormaps='Ez', colormaps_type='numbers',
-                 xi_from=inf, xi_to=-inf, r_from=0, r_to=inf,
-                 output_merging_r: int=1, output_merging_xi: int=1):
+    def __init__(
+        self, output_period=100, saving_xi_period=1000, colormaps='Ez',
+        colormaps_type='numbers', xi_from=inf, xi_to=-inf, r_from=0, r_to=inf,
+        output_merging_r: int=1, output_merging_xi: int=1
+    ):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
         for name in self.__colormaps_names:
@@ -196,7 +223,8 @@ class DiagnosticsColormaps:
                              "is not supported.")
 
         # Set time periodicity of detailed output:
-        self.__period = output_period
+        self.__output_period = output_period
+        self.__saving_period = saving_xi_period
 
         # Set borders of a subwindow:
         self.__xi_from, self.__xi_to = xi_from, xi_to
@@ -212,7 +240,7 @@ class DiagnosticsColormaps:
         self.__data['xi'] = []
 
     def __repr__(self) -> str:
-        return (f"Diagnostics_colormaps(output_period={self.__period}, " +
+        return (f"Diagnostics_colormaps(output_period={self.__output_period}, " +
             f"colormaps='{','.join(self.__colormaps_names)}', " +
             f"f_xi_type='{self.__colormaps_type}', xi_from={self.__xi_from}, " +
             f"xi_to={self.__xi_to}, r_from={self.__r_from}, " +
@@ -245,16 +273,19 @@ class DiagnosticsColormaps:
         # always diagnosed. And we check if period % time_step_size = 0,
         # because otherwise it won't diagnosed anything.
         self.__time_step_size = config.getfloat('time-step')
+        self.__xi_step_size   = config.getfloat('xi-step')
 
-        if self.__period < self.__time_step_size:
-            self.__period = self.__time_step_size
+        if self.__output_period < self.__time_step_size:
+            self.__output_period = self.__time_step_size
 
-        if self.__period % self.__time_step_size != 0:
+        if self.__output_period % self.__time_step_size != 0:
             print("The diagnostics will not work because",
-                  f"{self.__period} % {self.__time_step_size} != 0")
+                  f"{self.__output_period} % {self.__time_step_size} != 0")
 
-    def dxi(self, current_time, xi_plasma_layer,
-            pl_particles, pl_fields, pl_currents, ro_beam):
+    def after_step_dxi(
+        self, current_time, xi_plasma_layer, pl_particles, pl_fields,
+        pl_currents, ro_beam
+    ):
         if self.dxi_conditions_check(current_time, xi_plasma_layer):
             # Firstly, it adds the current value of xi to data dictionary:
             self.__data['xi'].append(xi_plasma_layer)
@@ -279,33 +310,61 @@ class DiagnosticsColormaps:
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
+        # We use dump here to save data not only at the end of the simulation
+        # window, but with some period too.
+        if xi_plasma_layer % self.__saving_period <= self.__xi_step_size / 2:
+            self.dump(current_time)
+
+        # We can save data and then clean the memory after
+        # the end of a subwindow.
+        if (xi_plasma_layer <= self.__xi_to and
+            (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to
+        ):
+            self.dump(current_time)
+
+            for name in self.__data:
+                self.__data[name] = []
+
+
     def dxi_conditions_check(self, current_time, xi_pl_layer):
-        return (current_time % self.__period == 0 and
-                xi_pl_layer <= self.__xi_from and xi_pl_layer >= self.__xi_to)
+        return (current_time % self.__output_period == 0 and
+                xi_pl_layer <= self.__xi_from and xi_pl_layer >= self.__xi_to
+        )
 
     def dump(self, current_time):
         # In case of colormaps, we reshape every data list except for xi list.
         size = len(self.__data['xi'])
         if size != 0:
+            data_for_saving = (self.__data).copy()
+
             for name in self.__colormaps_names:
-                    self.__data[name] = np.reshape(np.array(self.__data[name]),
-                                                  (size, -1))
+                    data_for_saving[name] = np.reshape(
+                        np.array(self.__data[name]), (size, -1)
+                    )
 
-        # Merging the data along r and xi axes:
-        if self.__merging_r > 1 or self.__merging_xi > 1:
-            for name in self.__colormaps_names:
-                self.__data[name] = conv_2d(self.__data[name],
-                                        self.__merging_xi, self.__merging_r)
+            # Merging the data along r and xi axes:
+            if self.__merging_r > 1 or self.__merging_xi > 1:
+                for name in self.__colormaps_names:
+                    data_for_saving[name] = conv_2d(
+                        data_for_saving, self.__merging_xi, self.__merging_r
+                    )
 
-        # Saving the data to a file:
-        time_for_save = current_time + self.__time_step_size
+            # Saving the data to a file:
+            time_for_save = current_time + self.__time_step_size
 
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
-        if 'numbers' in self.__colormaps_type or 'both' in self.__colormaps_type:
-            np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
-                     **self.__data)
+            # TODO: If there is a file with the same name with important data 
+            #       and we want to save data there, we should just add new data,
+            #       not rewrite a file.
+            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            if 'numbers' in self.__colormaps_type or 'both' in self.__colormaps_type:
+                np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
+                        **data_for_saving)
 
-    def dt(self, *params):
+            # Clean the memory from this data
+            for name in self.__data:
+                data_for_saving[name] = []
+
+    def after_step_dt(self, *params):
         # We use this function to clean old data:
         for name in self.__data:
             self.__data[name] = []
@@ -330,14 +389,15 @@ class SaveRunState:
         # Important for saving arrays from GPU:
         self.__pu_type = config.get('processing-unit-type').lower()
 
-    def dxi(self, *parameters):
+    def after_step_dxi(self, *parameters):
         pass
 
     def dump(self, *parameeters):
         pass
 
-    def dt(self, current_time,
-           pl_particles, pl_fields, pl_currents, beam_drain):
+    def after_step_dt(
+        self, current_time, pl_particles, pl_fields, pl_currents, beam_drain
+    ):
         time_for_save = current_time + self.__time_step_size
 
         # The run is saved if the current_time differs from a multiple
