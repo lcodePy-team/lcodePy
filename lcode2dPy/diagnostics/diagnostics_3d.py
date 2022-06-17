@@ -39,14 +39,14 @@ class Diagnostics3d:
 
     def after_step_dxi(self, *parameters):
         for diag in self.diag_list:
-            # try:
-            diag.after_step_dxi(*parameters)
-            # except AttributeError:
-            #     print(
-            #         f'{diag} type of diagnostics is not supported because' + 
-            #         'it does not have attribute called after_step_dxi(...).' +
-                    # 'this attribute does not work correctly.'
-            #     )
+            try:
+                diag.after_step_dxi(*parameters)
+            except AttributeError:
+                print(
+                    f'{diag} type of diagnostics is not supported because' + 
+                    'it does not have attribute called after_step_dxi(...).' +
+                    'this attribute does not work correctly.'
+                )
 
     def dump(self, *parameters):
         for diag in self.diag_list:

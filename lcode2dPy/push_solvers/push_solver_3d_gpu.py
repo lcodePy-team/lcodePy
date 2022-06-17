@@ -60,7 +60,7 @@ class PushAndSolver3d:
                     prev_pl_fields
                 )
 
-                ro_beam_prev = ro_beam
+                ro_beam_prev = ro_beam.copy()
 
                 # Beam layers operations:
                 beam_layer_to_move = concatenate_beam_layers(
