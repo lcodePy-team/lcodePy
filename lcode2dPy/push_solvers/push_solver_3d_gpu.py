@@ -3,8 +3,10 @@ import cupy as cp
 from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d_gpu.solver import Plane2d3vPlasmaSolver
 from lcode2dPy.plasma3d_gpu.data import GPUArrays, GPUArraysView
-from lcode2dPy.beam3d_gpu.beam import (BeamParticles, BeamSource, BeamDrain,
-                                       BeamCalculator, concatenate_beam_layers)
+from lcode2dPy.beam3d_gpu import (
+    BeamCalculator, BeamParticles, concatenate_beam_layers, BeamSource,
+    BeamDrain
+)
 from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
 
 

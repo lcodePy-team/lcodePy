@@ -6,7 +6,7 @@ from lcode2dPy.config.config import Config
 from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
 from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
 
-from lcode2dPy.beam3d import beam as beam3d_cpu_module
+import lcode2dPy.beam3d as beam3d_cpu_module
 
 
 particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),

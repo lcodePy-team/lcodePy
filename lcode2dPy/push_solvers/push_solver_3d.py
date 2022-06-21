@@ -3,8 +3,10 @@ import numpy as np
 from lcode2dPy.config.config import Config
 from lcode2dPy.plasma3d.data import Fields, Currents, Particles, Const_Arrays
 from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
-from lcode2dPy.beam3d.beam import (BeamParticles, BeamSource, BeamDrain,
-                                   BeamCalculator, concatenate_beam_layers)
+from lcode2dPy.beam3d import (
+    BeamCalculator, BeamParticles, concatenate_beam_layers, BeamSource,
+    BeamDrain
+)
 from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
 
 

@@ -16,12 +16,12 @@ from lcode2dPy.alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
 
 # Imports for 3d simulation
 from lcode2dPy.push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3dCPU
-from lcode2dPy.beam3d import beam as beam3d_cpu
+import lcode2dPy.beam3d as beam3d_cpu_module
 from lcode2dPy.plasma3d.initialization import init_plasma as init_plasma_cpu
 from lcode2dPy.plasma3d.initialization import load_plasma as load_plasma_cpu
 
 from lcode2dPy.push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
-from lcode2dPy.beam3d_gpu import beam as beam3d_gpu
+import lcode2dPy.beam3d_gpu as beam3d_gpu_module
 from lcode2dPy.plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
 from lcode2dPy.plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
 
@@ -85,12 +85,12 @@ class Cartesian3dSimulation:
             self.__push_solver = PushAndSolver3dCPU(self.__config)
             self.__init_plasma = init_plasma_cpu
             self.__load_plasma = load_plasma_cpu
-            self.__beam_module = beam3d_cpu
+            self.__beam_module = beam3d_cpu_module
         elif pu_type == 'gpu':
             self.__push_solver = PushAndSolver3dGPU(self.__config)
             self.__init_plasma = init_plasma_gpu
             self.__load_plasma = load_plasma_gpu
-            self.__beam_module = beam3d_gpu
+            self.__beam_module = beam3d_gpu_module
 
         # Finally, we set the diagnostics.
         if type(self.diagnostics) != list and self.diagnostics is not None:
