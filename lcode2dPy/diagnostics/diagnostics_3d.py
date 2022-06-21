@@ -8,14 +8,36 @@ from lcode2dPy.config.default_config import default_config
 
 from lcode2dPy.plasma3d_gpu.data import GPUArraysView
 
+# Auxiliary functions:
 
 def from_str_into_list(names_str: str):
-    # Makes a list of elements that it gets from a long string.
+    """ Makes a list of elements that it gets from a long string."""
     # For example: 'Ez, Ey, Ez ,Bx,,' becomes ['Ez', 'Ey', 'Ez', 'Bx']
     names = np.array(names_str.replace(' ', '').split(','))
     names = names[names != '']
     return names
 
+
+def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
+    """Calculates strided convolution using a mean/uniform kernel."""
+    new_arr = []
+    for i in range(0, arr.shape[0], merging_xi):
+        start_i, end_i = i, i + merging_xi
+        if end_i > arr.shape[0]:
+            end_i = arr.shape[0]
+
+        for j in range(0, arr.shape[1], merging_r):
+            start_j, end_j = j, j + merging_r
+            if end_j > arr.shape[1]:
+                end_j = arr.shape[1]
+
+            new_arr.append(np.mean(arr[start_i:end_i, start_j:end_j]))
+
+    return np.reshape(np.array(new_arr),
+                      ceil(arr.shape[0] / merging_xi, -1))
+
+
+# Diagnostics classes:
 
 class Diagnostics3d:
     def __init__(self, config: Config, diag_list=None):
@@ -104,11 +126,14 @@ class DiagnosticsFXi:
         self.__data['xi'] = []
 
     def __repr__(self):
-        return (f"Diagnostics_f_xi(output_period={self.__output_period}, " +
+        return (
+            f"DiagnosticsFXi(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_period}, " + 
             f"f_xi='{','.join(self.__f_xi_names)}', " +
             f"f_xi_type='{self.__f_xi_type}', " +
             f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
-            f"auxiliary_x={self.__auxiliary_x}, auxiliary_y={self.__auxiliary_y})")
+            f"auxiliary_x={self.__auxiliary_x}, auxiliary_y={self.__auxiliary_y})"
+        )
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -240,12 +265,16 @@ class DiagnosticsColormaps:
         self.__data['xi'] = []
 
     def __repr__(self) -> str:
-        return (f"Diagnostics_colormaps(output_period={self.__output_period}, " +
+        return (
+            f"DiagnosticsYXiColormaps(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_period}, " + 
             f"colormaps='{','.join(self.__colormaps_names)}', " +
-            f"f_xi_type='{self.__colormaps_type}', xi_from={self.__xi_from}, " +
-            f"xi_to={self.__xi_to}, r_from={self.__r_from}, " +
-            f"r_to={self.__r_to}, output_merging_r={self.__merging_r}, " +
-            f"output_merging_xi={self.__merging_xi})")
+            f"colormaps_type='{self.__colormaps_type}', " + 
+            f"xi_from={self.__xi_from}, xi_to={self.__xi_to}, " + 
+            f"r_from={self.__r_from}, r_to={self.__r_to}, " +
+            f"output_merging_r={self.__merging_r}, " +
+            f"output_merging_xi={self.__merging_xi})"
+        )
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -338,9 +367,9 @@ class DiagnosticsColormaps:
             data_for_saving = (self.__data).copy()
 
             for name in self.__colormaps_names:
-                    data_for_saving[name] = np.reshape(
-                        np.array(self.__data[name]), (size, -1)
-                    )
+                data_for_saving[name] = np.reshape(
+                    np.array(self.__data[name]), (size, -1)
+                )
 
             # Merging the data along r and xi axes:
             if self.__merging_r > 1 or self.__merging_xi > 1:
@@ -356,18 +385,118 @@ class DiagnosticsColormaps:
             #       and we want to save data there, we should just add new data,
             #       not rewrite a file.
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
-            if 'numbers' in self.__colormaps_type or 'both' in self.__colormaps_type:
+            if (
+                'numbers' in self.__colormaps_type or
+                'both' in self.__colormaps_type
+            ):
                 np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
-                        **data_for_saving)
-
-            # Clean the memory from this data
-            for name in self.__data:
-                data_for_saving[name] = []
+                    **data_for_saving)
 
     def after_step_dt(self, *params):
         # We use this function to clean old data:
         for name in self.__data:
             self.__data[name] = []
+
+
+class DiagnosticsTransverse:
+    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
+                           'px', 'py', 'pz', 'Phi']
+                        # 'ni']
+                    # TODO: add them and functionality!
+    __allowed_colormaps_type = ['pictures']
+    #TODO: add 'numbers' and 'both' and functionality
+
+    def __init__(
+        self, output_period=100, saving_xi_period=1000, colormaps='ne',
+        colormaps_type='pictures'
+    ):
+        # It creates a list of string elements such as Ez, Ex, By...
+        self.__colormaps_names = from_str_into_list(colormaps)
+        for name in self.__colormaps_names:
+            if name not in self.__allowed_colormaps:
+                raise Exception(f'{name} value is not supported as a colormap.')
+
+        # Output mode for the functions of xi:
+        if colormaps_type in self.__allowed_colormaps_type:
+            self.__colormaps_type = colormaps_type
+        else:
+            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+                             "is not supported.")
+
+        # Set time periodicity of detailed output:
+        self.__output_period = output_period
+        self.__saving_period = saving_xi_period
+
+    def __repr__(self) -> str:
+        return (
+            f"DiagnosticsXYColormaps(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_period}, " + 
+            f"colormaps='{','.join(self.__colormaps_names)}', " +
+            f"colormaps_type='{self.__colormaps_type}'"
+        )
+
+    def pull_config(self, config: Config):
+        """Pulls a config to get all required parameters."""
+        # Here we check if the output period is less than the time step size.
+        # In that case each time step is diagnosed. The first time step is
+        # always diagnosed. And we check if period % time_step_size = 0,
+        # because otherwise it won't diagnosed anything.
+        self.__time_step_size = config.getfloat('time-step')
+        self.__xi_step_size   = config.getfloat('xi-step')
+
+        if self.__output_period < self.__time_step_size:
+            self.__output_period = self.__time_step_size
+
+        if self.__saving_period < self.__xi_step_size:
+            self.__saving_period = self.__xi_step_size
+
+        if self.__output_period % self.__time_step_size != 0:
+            print("The diagnostics will not work because",
+                  f"{self.__output_period} % {self.__time_step_size} != 0")
+
+    def after_step_dxi(
+        self, current_time, xi_plasma_layer, pl_particles, pl_fields,
+        pl_currents, ro_beam
+    ):
+        if self.dxi_conditions_check(current_time, xi_plasma_layer):
+            # For xy diagnostics we save files to a file or plot a picture.
+            if (
+                'pictures' in self.__colormaps_type or
+                'both' in self.__colormaps_type
+            ):
+                Path('./diagnostics').mkdir(
+                    parents=True, exist_ok=True
+                )
+                for name in self.__colormaps_names:
+                    fname = f'{name}_{xi_plasma_layer:+09.2f}.png'
+                
+                    # if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
+                    #     val = getattr(pl_fields, name)[
+                    #         self.__steps//2, self.__r_f:self.__r_t]
+                    #     self.__data[name].append(val)
+
+                    if name == 'ne':
+                        plt.imsave(
+                            fname, getattr(pl_currents, 'ro').T, origin='lower',
+                            vmin=-0.1, vmax=0.1, cmap='bwr'
+                        )
+
+                    # if name == 'nb':
+                    #     val = ro_beam[self.__steps//2, self.__r_f:self.__r_t]
+                    #     self.__data[name].append(val)
+
+                    # if name in ['px', 'py', 'pz']:
+                    #     val = getattr(pl_particles, name)[
+                    #         self.__steps//2, self.__r_f:self.__r_t]
+                    #     self.__data[name].append(val)
+
+    def dxi_conditions_check(self, current_time, xi_pl_layer):
+        return (current_time % self.__output_period == 0 and
+                xi_pl_layer  % self.__saving_period <= self.__xi_step_size / 2
+        )
+    
+    def after_step_dt(self, *params):
+        pass
 
 
 class SaveRunState:
@@ -377,7 +506,7 @@ class SaveRunState:
         self.__save_plasma = bool(save_plasma)
 
     def __repr__(self) -> str:
-        return(f"Save_run_state(saving_period={self.__saving_period}, " +
+        return(f"SaveRunState(saving_period={self.__saving_period}, " +
             f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma})")
 
     def pull_config(self, config: Config):
@@ -424,22 +553,3 @@ class SaveRunState:
                     Bx=pl_fields.Bx, By=pl_fields.By, Bz=pl_fields.Bz,
                     Phi=pl_fields.Phi, ro=pl_currents.ro,
                     jx=pl_currents.jx, jy=pl_currents.jy, jz=pl_currents.jz)
-
-
-def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
-    """Calculates strided convolution using a mean/uniform kernel."""
-    new_arr = []
-    for i in range(0, arr.shape[0], merging_xi):
-        start_i, end_i = i, i + merging_xi
-        if end_i > arr.shape[0]:
-            end_i = arr.shape[0]
-
-        for j in range(0, arr.shape[1], merging_r):
-            start_j, end_j = j, j + merging_r
-            if end_j > arr.shape[1]:
-                end_j = arr.shape[1]
-
-            new_arr.append(np.mean(arr[start_i:end_i, start_j:end_j]))
-
-    return np.reshape(np.array(new_arr),
-                      ceil(arr.shape[0] / merging_xi, -1))
