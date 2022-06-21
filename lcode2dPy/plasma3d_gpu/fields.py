@@ -315,22 +315,21 @@ class FieldComputer(object):
 
         Ez_full  = calculate_Ez(self.grid_step_size, const, currents_full)
         Bz_full  = calculate_Bz(self.grid_step_size, const, currents_full)
-        Phi_full = calculate_Phi(const, currents_full)
+        Phi = fields_prev.Phi #calculate_Phi(const, currents_full)
 
         fields_full = GPUArrays(
             Ex=Ex_full, Ey=Ey_full, Ez=Ez_full,
             Bx=Bx_full, By=By_full, Bz=Bz_full,
-            Phi=Phi_full
+            Phi=Phi
         )
         
         Ez_half  = (Ez_full  + fields_prev.Ez) / 2
         Bz_half  = (Bz_full  + fields_prev.Bz) / 2
-        Phi_half = (Phi_full + fields_prev.Phi) / 2
 
         fields_half = GPUArrays(
             Ex=Ex_half, Ey=Ey_half, Ez=Ez_half,
             Bx=Bx_half, By=By_half, Bz=Bz_half,
-            Phi=Phi_half
+            Phi=Phi
         )
 
         return fields_full, fields_half

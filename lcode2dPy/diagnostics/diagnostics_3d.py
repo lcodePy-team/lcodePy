@@ -429,7 +429,7 @@ class DiagnosticsTransverse:
 
     def __repr__(self) -> str:
         return (
-            f"DiagnosticsXYColormaps(output_period={self.__output_period}, " +
+            f"DiagnosticsTransverse(output_period={self.__output_period}, " +
             f"saving_xi_period={self.__saving_period}, " + 
             f"colormaps='{','.join(self.__colormaps_names)}', " +
             f"colormaps_type='{self.__colormaps_type}'"
@@ -477,7 +477,8 @@ class DiagnosticsTransverse:
 
                     if name == 'ne':
                         plt.imsave(
-                            fname, getattr(pl_currents, 'ro').T, origin='lower',
+                            './diagnostics/' + fname,
+                            getattr(pl_currents, 'ro').T, origin='lower',
                             vmin=-0.1, vmax=0.1, cmap='bwr'
                         )
 

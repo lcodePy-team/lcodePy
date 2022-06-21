@@ -45,7 +45,7 @@ class Plane2d3vPlasmaSolver(object):
             particles_full, const_arrays
         )
 
-        fields, fields_avg = self.FComputer.compute_fields_corrector(
+        fields_full, fields_half = self.FComputer.compute_fields_corrector(
             fields_full, fields_prev, const_arrays, rho_beam, currents_prevprev,
             currents_prev, currents_full
         )
