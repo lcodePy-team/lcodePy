@@ -98,8 +98,12 @@ def generate_beam_array(config: Config, beam_shape: BeamShape):
         dxi = segment_start - xi_middle
         particles_in_layer = particles_in_layers[layer_idx]
         # Precalculate common particle properties of this layer
+
+        # TODO: q_m is broken! Use ux, uy, uz instead of px, py, pz
         q_m = (1 / segment.mass_charge_ratio) * (1 if current[layer_idx] > 0
                                                  else -1)
+        
+        # TODO: q_norm is broken and doesn't work for 3d correctly.
         q_norm = elem_charge * (1 if beam_shape.current >= 0 else -1)
         start_idx = part_idx
         end_idx = part_idx + particles_in_layer

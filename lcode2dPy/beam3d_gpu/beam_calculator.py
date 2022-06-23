@@ -206,7 +206,8 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k,
                           lost_idxes, moved_idxes, fell_idxes):
     """
-    Moves one particle as far as possible on current xi layer.
+    Moves one particle as far as possible on current xi layer. Based on
+    Higuera-Cary method (https://doi.org/10.1063/1.4979989)
     """
     xi_k = beam_xi_layer * -xi_step_size  # xi_{k}
     xi_k_1 = (beam_xi_layer + 1) * -xi_step_size  # xi_{k+1}
@@ -216,59 +217,84 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         return
     
     q_m = q_m_[k]; dt = dt_[k]
+    # TODO: We should use q, not q_m. Or use u, not p!
+    q = sign(q_m)
 
     while remaining_steps[k] > 0:
-        # Initial impulse and position vectors
+        # 1. We have initial momentum and an initial position vector:
         opx, opy, opz = px[k], py[k], pz[k]
         ox, oy, oxi = x[k], y[k], xi[k]
 
-        # Compute approximate position of the particle in the middle of the step
-        gamma_m = sqrt((1 / q_m) ** 2 + opx ** 2 + opy ** 2 + opz ** 2)
+        # 2. We calculate the posistion vector at half time step:
+        m_gamma = sqrt((1 / q_m)**2 + opx**2 + opy**2 + opz**2)
 
-        x_halfstep  = ox  + dt / 2 * (opx / gamma_m)
-        y_halfstep  = oy  + dt / 2 * (opy / gamma_m)
-        xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
-        # Add time shift correction (dxi = (v_z - c)*dt)
+        x_half  = ox  + dt / 2 * (opx / m_gamma)
+        y_half  = oy  + dt / 2 * (opy / m_gamma)
+        xi_half = oxi + dt / 2 * (opz / m_gamma - 1)
 
-        if not_in_layer(xi_halfstep, xi_k_1):
-            # TODO: Figure out how to tackle this problem!
+        if not_in_layer(xi_half, xi_k_1):
+            # If the particle fells to the next layer, we quit this loop, but 
+            # don't save any values. The particle will move to a new layer 
+            # afterwards. Does it break depositing? Think about it.
             fell_idxes[k] = True
             break
 
-        if is_lost(x_halfstep, y_halfstep, lost_radius):
-            x[k], y[k], xi[k] = x_halfstep, y_halfstep, xi_halfstep
+        if is_lost(x_half, y_half, lost_radius):
+            x[k], y[k], xi[k] = x_half, y_half, xi_half
             id[k] *= -1  # Particle hit the wall and is now lost
             lost_idxes[k] = True
             remaining_steps[k] = 0
             break
 
-        # Interpolate fields and compute new impulse
-        (Ex, Ey, Ez,
-        Bx, By, Bz) = particle_fields(x_halfstep, y_halfstep, xi_halfstep,
-                                                grid_steps, grid_step_size,
-                                                xi_step_size, xi_k,
-                                                Ex_k_1, Ey_k_1, Ez_k_1,
-                                                Bx_k_1, By_k_1, Bz_k_1,
-                                                Ex_k, Ey_k, Ez_k,
-                                                Bx_k, By_k, Bz_k)
+        # TODO: What if the particles is lost or not in layer?
 
-        # Compute new impulse
-        vx, vy, vz = opx / gamma_m, opy / gamma_m, opz / gamma_m
-        px_halfstep = (opx + sign(q_m) * dt / 2 * (Ex + vy * Bz - vz * By))
-        py_halfstep = (opy + sign(q_m) * dt / 2 * (Ey + vz * Bx - vx * Bz))
-        pz_halfstep = (opz + sign(q_m) * dt / 2 * (Ez + vx * By - vy * Bx))
+        # 3. Iterpolate fiels on particle's position:
+        Ex, Ey, Ez, Bx, By, Bz = particle_fields(
+            x_half, y_half, xi_half, grid_steps, grid_step_size,
+            xi_step_size, xi_k, Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
+            Ex_k, Ey_k, Ez_k, Bx_k, By_k, Bz_k
+        )
 
-        # Compute final coordinates and impulses
-        gamma_m = sqrt((1 / q_m) ** 2
-                    + px_halfstep ** 2 + py_halfstep ** 2 + pz_halfstep ** 2)
+        # 4. Calculate the relativistic factor at half time step:
+        px_m, bx = opx + q * dt / 2 * Ex, q * dt / 2 * Bx
+        py_m, by = opy + q * dt / 2 * Ey, q * dt / 2 * By
+        pz_m, bz = opz + q * dt / 2 * Ez, q * dt / 2 * Bz
 
-        x[k]  = ox  + dt * (px_halfstep / gamma_m)      #  x fullstep
-        y[k]  = oy  + dt * (py_halfstep / gamma_m)      #  y fullstep
-        xi[k] = oxi + dt * (pz_halfstep / gamma_m - 1)  # xi fullstep
+        m_gamma_m = sqrt((1 / q_m)**2 + px_m**2 + py_m**2 + pz_m**2)
 
-        px[k] = 2 * px_halfstep - opx                   # px fullstep
-        py[k] = 2 * py_halfstep - opy                   # py fullstep
-        pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
+        b_sqr = bx**2 + by**2 + bz**2
+        m_gamma_half = sqrt(
+            (m_gamma_m**2 - b_sqr + sqrt(
+                (m_gamma_m**2 - b_sqr)**2 + 4 * b_sqr +
+                4 * (bx * px_m + by * py_m + bz * pz_m)**2
+            )) / 2
+        )
+
+        # 5. Calculate auxiliary values:
+        tx, ty, tz = bx / m_gamma_half, by / m_gamma_half, bz / m_gamma_half
+        t_sqr = tx**2 + ty**2 + tz**2
+        sx, sy, sz = 2*tx / (1 + t_sqr), 2*ty / (1 + t_sqr), 2*tz / (1 + t_sqr) 
+        s_dot_p_m = sx * px_m + sy * py_m + sz * pz_m
+
+        # 6. Compute a new momentum at full time step:
+        px_full = (
+            tx * s_dot_p_m + px_m * (1 - t_sqr) / (1 + t_sqr) +
+            py_m * sz - pz_m * sy + q * dt / 2 * Ex
+        )
+        py_full = (
+            ty * s_dot_p_m + py_m * (1 - t_sqr) / (1 + t_sqr) +
+            pz_m * sx - px_m * sz + q * dt / 2 * Ey
+        )
+        pz_full = (
+            tz * s_dot_p_m + pz_m * (1 - t_sqr) / (1 + t_sqr) +
+            px_m * sy - py_m * sx + q * dt / 2 * Ez
+        )
+
+        # 7. Calculate a new position vector at full time step:
+        m_gamma_full = sqrt((1 / q_m)**2 + px_full**2 + py_full**2 + pz_full**2)
+        x[k]  = x_half  + dt / 2 * (px_full / m_gamma_full)
+        y[k]  = y_half  + dt / 2 * (py_full / m_gamma_full)
+        xi[k] = xi_half + dt / 2 * (pz_full / m_gamma_full - 1)
 
         if is_lost(x[k], y[k], lost_radius):
             id[k] *= -1  # Particle hit the wall and is now lost
@@ -279,7 +305,7 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         remaining_steps[k] -= 1
     
     # TODO: Do we need to add it here? (Yes, write why)
-    if remaining_steps[k] == 0 and not_in_layer(xi_halfstep, xi_k_1):
+    if remaining_steps[k] == 0 and not_in_layer(xi[k], xi_k_1):
         fell_idxes[k] = True
 
     if fell_idxes[k] == False and lost_idxes[k] == False:
