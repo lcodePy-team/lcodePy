@@ -277,24 +277,24 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
         s_dot_p_m = sx * px_m + sy * py_m + sz * pz_m
 
         # 6. Compute a new momentum at full time step:
-        px_full = (
+        px[k] = (   # px fullstep
             tx * s_dot_p_m + px_m * (1 - t_sqr) / (1 + t_sqr) +
             py_m * sz - pz_m * sy + q * dt / 2 * Ex
         )
-        py_full = (
+        py[k] = (   # py fullstep
             ty * s_dot_p_m + py_m * (1 - t_sqr) / (1 + t_sqr) +
             pz_m * sx - px_m * sz + q * dt / 2 * Ey
         )
-        pz_full = (
+        pz[k] = (   # pz fullstep
             tz * s_dot_p_m + pz_m * (1 - t_sqr) / (1 + t_sqr) +
             px_m * sy - py_m * sx + q * dt / 2 * Ez
         )
 
         # 7. Calculate a new position vector at full time step:
-        m_gamma_full = sqrt((1 / q_m)**2 + px_full**2 + py_full**2 + pz_full**2)
-        x[k]  = x_half  + dt / 2 * (px_full / m_gamma_full)
-        y[k]  = y_half  + dt / 2 * (py_full / m_gamma_full)
-        xi[k] = xi_half + dt / 2 * (pz_full / m_gamma_full - 1)
+        m_gamma_full = sqrt((1 / q_m)**2 + px[k]**2 + py[k]**2 + pz[k]**2)
+        x[k]  = x_half  + dt / 2 * (px[k] / m_gamma_full)     #  x fullstep
+        y[k]  = y_half  + dt / 2 * (py[k] / m_gamma_full)     #  y fullstep
+        xi[k] = xi_half + dt / 2 * (pz[k] / m_gamma_full - 1) # xi fullstep
 
         if is_lost(x[k], y[k], lost_radius):
             id[k] *= -1  # Particle hit the wall and is now lost
