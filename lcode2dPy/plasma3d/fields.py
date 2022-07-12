@@ -83,9 +83,11 @@ def dx_dy(arr, grid_step_size):
     return dx / (grid_step_size * 2), dy / (grid_step_size * 2)
 
 
-def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
-                          const: Const_Arrays, fields_avg: Fields,
-                          beam_ro, currents: Currents, currents_prev: Currents):
+def calculate_Ex_Ey_Bx_By(
+    grid_step_size, xi_step_size, trick, variant_A, const: Const_Arrays,
+    fields_avg: Fields, ro_beam_full, ro_beam_prev, currents_full: Currents,
+    currents_prev: Currents
+):
     """
     Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
     with and without transposition depending on the field component.
@@ -95,14 +97,16 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
            minus the coarse plasma particle cloud width).
     """
     jx_prev, jy_prev = currents_prev.jx, currents_prev.jy
-    jx,      jy      = currents.jx,      currents.jy
+    jx,      jy      = currents_full.jx, currents_full.jy
 
-    ro = currents.ro if not variant_A else (currents.ro + currents_prev.ro) / 2
-    jz = currents.jz if not variant_A else (currents.jz + currents_prev.jz) / 2
+    ro = (currents_full.ro + ro_beam_full +
+               currents_prev.ro + ro_beam_prev) / 2
+    jz = (currents_full.jz + ro_beam_full +
+               currents_prev.jz + ro_beam_prev) / 2
 
     # 1. Calculate gradients and RHS.
-    dro_dx, dro_dy = dx_dy(ro + beam_ro, grid_step_size)
-    djz_dx, djz_dy = dx_dy(jz + beam_ro, grid_step_size)
+    dro_dx, dro_dy = dx_dy(ro, grid_step_size)
+    djz_dx, djz_dy = dx_dy(jz, grid_step_size)
     djx_dxi = (jx_prev - jx) / xi_step_size  # - ?
     djy_dxi = (jy_prev - jy) / xi_step_size  # - ?
 
@@ -191,19 +195,20 @@ class FieldComputer(object):
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')
 
-    def compute_fields(self, flds: Fields, flds_prev: Fields,
-                       const: Const_Arrays, rho_beam,
-                       curr_prev: Currents, curr: Currents):
+    def compute_fields(
+        self, fields: Fields, flds_prev: Fields, const: Const_Arrays,
+        rho_beam_full, rho_beam_prev, currents_prev: Currents,
+        currents_full: Currents
+    ):
         # Looks terrible! TODO: rewrite this function entirely
-        new_flds = Fields((flds.Ex).shape[0])
+        new_flds = Fields((fields.Ex).shape[0])
 
-        (new_flds.Ex,
-         new_flds.Ey,
-         new_flds.Bx,
-         new_flds.By) = calculate_Ex_Ey_Bx_By(self.grid_step_size,
-                                              self.xi_step_size,
-                                              self.trick, self.variant_A, const,
-                                              flds, rho_beam, curr, curr_prev)
+        new_flds.Ex, new_flds.Ey, new_flds.Bx, new_flds.By =\
+            calculate_Ex_Ey_Bx_By(
+                self.grid_step_size, self.xi_step_size, self.trick,
+                self.variant_A, const, fields, rho_beam_full, rho_beam_prev,
+                currents_full, currents_prev
+            )
 
         if self.variant_A:
             new_flds.Ex = 2 * new_flds.Ex - flds_prev.Ex
@@ -211,9 +216,8 @@ class FieldComputer(object):
             new_flds.Bx = 2 * new_flds.Bx - flds_prev.Bx
             new_flds.By = 2 * new_flds.By - flds_prev.By
 
-        new_flds.Ez = calculate_Ez(self.grid_step_size, const, curr)
-        new_flds.Bz = calculate_Bz(self.grid_step_size, const, curr)
-
-        new_flds.Phi = calculate_Phi(const, curr)
+        new_flds.Ez = calculate_Ez(self.grid_step_size, const, currents_full)
+        new_flds.Bz = calculate_Bz(self.grid_step_size, const, currents_full)
+        new_flds.Phi = calculate_Phi(const, currents_full)
 
         return new_flds, new_flds.average(flds_prev)

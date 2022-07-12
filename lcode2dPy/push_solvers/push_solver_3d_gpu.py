@@ -36,7 +36,6 @@ class PushAndSolver3d:
 
         # TODO: Not sure this is right if we start from a saved plasma state and
         #       with a saved beamfile.
-        pl_currents_prev = pl_currents.copy()
         ro_beam_prev  = cp.zeros(
             (self.grid_steps, self.grid_steps), dtype=cp.float64
         )
@@ -46,15 +45,14 @@ class PushAndSolver3d:
             for xi_i in range(self.xi_steps + 1):
                 beam_layer_to_layout = \
                     beam_source.get_beam_layer_to_layout(xi_i)
-                ro_beam = \
+                ro_beam_full = \
                     self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i)
 
                 prev_pl_fields = pl_fields.copy()
 
-                pl_particles, pl_fields, pl_currents, pl_currents_prev = \
-                    self.pl_solver.step_dxi(
-                    pl_particles, pl_fields, pl_currents, pl_currents_prev,
-                    pl_const_arrays, ro_beam, ro_beam_prev
+                pl_particles, pl_fields, pl_currents = self.pl_solver.step_dxi(
+                    pl_particles, pl_fields, pl_currents, pl_const_arrays,
+                    ro_beam_full, ro_beam_prev
                 )
 
                 lost, moved, fell_to_next_layer = self.beam_calc.move_beam_layer(
@@ -62,7 +60,7 @@ class PushAndSolver3d:
                     prev_pl_fields
                 )
 
-                ro_beam_prev = ro_beam.copy()
+                ro_beam_prev = ro_beam_full.copy()
 
                 # Beam layers operations:
                 beam_layer_to_move = concatenate_beam_layers(
@@ -76,12 +74,13 @@ class PushAndSolver3d:
                 # Diagnostics:
                 if diagnostics:
                     xi_plasma_layer = - self.xi_step_size * xi_i
-                    diagnostics.after_step_dxi(current_time, xi_plasma_layer,
+                    diagnostics.after_step_dxi(
+                        current_time, xi_plasma_layer,
                         GPUArraysView(pl_particles), GPUArraysView(pl_fields),
-                        GPUArraysView(pl_currents), ro_beam.get()
+                        GPUArraysView(pl_currents), ro_beam_full.get()
                     )
 
-                # # Some diagnostics:
+                # Some diagnostics:
                 view_pl_fields = GPUArraysView(pl_fields)
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 

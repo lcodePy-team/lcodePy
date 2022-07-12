@@ -19,8 +19,8 @@ class Plane2d3vPlasmaSolver(object):
     # *_prevprev = * on the xi step with an index number k - 1
     def step_dxi(
         self, particles_prev: GPUArrays, fields_prev: GPUArrays,
-        currents_prev: GPUArrays, currents_prevprev: GPUArrays,
-        const_arrays: GPUArrays, rho_beam, rho_beam_prev
+        currents_prev: GPUArrays, const_arrays: GPUArrays,
+        rho_beam_full, rho_beam_prev
     ):
         particles_full = self.PMover.move_particles_wo_fields(particles_prev)
 
@@ -32,9 +32,9 @@ class Plane2d3vPlasmaSolver(object):
             particles_full, const_arrays
         )
 
-        fields_full, fields_half= self.FComputer.compute_fields_predictor(
-            fields_prev, const_arrays, rho_beam, rho_beam_prev, currents_prev,
-            currents_full
+        _, fields_half = self.FComputer.compute_fields(
+            fields_prev, fields_prev, const_arrays, rho_beam_full, rho_beam_prev,
+            currents_prev, currents_full
         )
 
 
@@ -45,8 +45,8 @@ class Plane2d3vPlasmaSolver(object):
             particles_full, const_arrays
         )
 
-        fields_full, fields_half = self.FComputer.compute_fields_corrector(
-            fields_full, fields_prev, const_arrays, rho_beam, currents_prevprev,
+        fields_full, fields_half = self.FComputer.compute_fields(
+            fields_half, fields_prev, const_arrays, rho_beam_full, rho_beam_prev,
             currents_prev, currents_full
         )
 
@@ -57,4 +57,4 @@ class Plane2d3vPlasmaSolver(object):
             particles_full, const_arrays
         )
 
-        return particles_full, fields_full, currents_full, currents_prev
+        return particles_full, fields_full, currents_full
