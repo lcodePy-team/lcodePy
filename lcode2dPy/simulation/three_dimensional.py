@@ -146,6 +146,12 @@ class Cartesian3dSimulation:
             print("Since the number of time steps hasn't been set explicitly,",
                   f"the code will simulate {N_steps} time steps with a time",
                   f"step size = {self.__time_step_size}.")
+        else:
+            self.__time_limit = \
+                N_steps * self.__time_step_size + self.__current_time
+            print("Since the number of time steps has been set explicitly,",
+                  f"the code will simulate till time limit = {self.__time_limit},",
+                  f"with a time step size = {self.__time_step_size}.")
 
         # 2. Checks for plasma continuation mode:
         if self.__cont_mode == 'n' or self.__cont_mode == 'no':
@@ -173,32 +179,37 @@ class Cartesian3dSimulation:
 
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
-                pl_fields, pl_particles, pl_currents, pl_const_arrays =\
+                # TODO: Check if it is correct!
+                self.__current_time = \
+                    self.__current_time + self.__time_step_size
+
+                pl_fields, pl_particles, pl_currents, pl_const_arrays = \
                     self.__init_plasmastate()
 
                 # Calculates one time step:
-                self.__push_solver.step_dt(pl_fields, pl_particles,
-                                        pl_currents, pl_const_arrays,
-                                        self.beam_source, self.beam_drain,
-                                        self.__current_time, self.__diagnostics)
+                self.__push_solver.step_dt(
+                    pl_fields, pl_particles, pl_currents, pl_const_arrays,
+                    self.beam_source, self.beam_drain, self.__current_time,
+                    self.__diagnostics
+                )
 
                 # Perform diagnostics
-                self.__diagnostics.after_step_dt(self.__current_time,
-                    pl_particles, pl_fields, pl_currents, self.beam_drain)
+                self.__diagnostics.after_step_dt(
+                    self.__current_time, pl_particles, pl_fields, pl_currents,
+                    self.beam_drain
+                )
 
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                self.beam_source = self.__beam_module.BeamSource(self.__config,
-                                                    self.beam_drain.beam_buffer)
+                self.beam_source = self.__beam_module.BeamSource(
+                    self.__config, self.beam_drain.beam_buffer
+                )
                 self.beam_drain  = self.__beam_module.BeamDrain()
-
-                self.__current_time = self.__current_time + self.__time_step_size
-                print()
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
             self.beam_source.beam.save('beamfile') # Do we need it?
-            print('\nThe work is done!')
+            print('The work is done!')
 
         # Other plasma continuation mode has not been implemented yet.
         # If you are writing these modes, just change where you put

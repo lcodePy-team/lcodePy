@@ -84,7 +84,10 @@ class PushAndSolver3d:
                 view_pl_fields = GPUArraysView(pl_fields)
                 Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
-                print(f'xi={-xi_i * self.xi_step_size:+.4f} {Ez_00:+.4e}')
+                print(
+                    f't={current_time:+.4f}, ' + 
+                    f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
+                )
 
         if diagnostics:
             diagnostics.dump(current_time)

@@ -96,7 +96,7 @@ class DiagnosticsFXi:
 
     def __init__(
         self, output_period=100, saving_xi_period=1000, f_xi='Ez',
-        f_xi_type='numbers', axis_x=0, axis_y=0, auxiliary_x=1, auxiliary_y=1
+        f_xi_type='numbers', axis_x=0, axis_y=0, auxiliary_x=0, auxiliary_y=1
     ):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__f_xi_names = from_str_into_list(f_xi)
@@ -118,7 +118,7 @@ class DiagnosticsFXi:
 
         # Set time periodicity of detailed output and safving into a file:
         self.__output_period = output_period
-        self.__saving_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period
 
         # We store data as a simple Python dictionary of lists for f(xi) data.
         # But I'm not sure this is the best way to handle data storing!
@@ -128,7 +128,7 @@ class DiagnosticsFXi:
     def __repr__(self):
         return (
             f"DiagnosticsFXi(output_period={self.__output_period}, " +
-            f"saving_xi_period={self.__saving_period}, " + 
+            f"saving_xi_period={self.__saving_xi_period}, " + 
             f"f_xi='{','.join(self.__f_xi_names)}', " +
             f"f_xi_type='{self.__f_xi_type}', " +
             f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
@@ -156,18 +156,20 @@ class DiagnosticsFXi:
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
 
-        if self.__saving_period < self.__time_step_size:
-            self.__saving_period = self.__time_step_size
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
 
         if self.__output_period % self.__time_step_size != 0:
-            print("The diagnostics will not work because",
-                  f"{self.__output_period} % {self.__time_step_size} != 0")
+            raise Exception(
+                "The diagnostics will not work because" +
+                f"{self.__output_period} % {self.__time_step_size} != 0"
+            )
 
     def after_step_dxi(
         self, current_time, xi_plasma_layer, pl_particles, pl_fields,
         pl_currents, ro_beam
     ):
-        if self.dxi_conditions_check(current_time, xi_plasma_layer):
+        if self.conditions_check(current_time, xi_plasma_layer):
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
@@ -176,7 +178,8 @@ class DiagnosticsFXi:
                     self.__data[name].append(field)
 
                 if name == 'ne':
-                    ro = getattr(pl_currents, 'ro')[self.__ax_x, self.__ax_y]
+                    # TODO: It's just a crutch!!!
+                    ro = 1 - getattr(pl_currents, 'ro')[self.__ax_x, self.__ax_y]
                     self.__data[name].append(ro)
 
                 if name == 'nb':
@@ -194,26 +197,27 @@ class DiagnosticsFXi:
         
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
-        if xi_plasma_layer % self.__saving_period <= self.__xi_step_size / 2:
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
             self.dump(current_time)
 
-    def dxi_conditions_check(self, current_time, xi_pl_layer):
+    def conditions_check(self, current_time, xi_pl_layer):
         return current_time % self.__output_period == 0
 
     def dump(self, current_time):
-        time_save = current_time + self.__time_step_size
+        if self.conditions_check(current_time, inf):
+            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
+                np.savez(f'./diagnostics/f_xi_{current_time:08.2f}.npz',
+                            **self.__data)
 
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
-        if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
-            np.savez(f'./diagnostics/f_xi_{time_save:08.2f}.npz',
-                     **self.__data)
-
-        if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
-            for name in self.__f_xi_names:
-                plt.plot(self.__data['xi'], self.__data[name])
-                plt.savefig(f'./diagnostics/{name}_f_xi_{time_save:08.2f}.png')
-                            # vmin=-1, vmax=1)
-                plt.close()
+            if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
+                for name in self.__f_xi_names:
+                    plt.plot(self.__data['xi'], self.__data[name])
+                    plt.savefig(
+                        f'./diagnostics/{name}_f_xi_{current_time:08.2f}.png'
+                    )
+                                # vmin=-1, vmax=1)
+                    plt.close()
 
     def after_step_dt(self, *params):
         # We use this function to clean old data:
@@ -249,7 +253,7 @@ class DiagnosticsColormaps:
 
         # Set time periodicity of detailed output:
         self.__output_period = output_period
-        self.__saving_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period
 
         # Set borders of a subwindow:
         self.__xi_from, self.__xi_to = xi_from, xi_to
@@ -267,7 +271,7 @@ class DiagnosticsColormaps:
     def __repr__(self) -> str:
         return (
             f"DiagnosticsYXiColormaps(output_period={self.__output_period}, " +
-            f"saving_xi_period={self.__saving_period}, " + 
+            f"saving_xi_period={self.__saving_xi_period}, " + 
             f"colormaps='{','.join(self.__colormaps_names)}', " +
             f"colormaps_type='{self.__colormaps_type}', " + 
             f"xi_from={self.__xi_from}, xi_to={self.__xi_to}, " + 
@@ -325,8 +329,10 @@ class DiagnosticsColormaps:
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
+                # TODO: ne isn't the same thing as ro!
                 if name == 'ne':
-                    val = getattr(pl_currents, 'ro')[
+                    # val = getattr(pl_currents, 'ro')[ # It isn't right!
+                    val = 1 - getattr(pl_currents, 'ro')[ # TODO: it's a crutch!
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
@@ -341,7 +347,7 @@ class DiagnosticsColormaps:
 
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
-        if xi_plasma_layer % self.__saving_period <= self.__xi_step_size / 2:
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
             self.dump(current_time)
 
         # We can save data and then clean the memory after
@@ -355,17 +361,17 @@ class DiagnosticsColormaps:
                 self.__data[name] = []
 
 
-    def dxi_conditions_check(self, current_time, xi_pl_layer):
+    def conditions_check(self, current_time, xi_pl_layer):
         return (current_time % self.__output_period == 0 and
                 xi_pl_layer <= self.__xi_from and xi_pl_layer >= self.__xi_to
         )
 
     def dump(self, current_time):
         # In case of colormaps, we reshape every data list except for xi list.
-        size = len(self.__data['xi'])
-        if size != 0:
+        if self.conditions_check(current_time, inf):
             data_for_saving = (self.__data).copy()
 
+            size = len(self.__data['xi'])
             for name in self.__colormaps_names:
                 data_for_saving[name] = np.reshape(
                     np.array(self.__data[name]), (size, -1)
@@ -378,9 +384,6 @@ class DiagnosticsColormaps:
                         data_for_saving, self.__merging_xi, self.__merging_r
                     )
 
-            # Saving the data to a file:
-            time_for_save = current_time + self.__time_step_size
-
             # TODO: If there is a file with the same name with important data 
             #       and we want to save data there, we should just add new data,
             #       not rewrite a file.
@@ -389,8 +392,11 @@ class DiagnosticsColormaps:
                 'numbers' in self.__colormaps_type or
                 'both' in self.__colormaps_type
             ):
-                np.savez(f'./diagnostics/colormaps_{time_for_save:08.2f}.npz',
+                np.savez(f'./diagnostics/colormaps_{current_time:08.2f}.npz',
                     **data_for_saving)
+            
+            # Clean some memory. TODO: Better ways to do that?
+            data_for_saving = 0
 
     def after_step_dt(self, *params):
         # We use this function to clean old data:
@@ -425,12 +431,12 @@ class DiagnosticsTransverse:
 
         # Set time periodicity of detailed output:
         self.__output_period = output_period
-        self.__saving_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period
 
     def __repr__(self) -> str:
         return (
             f"DiagnosticsTransverse(output_period={self.__output_period}, " +
-            f"saving_xi_period={self.__saving_period}, " + 
+            f"saving_xi_period={self.__saving_xi_period}, " + 
             f"colormaps='{','.join(self.__colormaps_names)}', " +
             f"colormaps_type='{self.__colormaps_type}'"
         )
@@ -447,8 +453,8 @@ class DiagnosticsTransverse:
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
 
-        if self.__saving_period < self.__xi_step_size:
-            self.__saving_period = self.__xi_step_size
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
 
         if self.__output_period % self.__time_step_size != 0:
             print("The diagnostics will not work because",
@@ -458,7 +464,7 @@ class DiagnosticsTransverse:
         self, current_time, xi_plasma_layer, pl_particles, pl_fields,
         pl_currents, ro_beam
     ):
-        if self.dxi_conditions_check(current_time, xi_plasma_layer):
+        if self.conditions_check(current_time, xi_plasma_layer):
             # For xy diagnostics we save files to a file or plot a picture.
             if (
                 'pictures' in self.__colormaps_type or
@@ -475,6 +481,7 @@ class DiagnosticsTransverse:
                     #         self.__steps//2, self.__r_f:self.__r_t]
                     #     self.__data[name].append(val)
 
+                    # TODO: ne isn't the same thing as ro!
                     if name == 'ne':
                         plt.imsave(
                             './diagnostics/' + fname,
@@ -491,10 +498,14 @@ class DiagnosticsTransverse:
                     #         self.__steps//2, self.__r_f:self.__r_t]
                     #     self.__data[name].append(val)
 
-    def dxi_conditions_check(self, current_time, xi_pl_layer):
-        return (current_time % self.__output_period == 0 and
-                xi_pl_layer  % self.__saving_period <= self.__xi_step_size / 2
+    def conditions_check(self, current_time, xi_pl_layer):
+        return (
+            current_time % self.__output_period == 0 and
+            xi_pl_layer  % self.__saving_xi_period <= self.__xi_step_size / 2
         )
+    
+    def dump(self, current_time):
+        pass
     
     def after_step_dt(self, *params):
         pass
@@ -528,8 +539,6 @@ class SaveRunState:
     def after_step_dt(
         self, current_time, pl_particles, pl_fields, pl_currents, beam_drain
     ):
-        time_for_save = current_time + self.__time_step_size
-
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__saving_period <= self.__time_step_size / 2:
@@ -537,7 +546,7 @@ class SaveRunState:
 
             if self.__save_beam:
                 beam_drain.beam_buffer.save(
-                    f'./run_states/beamfile_{time_for_save:08.2f}')
+                    f'./run_states/beamfile_{current_time:08.2f}')
 
             if self.__save_plasma:
                 # Important for saving arrays from GPU (is it really?)
@@ -547,7 +556,7 @@ class SaveRunState:
                     pl_currents  = GPUArraysView(pl_currents)
 
                 np.savez_compressed(
-                    file=f'./run_states/plasmastate_{time_for_save:08.2f}',
+                    file=f'./run_states/plasmastate_{current_time:08.2f}',
                     x_offt=pl_particles.x_offt, y_offt=pl_particles.y_offt,
                     px=pl_particles.px, py=pl_particles.py, pz=pl_particles.pz,
                     Ex=pl_fields.Ex, Ey=pl_fields.Ey, Ez=pl_fields.Ez,
