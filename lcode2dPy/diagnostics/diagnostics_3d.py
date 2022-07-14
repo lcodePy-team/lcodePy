@@ -319,7 +319,7 @@ class DiagnosticsColormaps:
         self, current_time, xi_plasma_layer, pl_particles, pl_fields,
         pl_currents, ro_beam
     ):
-        if self.dxi_conditions_check(current_time, xi_plasma_layer):
+        if self.conditions_check(current_time, xi_plasma_layer):
             # Firstly, it adds the current value of xi to data dictionary:
             self.__data['xi'].append(xi_plasma_layer)
 
