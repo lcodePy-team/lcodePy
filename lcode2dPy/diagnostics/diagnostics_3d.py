@@ -108,7 +108,7 @@ class DiagnosticsFXi:
         if f_xi_type in self.__allowed_f_xi_type:
             self.__f_xi_type = f_xi_type
         else:
-            raise Exception(f"{f_xi_type} type of f(xi) diagnostics is" +
+            raise Exception(f"{f_xi_type} type of f(xi) diagnostics is " +
                              "not supported.")
 
         # The position of a `probe' line 1 from the center:
@@ -161,7 +161,7 @@ class DiagnosticsFXi:
 
         if self.__output_period % self.__time_step_size != 0:
             raise Exception(
-                "The diagnostics will not work because" +
+                "The diagnostics will not work because " +
                 f"{self.__output_period} % {self.__time_step_size} != 0"
             )
 
@@ -312,8 +312,10 @@ class DiagnosticsColormaps:
             self.__output_period = self.__time_step_size
 
         if self.__output_period % self.__time_step_size != 0:
-            print("The diagnostics will not work because",
-                  f"{self.__output_period} % {self.__time_step_size} != 0")
+            raise Exception(
+                "The diagnostics will not work because " +
+                f"{self.__output_period} % {self.__time_step_size} != 0"
+            )
 
     def after_step_dxi(
         self, current_time, xi_plasma_layer, pl_particles, pl_fields,
@@ -456,8 +458,10 @@ class DiagnosticsTransverse:
             self.__saving_xi_period = self.__xi_step_size
 
         if self.__output_period % self.__time_step_size != 0:
-            print("The diagnostics will not work because",
-                  f"{self.__output_period} % {self.__time_step_size} != 0")
+            raise Exception(
+                "The diagnostics will not work because " +
+                f"{self.__output_period} % {self.__time_step_size} != 0"
+            )
 
     def after_step_dxi(
         self, current_time, xi_plasma_layer, pl_particles, pl_fields,
