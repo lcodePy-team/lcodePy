@@ -87,8 +87,8 @@ class Diagnostics3d:
 
 
 class DiagnosticsFXi:
-    __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
-                      'Ez2', 'Bz2', 'nb2', 'Phi']
+    __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
+                      'Ez2', 'Bz2', 'rho_beam2', 'Phi']
                     # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
@@ -174,26 +174,26 @@ class DiagnosticsFXi:
 
             for name in self.__f_xi_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                    field = getattr(pl_fields, name)[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(field)
+                    val = getattr(pl_fields, name)[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(val)
 
-                if name == 'ne':
+                if name == 'rho':
                     # TODO: It's just a crutch!!!
-                    ro = 1 - getattr(pl_currents, 'ro')[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(ro)
+                    val = getattr(pl_currents, 'ro')[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(val)
 
-                if name == 'nb':
-                    ro = ro_beam[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(ro)
+                if name == 'rho_beam':
+                    val = ro_beam[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(val)
 
                 if name in ['Ez2', 'Bz2']:
-                    field = getattr(
+                    val = getattr(
                         pl_fields, name[:2])[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(field)
+                    self.__data[name].append(val)
 
-                if name == 'nb2':
-                    ro = ro_beam[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(ro)
+                if name == 'rho_beam2':
+                    val = ro_beam[self.__aux_x, self.__aux_y]
+                    self.__data[name].append(val)
         
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
@@ -226,7 +226,7 @@ class DiagnosticsFXi:
 
 
 class DiagnosticsColormaps:
-    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
+    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
                            'px', 'py', 'pz', 'Phi']
                         # 'ni']
                     # TODO: add them and functionality!
@@ -329,14 +329,13 @@ class DiagnosticsColormaps:
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
-                # TODO: ne isn't the same thing as ro!
-                if name == 'ne':
+                if name == 'rho':
                     # val = getattr(pl_currents, 'ro')[ # It isn't right!
-                    val = 1 - getattr(pl_currents, 'ro')[ # TODO: it's a crutch!
+                    val = getattr(pl_currents, 'ro')[
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
-                if name == 'nb':
+                if name == 'rho_beam':
                     val = ro_beam[self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
@@ -405,7 +404,7 @@ class DiagnosticsColormaps:
 
 
 class DiagnosticsTransverse:
-    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'nb',
+    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
                            'px', 'py', 'pz', 'Phi']
                         # 'ni']
                     # TODO: add them and functionality!
@@ -413,7 +412,7 @@ class DiagnosticsTransverse:
     #TODO: add 'numbers' and 'both' and functionality
 
     def __init__(
-        self, output_period=100, saving_xi_period=1000, colormaps='ne',
+        self, output_period=100, saving_xi_period=1000, colormaps='rho',
         colormaps_type='pictures'
     ):
         # It creates a list of string elements such as Ez, Ex, By...
@@ -481,15 +480,14 @@ class DiagnosticsTransverse:
                     #         self.__steps//2, self.__r_f:self.__r_t]
                     #     self.__data[name].append(val)
 
-                    # TODO: ne isn't the same thing as ro!
-                    if name == 'ne':
+                    if name == 'rho':
                         plt.imsave(
                             './diagnostics/' + fname,
                             getattr(pl_currents, 'ro').T, origin='lower',
                             vmin=-0.1, vmax=0.1, cmap='bwr'
                         )
 
-                    # if name == 'nb':
+                    # if name == 'rho_beam':
                     #     val = ro_beam[self.__steps//2, self.__r_f:self.__r_t]
                     #     self.__data[name].append(val)
 
