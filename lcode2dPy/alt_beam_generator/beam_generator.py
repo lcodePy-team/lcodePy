@@ -1,3 +1,4 @@
+from copy import copy
 import numpy as np
 
 from lcode2dPy.config.default_config import default_config
@@ -32,37 +33,61 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
     if type(config) == dict:
         config = Config(config)
 
-    # We create a dictionary with default beam parameters (test 1 beam).
-    # First 3 parameters go to BeamShape, other - to beam_segment_shape.
-    complete_beam_parameters = {'current': 0.01, 'particles_in_layer': 2000,
-                                'rng_seed': 1,
-                                'length': 5.01, 'ampl': 5., 'xishape': 'cos',
-                                'radius': 1., 'energy': 1000., 'rshape': 'g',
-                                'angspread': 1e-5, 'angshape': 'l', 'espread': 0,
-                                'eshape': 'm', 'mass_charge_ratio': 1}
+    # We create two dictionaries with default beam parameters (test 1 beam):
+    # parameters from beam_shape_params go to BeamShape, parameters from
+    # def_beam_segment_params go to BeamSegmentShape. By default, test 1 beam
+    # is created.
+    beam_shape_params = {
+        'current': 0.01, 'particles_in_layer': 2000, 'rng_seed': 1
+    }
+    def_beam_segment_params = {
+        'length': 5.01, 'ampl': 5., 'xishape': 'cos', 'radius': 1.,
+        'energy': 1000., 'xshift': 0, 'yshift': 0, 'rshape': 'g',
+        'angspread': 1e-5, 'angshape': 'l', 'espread': 0, 'eshape': 'm',
+        'mass_charge_ratio': 1
+    }
 
     if beam_parameters is not None:
-        # Here we change default beam parameters if a user set a new default
-        # parameters.
-        if 'default' in beam_parameters.keys():
-            for def_key in beam_parameters['default'].keys():
-                complete_beam_parameters[def_key] = (
-                    beam_parameters['default'])[def_key]
-
-        # Every manually set parameter will overwrite default one.
         for key in beam_parameters.keys():
-            if key != 'default':
-                complete_beam_parameters[key] = beam_parameters[key]
+            # Here it changes beam shape parameters if a user set new ones.
+            if key in beam_shape_params.keys():
+                beam_shape_params[key] = beam_parameters[key]
+        
+        # Creates a beam shape.
+        beam_shape = BeamShape(**beam_shape_params)
 
-    # You can set 'beam_current' and 'particles_in_layer' parameters
-    # here for the whole beam (beam_shape).
-    beam_shape = BeamShape(**complete_beam_parameters)
+        for key in beam_parameters.keys():            
+            if type(beam_parameters[key]) == dict:
+                # Here it changes default beam parameters if a user set
+                # a new default parameters.
+                if key == 'default':
+                    for def_key in beam_parameters['default'].keys():
+                        def_beam_segment_params[def_key] = (
+                            beam_parameters['default'])[def_key]
+                
+                # Here we add a new beam segment if its parameters are set by
+                # a user.
+                else:
+                    new_segment_params = def_beam_segment_params.copy()
+                    for segment_key in (beam_parameters[key]).keys():
+                        new_segment_params[segment_key] = (
+                            beam_parameters[key])[segment_key]
 
-    # Works only for one segment (for now).
-    # TODO: Add new functionality that allows the user to define multiple
-    #       beam segments.
-    beam_segment = BeamSegmentShape(**complete_beam_parameters)
-    beam_shape.add_segment(beam_segment)
+                    # Creates a new beam segment shape and then add this new
+                    # segment to beam_shape.
+                    beam_segment = BeamSegmentShape(**new_segment_params)
+                    beam_shape.add_segment(beam_segment)
+            
+            elif key not in beam_shape_params.keys():
+                raise Exception(
+                    f"The {key} key of beam_parameters dictionary" +
+                    "is not supported."
+                )
+
+    else:
+        beam_shape = BeamShape(**beam_shape_params)
+        beam_segment = BeamSegmentShape(**def_beam_segment_params)
+        beam_shape.add_segment(beam_segment)
 
     # Now we generate beam particles. beam_module is either
     # lcode2dPy.beam3d.beam or lcode2dPy.beam3d_gpu.beam

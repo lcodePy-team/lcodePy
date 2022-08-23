@@ -3,15 +3,19 @@ import functools
 from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
 
 class BeamShape:
-    def __init__(self, **beam_parameters):
-        self.current = beam_parameters['current']
-        self.particles_in_layer = beam_parameters['particles_in_layer']
-        self.rng_seed = beam_parameters['rng_seed']
+    def __init__(self, **beam_shape_params):
+        self.current = beam_shape_params['current']
+        self.particles_in_layer = beam_shape_params['particles_in_layer']
+        self.rng_seed = beam_shape_params['rng_seed']
 
         self.segments: list[BeamSegmentShape] = []
         # self.rigid = False
 
     def add_segment(self, beam_segment: BeamSegmentShape):
+        """
+        Adds a beam segment to the beam shape that describes the beam that is
+        later created in beam_generator.py.
+        """
         self.segments.append(beam_segment)
         beam_segment.set_beam_shape(self)
 
