@@ -180,7 +180,7 @@ def init_plasma(config: Config):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents, _ = init_plasma(config)
+    fields, particles, currents, const_arrays = init_plasma(config)
 
     with np.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
@@ -196,4 +196,4 @@ def load_plasma(config: Config, path_to_plasmastate: str):
         currents = GPUArrays(ro=state['ro'], jx=state['jx'],
                              jy=state['jy'], jz=state['jz'])
 
-    return fields, particles, currents
+    return fields, particles, currents, const_arrays

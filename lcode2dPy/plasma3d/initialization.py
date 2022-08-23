@@ -166,7 +166,7 @@ def init_plasma(config: Config):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents, _ = init_plasma(config)
+    fields, particles, currents, const_arrays = init_plasma(config)
 
     with np.load(file=path_to_plasmastate) as state:
         fields.Ex, fields.Ey, fields.Ez =\
@@ -183,4 +183,4 @@ def load_plasma(config: Config, path_to_plasmastate: str):
         currents.ro, currents.jx, currents.jy, currents.jz = \
             state['ro'], state['jx'], state['jy'], state['jz']
 
-    return fields, particles, currents
+    return fields, particles, currents, const_arrays

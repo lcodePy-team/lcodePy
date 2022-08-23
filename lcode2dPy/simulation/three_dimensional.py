@@ -113,16 +113,17 @@ class Cartesian3dSimulation:
     #     pass
 
     def __load_plasmastate(self):
-        self.__loaded_fields, self.__loaded_particles, self.__loaded_currents =\
+        (self.__loaded_fields, self.__loaded_particles,
+        self.__loaded_currents, self.__const_arrays) =\
             self.__load_plasma(self.__config, self.path_to_plasmastate)
 
     def __init_plasmastate(self):
         # In case of an external plasma state, we set values
         # as the loaded values:
         if self.external_plasmastate:
-            pl_fields, pl_particles, pl_currents = (
+            pl_fields, pl_particles, pl_currents, pl_const_arrays = (
                 self.__loaded_fields, self.__loaded_particles,
-                self.__loaded_currents
+                self.__loaded_currents, self.__const_arrays
             )
         else:
             # Initializes a plasma state:
