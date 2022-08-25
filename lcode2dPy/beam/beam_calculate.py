@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as np
 
-from lcode2dPy.beam.weights import (
+from .weights import (
     deposit_particles,
     particle_fields,
     particles_weights,

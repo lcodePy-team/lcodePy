@@ -3,8 +3,8 @@ import numba
 
 from math import floor, sqrt
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.beam3d_gpu.data import BeamParticles
+from ..config.config import Config
+from .data import BeamParticles
 
 WARP_SIZE = 32
 

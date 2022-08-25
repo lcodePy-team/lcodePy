@@ -2,9 +2,9 @@
 import numpy as np
 from numba import njit
 
-from lcode2dPy.plasma.data import Currents
-from lcode2dPy.plasma.gamma import gamma_mass_nb
-from lcode2dPy.plasma.weights import (
+from .data import Currents
+from .gamma import gamma_mass_nb
+from .weights import (
     deposit_antisymmetric,
     deposit_symmetric,
     particles_weights,

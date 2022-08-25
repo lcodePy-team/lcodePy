@@ -3,8 +3,8 @@ import numba as nb
 
 from math import floor, sqrt
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.beam3d.data import BeamParticles
+from ..config.config import Config
+from .data import BeamParticles
 
 
 # Deposition and interpolation helper function #

@@ -1,13 +1,13 @@
 from copy import copy
 import numpy as np
 
-from lcode2dPy.config.default_config import default_config
-from lcode2dPy.config.config import Config
+from ..config.default_config import default_config
+from ..config.config import Config
 
-from lcode2dPy.alt_beam_generator.beam_shape import BeamShape
-from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
+from .beam_shape import BeamShape
+from .beam_segment_shape import BeamSegmentShape
 
-import lcode2dPy.beam3d as beam3d_cpu_module
+from .. import beam3d as beam3d_cpu_module
 
 
 particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
@@ -83,6 +83,10 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
                     f"The {key} key of beam_parameters dictionary" +
                     "is not supported."
                 )
+        
+        if len(beam_shape.segments) == 0:
+            beam_segment = BeamSegmentShape(**def_beam_segment_params)
+            beam_shape.add_segment(beam_segment)
 
     else:
         beam_shape = BeamShape(**beam_shape_params)
@@ -90,7 +94,7 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
         beam_shape.add_segment(beam_segment)
 
     # Now we generate beam particles. beam_module is either
-    # lcode2dPy.beam3d.beam or lcode2dPy.beam3d_gpu.beam
+    # beam3d or beam3d_gpu
     beam_particles = beam_module.BeamParticles()
     beam_particles.init_generated(generate_beam_array(config, beam_shape))
     return beam_particles

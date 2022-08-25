@@ -1,13 +1,13 @@
 import numpy as np
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d.data import Fields, Currents, Particles, Const_Arrays
-from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
-from lcode2dPy.beam3d import (
+from ..config.config import Config
+from ..plasma3d.data import Fields, Currents, Particles, Const_Arrays
+from ..plasma3d.solver import Plane2d3vPlasmaSolver
+from ..beam3d import (
     BeamCalculator, BeamParticles, concatenate_beam_layers, BeamSource,
     BeamDrain
 )
-from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
+from ..diagnostics.diagnostics_3d import Diagnostics3d
 
 
 class PushAndSolver3d:
@@ -71,7 +71,7 @@ class PushAndSolver3d:
             # Diagnostics:
             if diagnostics:
                 xi_plasma_layer = - self.xi_step_size * xi_i
-                diagnostics.dxi(
+                diagnostics.after_step_dxi(
                     current_time, xi_plasma_layer,
                     pl_particles, pl_fields, pl_currents, ro_beam_full
                 )

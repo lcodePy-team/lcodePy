@@ -1,9 +1,9 @@
 """Module for calculator of one full step along xi."""
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d_gpu.data import GPUArrays
-from lcode2dPy.plasma3d_gpu.fields import FieldComputer
-from lcode2dPy.plasma3d_gpu.move import ParticleMover
-from lcode2dPy.plasma3d_gpu.rhoj import RhoJComputer
+from ..config.config import Config
+from .data import GPUArrays
+from .fields import FieldComputer
+from .move import ParticleMover
+from .rhoj import RhoJComputer
 
 class Plane2d3vPlasmaSolver(object):
     def __init__(self, config: Config):

@@ -6,9 +6,9 @@ import cupy as cp
 
 from math import sqrt
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d_gpu.weights import weights
-from lcode2dPy.plasma3d_gpu.data import GPUArrays
+from ..config.config import Config
+from .weights import weights
+from .data import GPUArrays
 
 WARP_SIZE = 32
 

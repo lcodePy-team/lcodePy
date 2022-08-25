@@ -2,9 +2,9 @@
 import numpy as np
 import cupy as cp
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d_gpu.data import GPUArrays
-from lcode2dPy.plasma3d_gpu.weights import initial_deposition
+from ..config.config import Config
+from .data import GPUArrays
+from .weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1

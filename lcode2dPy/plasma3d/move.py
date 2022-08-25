@@ -4,9 +4,9 @@ import numpy as np
 
 from math import sqrt
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d.weights import weights
-from lcode2dPy.plasma3d.data import Fields, Particles
+from ..config.config import Config
+from .weights import weights
+from .data import Fields, Particles
 
 # Field interpolation and particle movement (fused) #
 

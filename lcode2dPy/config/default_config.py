@@ -1,5 +1,5 @@
-from lcode2dPy.config.config import Config
-from lcode2dPy.config.default_config_values import default_config_values
+from .config import Config
+from .default_config_values import default_config_values
 
 
 default_config = Config()

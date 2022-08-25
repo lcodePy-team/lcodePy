@@ -1,6 +1,6 @@
 import functools
 
-from lcode2dPy.alt_beam_generator.beam_segment_shape import BeamSegmentShape
+from .beam_segment_shape import BeamSegmentShape
 
 class BeamShape:
     def __init__(self, **beam_shape_params):

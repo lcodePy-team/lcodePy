@@ -1,8 +1,7 @@
 import cupy as cp
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.beam3d_gpu.data import BeamParticles, concatenate_beam_layers
-
+from ..config.config import Config
+from .data import BeamParticles, concatenate_beam_layers
 
 class BeamSource:
     """

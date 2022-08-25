@@ -3,8 +3,8 @@ import numpy as np
 
 import scipy.fftpack
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d.data import Fields, Currents, Const_Arrays
+from ..config.config import Config
+from .data import Fields, Currents, Const_Arrays
 
 
 # Solving Laplace equation with Dirichlet boundary conditions (Ez and Phi) #
@@ -181,7 +181,7 @@ class FieldComputer(object):
 
     Parameters
     ----------
-    config : lcode2dPy.config.Config
+    config : ..config.Config
 
     Attributes
     ----------

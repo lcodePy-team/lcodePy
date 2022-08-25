@@ -3,27 +3,27 @@
 import numpy as np
 
 # Config
-from lcode2dPy.config.default_config_values import default_config_values
-from lcode2dPy.config.config import Config
+from ..config.default_config_values import default_config_values
+from ..config.config import Config
 
 # Diagnostics
-from lcode2dPy.diagnostics.diagnostics_3d import Diagnostics3d
+from ..diagnostics.diagnostics_3d import Diagnostics3d
 
 # Imports for beam generating in 3d (can be used for 2d also)
-from lcode2dPy.alt_beam_generator.beam_generator import generate_beam
-from lcode2dPy.alt_beam_generator.beam_generator import particle_dtype3d
-from lcode2dPy.alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
+from ..alt_beam_generator.beam_generator import generate_beam
+from ..alt_beam_generator.beam_generator import particle_dtype3d
+from ..alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
 
 # Imports for 3d simulation
-from lcode2dPy.push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3dCPU
-import lcode2dPy.beam3d as beam3d_cpu_module
-from lcode2dPy.plasma3d.initialization import init_plasma as init_plasma_cpu
-from lcode2dPy.plasma3d.initialization import load_plasma as load_plasma_cpu
+from ..push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3dCPU
+from .. import beam3d as beam3d_cpu_module
+from ..plasma3d.initialization import init_plasma as init_plasma_cpu
+from ..plasma3d.initialization import load_plasma as load_plasma_cpu
 
-from lcode2dPy.push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
-import lcode2dPy.beam3d_gpu as beam3d_gpu_module
-from lcode2dPy.plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
-from lcode2dPy.plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
+from ..push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
+from .. import beam3d_gpu as beam3d_gpu_module
+from ..plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
+from ..plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
 
 
 class Cartesian3dSimulation:
@@ -173,7 +173,7 @@ class Cartesian3dSimulation:
 
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
-                # lcode2dPy.alt_beam_generator.beam_generator
+                # ..alt_beam_generator.beam_generator
                 else:
                     raise Exception("Sorry, for now, only 'no' mode of" +
                                     "rigid-beam is supported.")

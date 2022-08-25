@@ -1,18 +1,18 @@
 # General imports
 import numpy as np
-from lcode2dPy.config.default_config import default_config
-from lcode2dPy.config.config import Config
-from lcode2dPy.beam_generator.beam_generator import make_beam, Gauss, rGauss
+from ..config.default_config import default_config
+from ..config.config import Config
+from ..beam_generator.beam_generator import make_beam, Gauss, rGauss
 
 # Diagnostics
-from lcode2dPy.diagnostics.targets import MyDiagnostics
+from ..diagnostics.targets import MyDiagnostics
 
 # Imports for 2d simulation
-from lcode2dPy.push_solvers.push_solver import PusherAndSolver
-from lcode2dPy.beam.beam_slice import BeamSlice
-from lcode2dPy.beam.beam_slice import particle_dtype as beam_particle_dtype_2d
-from lcode2dPy.beam.beam_io import MemoryBeamSource, MemoryBeamDrain
-from lcode2dPy.plasma.initialization import init_plasma as init_plasma_2d
+from ..push_solvers.push_solver import PusherAndSolver
+from ..beam.beam_slice import BeamSlice
+from ..beam.beam_slice import particle_dtype as beam_particle_dtype_2d
+from ..beam.beam_io import MemoryBeamSource, MemoryBeamDrain
+from ..plasma.initialization import init_plasma as init_plasma_2d
 
 
 class Simulation:

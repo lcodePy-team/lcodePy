@@ -2,9 +2,9 @@ from copy import copy
 import numpy as np
 
 from typing import Any
-from lcode2dPy.config.template import lcode_template
+from .template import lcode_template
 
-from lcode2dPy.config.default_config_values import default_config_values
+from .default_config_values import default_config_values
 
 
 class Config:

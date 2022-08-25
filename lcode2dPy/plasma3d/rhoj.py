@@ -1,7 +1,7 @@
 """Routine to compute charge density and currents of particles."""
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d.data import Currents, Particles, Const_Arrays
-from lcode2dPy.plasma3d.weights import deposit
+from ..config.config import Config
+from .data import Currents, Particles, Const_Arrays
+from .weights import deposit
 
 class RhoJComputer(object):
     def __init__(self, config: Config):

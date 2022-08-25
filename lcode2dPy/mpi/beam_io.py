@@ -3,9 +3,9 @@ import logging
 import numpy as np
 from mpi4py import MPI
 
-from lcode2dPy.beam import BeamSlice
-from lcode2dPy.beam.beam_io import BeamSource, BeamDrain
-from lcode2dPy.mpi.util import MPIWorker, particle_dtype
+from ..beam import BeamSlice
+from ..beam.beam_io import BeamSource, BeamDrain
+from .util import MPIWorker, particle_dtype
 
 MPI_TAG_PARTICLES = 1
 

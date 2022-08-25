@@ -1,9 +1,9 @@
 """Module for plasma (3d solver) initialization routines."""
 import numpy as np
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.plasma3d.data import Fields, Particles, Currents, Const_Arrays
-from lcode2dPy.plasma3d.weights import initial_deposition
+from ..config.config import Config
+from .data import Fields, Particles, Currents, Const_Arrays
+from .weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1

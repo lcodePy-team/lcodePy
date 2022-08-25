@@ -2,8 +2,8 @@
 import numpy as np
 from numba import njit
 
-from lcode2dPy.plasma.data import Fields
-from lcode2dPy.plasma.ode import (
+from .data import Fields
+from .ode import (
     cumtrapz_numba,
     tridiagonal_solve_neumann_like,
     tridiagonal_solve_dirichlet,
@@ -200,7 +200,7 @@ class FieldComputer(object):
 
     Parameters
     ----------
-    config : lcode2dPy.config.Config
+    config : ..config.Config
 
     Attributes
     ----------
@@ -219,20 +219,20 @@ class FieldComputer(object):
 
         Parameters
         ----------
-        fields : lcode2dPy.plasma.data.Fields
+        fields : .data.Fields
             Fields from the previous xi step
         rho_beam : np.ndarray
             Beam charge density on the next step.
-        currents_previous : lcode2dPy.plasma.data.Currents
+        currents_previous : .data.Currents
             Current densities from the previous step
-        currents : lcode2dPy.plasma.data.Currents
+        currents : .data.Currents
             Predicted current densities on the next step
         xi_step_p : float
             Absolute value of longitudinal grid step size.
 
         Returns
         -------
-        lcode2dPy.plasma.data.Fields
+        .data.Fields
             Fields on the next xi step
 
         """

@@ -3,10 +3,10 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lcode2dPy.config.config import Config
-from lcode2dPy.config.default_config import default_config
+from ..config.config import Config
+from ..config.default_config import default_config
 
-from lcode2dPy.plasma3d_gpu.data import GPUArraysView
+from ..plasma3d_gpu.data import GPUArraysView
 
 # Auxiliary functions:
 

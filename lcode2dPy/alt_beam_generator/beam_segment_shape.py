@@ -1,6 +1,6 @@
-from lcode2dPy.alt_beam_generator.eshape import EShape
-from lcode2dPy.alt_beam_generator.rshape import RShape
-from lcode2dPy.alt_beam_generator.xishape import XiShape
+from .eshape import EShape
+from .rshape import RShape
+from .xishape import XiShape
 
 class BeamSegmentShape:
     def __init__(self, **beam_segment_params):
