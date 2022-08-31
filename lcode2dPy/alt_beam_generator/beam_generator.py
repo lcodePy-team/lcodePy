@@ -101,9 +101,10 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
 
 
 def generate_beam_array(config: Config, beam_shape: BeamShape):
-    xi_step_p = config.getfloat('window-width-step-size')
+    xi_step_p = config.getfloat('xi-step')
+    xy_step_p = config.getfloat('window-width-step-size')
     three_dimensions = (config.get('geometry').lower() == '3d')
-    max_radius = xi_step_p * config.getint('window-width-steps') / 2
+    max_radius = xy_step_p * config.getint('window-width-steps') / 2
     # Should a user define max_radius by themselves?
 
     rng = np.random.RandomState(beam_shape.rng_seed)
