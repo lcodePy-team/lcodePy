@@ -44,7 +44,8 @@ class Cartesian3dSimulation:
         # self.beam_particle_dtype = particle_dtype3d
 
         # We use this time as a general time value:
-        self.__current_time = 0.
+        self.current_time = 0.
+        # The user can change this value for diagnostic convenience.
 
         # We initialize a beam source and a beam drain:
         self.beam_source = None
