@@ -150,7 +150,7 @@ class Cartesian3dSimulation:
                   f"step size = {self.__time_step_size}.")
         else:
             self.__time_limit = \
-                N_steps * self.__time_step_size + self.__current_time
+                N_steps * self.__time_step_size + self.current_time
             print("Since the number of time steps has been set explicitly,",
                   f"the code will simulate till time limit = {self.__time_limit},",
                   f"with a time step size = {self.__time_step_size}.")
@@ -182,8 +182,8 @@ class Cartesian3dSimulation:
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
                 # TODO: Check if it is correct!
-                self.__current_time = \
-                    self.__current_time + self.__time_step_size
+                self.current_time = \
+                    self.current_time + self.__time_step_size
 
                 pl_fields, pl_particles, pl_currents, pl_const_arrays = \
                     self.__init_plasmastate()
@@ -191,13 +191,13 @@ class Cartesian3dSimulation:
                 # Calculates one time step:
                 self.__push_solver.step_dt(
                     pl_fields, pl_particles, pl_currents, pl_const_arrays,
-                    self.beam_source, self.beam_drain, self.__current_time,
+                    self.beam_source, self.beam_drain, self.current_time,
                     self.__diagnostics
                 )
 
                 # Perform diagnostics
                 self.__diagnostics.after_step_dt(
-                    self.__current_time, pl_particles, pl_fields, pl_currents,
+                    self.current_time, pl_particles, pl_fields, pl_currents,
                     self.beam_drain
                 )
 
