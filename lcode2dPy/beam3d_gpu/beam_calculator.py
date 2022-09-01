@@ -135,7 +135,7 @@ def interp(value_0, value_1, i, j,
 def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
                     Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
                     Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
-    xi_loc = (xi_k - xi) / xi_step_size
+    xi_loc = (xi - xi_k) / xi_step_size
 
     (i, j,
     w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
