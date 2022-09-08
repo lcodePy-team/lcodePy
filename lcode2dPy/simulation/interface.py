@@ -1,49 +1,77 @@
 # General imports
 import numpy as np
-from lcode2dPy.config.default_config import default_config
-from lcode2dPy.beam_generator.beam_generator import make_beam, Gauss, rGauss
+from ..config.default_config import default_config
+from ..config.config import Config
+from ..beam_generator.beam_generator import make_beam, Gauss, rGauss
+
+# Diagnostics
+from ..diagnostics.targets import MyDiagnostics
 
 # Imports for 2d simulation
-from lcode2dPy.push_solver import PusherAndSolver
-from lcode2dPy.beam.beam_slice import BeamSlice
-from lcode2dPy.beam.beam_slice import particle_dtype as beam_particle_dtype_2d
-from lcode2dPy.beam.beam_io import MemoryBeamSource, MemoryBeamDrain
-from lcode2dPy.plasma.initialization import init_plasma
-from lcode2dPy.diagnostics.targets import MyDiagnostics
+from ..push_solvers.push_solver import PusherAndSolver
+from ..beam.beam_slice import BeamSlice
+from ..beam.beam_slice import particle_dtype as beam_particle_dtype_2d
+from ..beam.beam_io import MemoryBeamSource, MemoryBeamDrain
+from ..plasma.initialization import init_plasma as init_plasma_2d
 
 
 class Simulation:
-    def __init__(self, config=default_config, beam_generator=make_beam,
+    def __init__(self, config: Config=default_config, beam_generator=make_beam,
                  beam_pars=None, diagnostics=None):
+        # Firstly, we set some instance variables:
         self.config = config
-        self.t_step = config.getfloat('time-step')
+        self.time_limit = config.getfloat('time-limit') 
+        self.time_step_size = config.getfloat('time-step')
+        self.rigid_beam = config.get('rigid-beam')
 
-        geometry = config.get('geometry')
+        # Mode of plasma continuation:
+        self.cont_mode = config.get('continuation')
+
+        # Here we get information about the geometry of the simulation window
+        # and the type of processing unit (CPU or GPU)
+        geometry = config.get('geometry').lower()
+        
         if geometry == 'circ' or geometry == 'c':
             self.push_solver = PusherAndSolver(self.config) # circ
+            self.init_plasma = init_plasma_2d
             self.beam_particle_dtype = beam_particle_dtype_2d
+            self.geomtry = '2d'
+
         elif geometry == 'plane':
             self.push_solver = PusherAndSolver(self.config) # 2d_plane
+            self.init_plasma = init_plasma_2d
             self.beam_particle_dtype = beam_particle_dtype_2d
+            self.geometry = '2d'
 
+        else:
+            raise Exception(f"{geometry} type of geometry is not supported.")
+
+        # Here we set parameters for beam generation, where we will store beam
+        # particles and where they will go after calculations
         self.beam_generator = beam_generator
         self.beam_pars = beam_pars
 
         self.current_time = 0.
+        # TODO: We should be able to use a beam file as a beam source.
+        #       For now, it will always generate a new beam.
         self.beam_source = None
         self.beam_drain = None
         
+        # Finally, we set the diagnostics.
         self.diagnostics = diagnostics
 
     def step(self, N_steps):
         """Compute N time steps."""
         # t step function, makes N_steps time steps.
+        if N_steps is None:
+            N_steps = int(self.time_limit / self.time_step_size)
 
         # Beam generation
         if self.beam_source is None:
-            beam_particles = self.beam_generator(self.config, **self.beam_pars)
+            beam_particles = self.beam_generator(self.config,
+                                                    **self.beam_pars)
             beam_particles = np.array(list(map(tuple, beam_particles.to_numpy())),
-                                      dtype=self.beam_particle_dtype)
+                                    dtype=self.beam_particle_dtype)
 
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
             self.beam_source = MemoryBeamSource(beam_slice) #TODO mpi_beam_source
@@ -52,7 +80,7 @@ class Simulation:
 #             self.diagnostics.sim = self
         # Time loop
         for t_i in range(N_steps):
-            fields, plasma_particles = init_plasma(self.config)
+            fields, plasma_particles = self.init_plasma(self.config)
 
             plasma_particles_new, fields_new = self.push_solver.step_dt(
                 plasma_particles, fields, self.beam_source, self.beam_drain,
@@ -62,11 +90,11 @@ class Simulation:
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
             self.beam_source = MemoryBeamSource(beam_slice)
             self.beam_drain = MemoryBeamDrain()
-            self.current_time = self.current_time + self.t_step
+            self.current_time = self.current_time + self.time_step_size
             # Every t step diagnostics 
             # if self.diagnostics:
             #     self.diagnostics.every_dt()
-            
+
 
 # class Diagnostics2d:
 #     def __init__(self, dt_diag, dxi_diag):

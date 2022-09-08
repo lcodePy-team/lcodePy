@@ -5,11 +5,15 @@ class RShape:
     shapes = {}
 
     # Returns (r_b, p_br, M_b)
-    def values2d(self, random, radius, sigma_impulse, r_max, size):
+    def values2d(
+        self, random, radius, sigma_impulse, r_max, size, xshift, yshift
+    ):
         raise NotImplementedError
     
     # Returns (x, y, p_x, p_y)
-    def values3d(self, random, radius, sigma_impulse, r_max, size):
+    def values3d(
+        self, random, radius, sigma_impulse, r_max, size, xshift, yshift
+    ):
         raise NotImplementedError
 
     @classmethod
@@ -37,15 +41,23 @@ class FuncRShape(RShape):
         self.func3d = func3d
 
     # Returns (r_b, p_br, M_b)
-    def values2d(self, random, radius, sigma_impulse, r_max, size):
-        return self.func2d(random, radius, sigma_impulse, r_max, size)
+    def values2d(
+        self, random, radius, sigma_impulse, r_max, size, xshift, yshift
+    ):
+        return self.func2d(
+            random, radius, sigma_impulse, r_max, size, xshift, yshift
+        )
     
     # Returns (r_b, p_br, M_b)
-    def values3d(self, random, radius, sigma_impulse, r_max, size):
-        return self.func3d(random, radius, sigma_impulse, r_max, size)
+    def values3d(
+        self, random, radius, sigma_impulse, r_max, size, xshift, yshift
+    ):
+        return self.func3d(
+            random, radius, sigma_impulse, r_max, size, xshift, yshift
+        )
 
 
-def gauss2d(random, radius, sigma_impulse, r_max, size):
+def gauss2d(random, radius, sigma_impulse, r_max, size, xshift, yshift):
     a = 1 - np.exp(-r_max ** 2 / (2 * radius ** 2))
     r_b = radius * np.sqrt(-2 * np.log(1 - random.random_sample(size) * a))
     p_br = random.normal(0, sigma_impulse, size)
@@ -53,12 +65,12 @@ def gauss2d(random, radius, sigma_impulse, r_max, size):
     M_b = r_b * p_bf
     return r_b, p_br, M_b
 
-def gauss3d(random, radius, sigma_impulse, r_max, size):
+def gauss3d(random, radius, sigma_impulse, r_max, size, xshift, yshift):
     a = 1 - np.exp(-r_max ** 2 / (2 * radius ** 2))
     r = radius * np.sqrt(-2 * np.log(1 - random.random_sample(size) * a))
     phi = random.uniform(0, 2 * np.pi, size)
-    x = r * np.cos(phi)
-    y = r * np.sin(phi)
+    x = r * np.cos(phi) + xshift
+    y = r * np.sin(phi) + yshift
     p_x = random.normal(0, sigma_impulse, size)
     p_y = random.normal(0, sigma_impulse, size)
     return x, y, p_x, p_y

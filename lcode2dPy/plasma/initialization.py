@@ -1,8 +1,8 @@
 """Module for plasma initialization routines."""
 import numpy as np
 
-from lcode2dPy.plasma.data import Fields, Particles
-from lcode2dPy.plasma.profiles import get_plasma_profile
+from .data import Fields, Particles
+from .profiles import get_plasma_profile
 
 
 def init_plasma(config):

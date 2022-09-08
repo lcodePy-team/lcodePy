@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from lcode2dPy.beam.beam_slice import BeamSlice
+from .beam_slice import BeamSlice
 
 
 class BeamSource(ABC):

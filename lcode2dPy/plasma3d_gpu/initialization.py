@@ -2,8 +2,9 @@
 import numpy as np
 import cupy as cp
 
-from lcode2dPy.plasma3d_gpu.data import GPUArrays
-from lcode2dPy.plasma3d_gpu.weights import initial_deposition
+from ..config.config import Config
+from .data import GPUArrays
+from .weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -122,7 +123,7 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
-def init_plasma(config):
+def init_plasma(config: Config):
     """
     Initialize all the arrays needed (for what?).
     """
@@ -137,7 +138,10 @@ def init_plasma(config):
     assert grid_steps % 2 == 1
 
     # particles should not reach the window pre-boundary cells
-    assert reflect_padding_steps > 2
+    if reflect_padding_steps <= 2:
+        raise Exception("'reflect_padding_steps' parameter is too low.\n" +
+                        "Details: 'reflect_padding_steps' must be bigger than" +
+                        " 2. By default it is 5.")
 
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,
@@ -159,7 +163,8 @@ def init_plasma(config):
         return cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
 
     fields = GPUArrays(Ex=zeros(), Ey=zeros(), Ez=zeros(),
-                       Bx=zeros(), By=zeros(), Bz=zeros())
+                       Bx=zeros(), By=zeros(), Bz=zeros(),
+                       Phi=zeros())
 
     particles = GPUArrays(x_init=x_init, y_init=y_init,
                           x_offt=x_offt, y_offt=y_offt,
@@ -170,5 +175,25 @@ def init_plasma(config):
     const_arrays = GPUArrays(ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
                              field_mixed_matrix=mix_matrix,
                              neumann_matrix=neu_matrix)
+
+    return fields, particles, currents, const_arrays
+
+
+def load_plasma(config: Config, path_to_plasmastate: str):
+    fields, particles, currents, const_arrays = init_plasma(config)
+
+    with np.load(file=path_to_plasmastate) as state:
+        fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
+                           Ez=state['Ez'], Bx=state['Bx'],
+                           By=state['By'], Bz=state['Bz'],
+                           Phi=state['Phi'])
+
+        particles = GPUArrays(x_init=particles.x_init, y_init=particles.y_init,
+                              q=particles.q, m=particles.m,
+                              x_offt=state['x_offt'], y_offt=state['y_offt'],
+                              px=state['px'], py=state['py'], pz=state['pz'])
+
+        currents = GPUArrays(ro=state['ro'], jx=state['jx'],
+                             jy=state['jy'], jz=state['jz'])
 
     return fields, particles, currents, const_arrays

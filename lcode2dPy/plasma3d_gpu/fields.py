@@ -1,10 +1,11 @@
 """Functions to find fields on the next step of plasma evolution."""
 import cupy as cp
 
-from lcode2dPy.plasma3d_gpu.data import GPUArrays, fields_average
+from ..config.config import Config
+from .data import GPUArrays, fields_average
 
 
-# Solving Laplace equation with Dirichlet boundary conditions (Ez) #
+# Solving Laplace equation with Dirichlet boundary conditions (Ez and Phi) #
 
 def dst2d(a):
     """
@@ -55,6 +56,24 @@ def calculate_Ez(grid_step_size, const, currents):
     return Ez
 
 
+def calculate_Phi(const, currents):
+    """
+    Calculates Phi as iDST2D(dirichlet_matrix * DST2D(-ro + jz)).
+    """
+    ro, jz = currents.ro, currents.jz
+
+    rhs_inner = (ro - jz)[1:-1, 1:-1]
+
+    f = dst2d(rhs_inner)
+
+    f *= const.dirichlet_matrix
+
+    Phi_inner = dst2d(f)
+    Phi = cp.pad(Phi_inner, 1, 'constant', constant_values=0)
+
+    return Phi
+
+
 # Solving Laplace or Helmholtz equation with mixed boundary conditions #
 
 def mix2d(a):
@@ -92,9 +111,10 @@ def dx_dy(arr, grid_step_size):
     return dx / (grid_step_size * 2), dy / (grid_step_size * 2)
 
 
-def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
-                          const, fields_avg,
-                          beam_ro, currents, currents_prev):
+def calculate_Ex_Ey_Bx_By(
+    grid_step_size, xi_step_size, const, fields, ro_beam_full, ro_beam_prev,
+    currents_full, currents_prev
+):
     """
     Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
     with and without transposition depending on the field component.
@@ -104,22 +124,24 @@ def calculate_Ex_Ey_Bx_By(grid_step_size, xi_step_size, trick, variant_A,
            minus the coarse plasma particle cloud width).
     """
     jx_prev, jy_prev = currents_prev.jx, currents_prev.jy
-    jx,      jy      = currents.jx,      currents.jy
-
-    ro = currents.ro if not variant_A else (currents.ro + currents_prev.ro) / 2
-    jz = currents.jz if not variant_A else (currents.jz + currents_prev.jz) / 2
+    jx_full, jy_full = currents_full.jx, currents_full.jy
+    
+    ro_half = (currents_full.ro + ro_beam_full +
+               currents_prev.ro + ro_beam_prev) / 2
+    jz_half = (currents_full.jz + ro_beam_full +
+               currents_prev.jz + ro_beam_prev) / 2
 
     # 0. Calculate gradients and RHS.
-    dro_dx, dro_dy = dx_dy(ro + beam_ro, grid_step_size)
-    djz_dx, djz_dy = dx_dy(jz + beam_ro, grid_step_size)
-    djx_dxi = (jx_prev - jx) / xi_step_size  # - ?
-    djy_dxi = (jy_prev - jy) / xi_step_size  # - ?
+    dro_dx, dro_dy = dx_dy(ro_half, grid_step_size)
+    djz_dx, djz_dy = dx_dy(jz_half, grid_step_size)
+    djx_dxi = (jx_prev - jx_full) / xi_step_size  # - ?
+    djy_dxi = (jy_prev - jy_full) / xi_step_size  # - ?
 
-    # Are we solving a Laplace equation or a Helmholtz one?
-    Ex_rhs = -((dro_dx - djx_dxi) - fields_avg.Ex * trick)  # -?
-    Ey_rhs = -((dro_dy - djy_dxi) - fields_avg.Ey * trick)
-    Bx_rhs = +((djz_dy - djy_dxi) + fields_avg.Bx * trick)
-    By_rhs = -((djz_dx - djx_dxi) - fields_avg.By * trick)
+    # We are solving a Helmholtz equation
+    Ex_rhs = -(dro_dx - djx_dxi - fields.Ex)  # -?
+    Ey_rhs = -(dro_dy - djy_dxi - fields.Ey)
+    Bx_rhs = +(djz_dy - djy_dxi + fields.Bx)
+    By_rhs = -(djz_dx - djx_dxi - fields.By)
 
     # Boundary conditions application (for future reference, ours are zero):
     # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
@@ -207,7 +229,7 @@ class FieldComputer(object):
 
     Parameters
     ----------
-    config : lcode2dPy.config.Config
+    config : ..config.Config
 
     Attributes
     ----------
@@ -215,31 +237,45 @@ class FieldComputer(object):
         Plane grid step size.
 
     """
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.xi_step_size = config.getfloat('xi-step')
         self.trick = config.getfloat('field-solver-subtraction-trick')
         self.variant_A = config.getbool('field-solver-variant-A')
 
-    def compute_fields(self, fields, fields_prev, const,
-                       rho_beam, currents_prev, currents):
+    def compute_fields(
+        self, fields, fields_prev, const, rho_beam_full, rho_beam_prev,
+        currents_prev, currents_full
+    ):
         # Looks terrible! TODO: rewrite this function entirely
 
-        Ex, Ey, Bx, By = calculate_Ex_Ey_Bx_By(
-                            self.grid_step_size, self.xi_step_size,
-                            self.trick, self.variant_A, const,
-                            fields, rho_beam, currents, currents_prev)
-                                            
-        if self.variant_A:
-            Ex = 2 * Ex - fields_prev.Ex
-            Ey = 2 * Ey - fields_prev.Ey
-            Bx = 2 * Bx - fields_prev.Bx
-            By = 2 * By - fields_prev.By
+        Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By(
+            self.grid_step_size, self.xi_step_size, const, fields,
+            rho_beam_full, rho_beam_prev, currents_full, currents_prev
+        )
 
-        Ez = calculate_Ez(self.grid_step_size, const, currents)
-        Bz = calculate_Bz(self.grid_step_size, const, currents)
+        Ex_full = 2 * Ex_half - fields_prev.Ex
+        Ey_full = 2 * Ey_half - fields_prev.Ey
+        Bx_full = 2 * Bx_half - fields_prev.Bx
+        By_full = 2 * By_half - fields_prev.By
 
-        new_fields = GPUArrays(Ex=Ex, Ey=Ey, Ez=Ez,
-                               Bx=Bx, By=By, Bz=Bz)
+        Ez_full = calculate_Ez(self.grid_step_size, const, currents_full)
+        Bz_full = calculate_Bz(self.grid_step_size, const, currents_full)
+        Phi = calculate_Phi(const, currents_full)
 
-        return new_fields, fields_average(new_fields, fields_prev)
+        fields_full = GPUArrays(
+            Ex=Ex_full, Ey=Ey_full, Ez=Ez_full,
+            Bx=Bx_full, By=By_full, Bz=Bz_full,
+            Phi=Phi
+        )
+        
+        Ez_half  = (Ez_full  + fields_prev.Ez) / 2
+        Bz_half  = (Bz_full  + fields_prev.Bz) / 2
+
+        fields_half = GPUArrays(
+            Ex=Ex_half, Ey=Ey_half, Ez=Ez_half,
+            Bx=Bx_half, By=By_half, Bz=Bz_half,
+            Phi=Phi
+        )
+
+        return fields_full, fields_half

@@ -4,8 +4,9 @@ import numpy as np
 
 from math import sqrt
 
-from lcode2dPy.plasma3d.weights import weights
-from lcode2dPy.plasma3d.data import Particles
+from ..config.config import Config
+from .weights import weights
+from .data import Fields, Particles
 
 # Field interpolation and particle movement (fused) #
 
@@ -163,7 +164,8 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
 
 
 def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
-               particles, estimated_particles, fields):
+               particles: Particles, estimated_particles: Particles,
+               fields: Fields):
     """
     Update plasma particle coordinates and momenta according to the field
     values interpolated halfway between the previous plasma particle location
@@ -211,7 +213,7 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
     # or somehow use Particles.copy().
 
 
-def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
+def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Particles):
     """
     Move coarse plasma particles as if there were no fields.
     Also reflect the particles from `+-reflect_boundary`.
@@ -240,7 +242,7 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles):
 
 
 class ParticleMover:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.xi_step          = config.getfloat('xi-step')
         reflect_padding_steps = config.getint('reflect-padding-steps')
         self.grid_step_size   = config.getfloat('window-width-step-size')

@@ -1,14 +1,29 @@
 from copy import copy
 import numpy as np
 
-from typing import Dict, Any, Optional
-from lcode2dPy.config.template import lcode_template
+from typing import Any
+from .template import lcode_template
+
+from .default_config_values import default_config_values
+
 
 class Config:
-    config_values: Dict[str, str]
+    # We don't really need config_values, can work with _arr. TODO: discuss this.
+    # config_values: dict[str, str] # And we don't really need to declare this.
 
-    def __init__(self):
+    def __init__(self, new_config_values: dict=None, default_config=True):
+        # Initialize an empty dictionaty for config values:
         self.config_values = {}
+
+        # If a user wants to set config_values over default ones, then he/she
+        # just writes: config = Config() /If a user wants to create a new empty
+        # config, then he/she writes: config = Config(default_config=False)
+        if default_config:
+            self.update(default_config_values)
+
+        # If a user sets new config values when initializing a new config:
+        if new_config_values is not None:
+            self.update(new_config_values)
 
     def get(self, option_name: str, fallback: str = '') -> str:
         self.adjust_config_values(option_name)
@@ -29,7 +44,7 @@ class Config:
 
     def getint(self, option_name: str, fallback: int = 0) -> int:
         try:
-            return int(self.get(option_name))
+            return int(float(self.get(option_name)))
         except ValueError:
             return fallback
 
@@ -42,7 +57,23 @@ class Config:
     def set(self, option_name: str, option_value: Any):
         self.config_values[option_name] = str(option_value)
 
+    def update(self, new_config_values: dict=None): #, **kconfig_values):
+        """
+        Works similarly to the update() method of a Python dictionary:
+        this method inserts the specified items to the config_values.
+        """
+        if new_config_values is not None:
+            for key in new_config_values:
+                self.set(key, new_config_values[key])
+
+        # We can add this part if we want to support **karg
+        # for key in kconfig_values:
+        #     self.set(key, kconfig_values[key])
+
     def __copy__(self) -> 'Config':
+        """
+        Works similarly to the copy() method of a Python dictionary.
+        """
         ret = Config()
         ret.config_values = copy(self.config_values)
         return ret

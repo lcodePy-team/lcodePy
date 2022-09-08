@@ -3,183 +3,8 @@ import numba as nb
 
 from math import floor, sqrt
 
-# We don't really need this class. It's more convenient
-# to have something like GPUArrays from plasma3d_gpu.
-
-class BeamParticles:
-    def __init__(self, size):
-        """
-        Create a new empty array of beam particles. Can be used both as
-        a whole beam particles array and as a layer of beam particles.
-        """
-        self.size = size
-
-        self.xi = np.zeros(size,     dtype=np.float64)
-        self.x = np.zeros(size,      dtype=np.float64)
-        self.y = np.zeros(size,      dtype=np.float64)
-        self.px = np.zeros(size,     dtype=np.float64)
-        self.py = np.zeros(size,     dtype=np.float64)
-        self.pz = np.zeros(size,     dtype=np.float64)
-        self.q_m = np.zeros(size,    dtype=np.float64)
-        self.q_norm = np.zeros(size, dtype=np.float64)
-        self.id = np.zeros(size,     dtype=np.int64)
-        self.dt = np.zeros(size,     dtype=np.float64)
-        self.remaining_steps = np.zeros(size,
-                                     dtype=np.int64)
-        # An additional parameter to track lost particles.
-        # self.lost = np.zeros(size, dtype=np.bool8)
-
-    def load(self, *args, **kwargs):
-        with np.load(*args, **kwargs) as loaded:
-            self.size = len(loaded['xi'])
-            self.xi = loaded['xi']
-            self.x = loaded['x']
-            self.y = loaded['y']
-            self.px = loaded['px']
-            self.py = loaded['py']
-            self.pz = loaded['pz']
-            self.q_m = loaded['q_m']
-            self.q_norm = loaded['q_norm']
-            self.id = loaded['id']
-            self.dt = np.zeros(self.size, dtype=np.float64)
-            self.remaining_steps = np.zeros(self.size,
-                                          dtype=np.int64)
-            # self.lost = np.zeros(self.size, dtype=np.bool8)
-
-    def save(self, *args, **kwargs):
-        np.savez_compressed(*args, **kwargs,
-                            xi = self.xi,
-                            x = self.x,
-                            y = self.y,
-                            px = self.px,
-                            py = self.py,
-                            pz = self.pz,
-                            q_m = self.q_m,
-                            q_norm = self.q_norm,
-                            id = self.id)
-
-    # Essentials for beam layer calculations #
-
-    def xi_sorted(self):
-        """
-        Sort beam particles along xi axis.
-        """
-        sort_idxes = np.argsort(-self.xi)
-
-        self.xi = self.xi[sort_idxes]
-        self.x = self.x[sort_idxes]
-        self.y = self.y[sort_idxes]
-        self.px = self.px[sort_idxes]
-        self.py = self.py[sort_idxes]
-        self.pz = self.pz[sort_idxes]
-        self.q_m = self.q_m[sort_idxes]
-        self.q_norm = self.q_norm[sort_idxes]
-        self.id = self.id[sort_idxes]
-        self.dt = self.dt[sort_idxes]
-        self.remaining_steps = self.remaining_steps[sort_idxes]
-        # self.lost = self.lost[sort_idxes]
-
-    def get_layer(self, indexes_arr):
-        """
-        Return a layer with indexes from indexes_arr.
-        """
-        # TODO: Find a better method of getting a layer!
-        #       Have a look at plasma3d_gpu.data for examples.
-        new_beam_layer = BeamParticles(indexes_arr.size)
-
-        new_beam_layer.xi = self.xi[indexes_arr]
-        new_beam_layer.x = self.x[indexes_arr]
-        new_beam_layer.y = self.y[indexes_arr]
-        new_beam_layer.px = self.px[indexes_arr]
-        new_beam_layer.py = self.py[indexes_arr]
-        new_beam_layer.pz = self.pz[indexes_arr]
-        new_beam_layer.q_m = self.q_m[indexes_arr]
-        new_beam_layer.q_norm = self.q_norm[indexes_arr]
-        new_beam_layer.id = self.id[indexes_arr]
-        new_beam_layer.dt = self.dt[indexes_arr]
-        new_beam_layer.remaining_steps = self.remaining_steps[indexes_arr]
-        # new_beam_layer.lost =   self.lost[indexes_arr]
-
-        return new_beam_layer
-
-
-def concatenate_beam_layers(b_layer_1: BeamParticles, b_layer_2: BeamParticles):
-    """
-    Concatenate two beam particles layers.
-    """
-    new_b_layer = BeamParticles(b_layer_1.size + b_layer_2.size)
-    # TODO: The same task as for self.get_sublayer()
-
-    new_b_layer.xi =     np.concatenate((b_layer_1.xi, b_layer_2.xi))
-    new_b_layer.x =      np.concatenate((b_layer_1.x, b_layer_2.x))
-    new_b_layer.y =      np.concatenate((b_layer_1.y, b_layer_2.y))
-    new_b_layer.px =     np.concatenate((b_layer_1.px, b_layer_2.px))
-    new_b_layer.py =     np.concatenate((b_layer_1.py, b_layer_2.py))
-    new_b_layer.pz =     np.concatenate((b_layer_1.pz, b_layer_2.pz))
-    new_b_layer.q_m =    np.concatenate((b_layer_1.q_m, b_layer_2.q_m))
-    new_b_layer.q_norm = np.concatenate((b_layer_1.q_norm, b_layer_2.q_norm))
-    new_b_layer.id =     np.concatenate((b_layer_1.id, b_layer_2.id))
-    new_b_layer.dt =     np.concatenate((b_layer_1.dt, b_layer_2.dt))
-    new_b_layer.remaining_steps = np.concatenate((b_layer_1.remaining_steps,
-                                            b_layer_2.remaining_steps))
-
-    return new_b_layer
-
-#TODO: The BeamParticles class makes jitting harder. And we don't really need
-#      this class. Get rid of it.
-
-class BeamSource:
-    """
-    This class helps to extract a beam layer from beam particles array.
-    """
-    # Do we really need this class?
-    def __init__(self, config, beam: BeamParticles):
-        # From config:
-        self.xi_step_size = config.getfloat('xi-step')
-        
-        # Get the whole beam or a beam layer:
-        beam.xi_sorted()
-        self.beam = beam
-
-        # Dropped sorted_idxes = argsort(-self.beam.xi)...
-        # It needs to be somewhere!
-
-        # Shows how many particles have already deposited:
-        self.layout_count = 0 # or _used_count in beam2d
-
-    def get_beam_layer_to_layout(self, plasma_layer_idx):
-        xi_min = - self.xi_step_size * plasma_layer_idx
-        xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
-
-        begin = self.layout_count
-
-        # Does it find all particles that lay in the layer? Check it.
-        arr_to_search = self.beam.xi[begin:]
-        if len(arr_to_search) != 0:
-            layer_length = np.sum((xi_max <= arr_to_search) *
-                                  (arr_to_search < xi_min))
-        else:
-            layer_length = 0
-        self.layout_count += layer_length
-
-        indexes_arr = np.arange(begin, begin + layer_length)
-        return self.beam.get_layer(indexes_arr)
-
-
-class BeamDrain:
-    def __init__(self):
-        self.beam_buffer = BeamParticles(0)
-        self.lost_buffer = BeamParticles(0)
-
-    def push_beam_layer(self, beam_layer: BeamParticles):
-        if beam_layer.size > 0:
-            self.beam_buffer = concatenate_beam_layers(self.beam_buffer,
-                                                       beam_layer)
-
-    def push_beam_lost(self, lost_layer: BeamParticles):
-        if lost_layer.size > 0:
-            self.lost_buffer = concatenate_beam_layers(self.lost_buffer,
-                                                       lost_layer)
+from ..config.config import Config
+from .data import BeamParticles
 
 
 # Deposition and interpolation helper function #
@@ -220,58 +45,118 @@ def particles_weights(x, y, dxi, grid_steps, grid_step_size):  # dxi = (xi_prev 
 @nb.njit
 def weights(x, y, xi_loc, grid_steps, grid_step_size):
     """
+    Calculates the position and the weights of a beam particleon a 3d cartesian
+    grid.
     """
     x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
     x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
     # xi_loc = dxi = (xi_prev - xi) / D_XIP
 
+    # First order core along xi axis
     wxi0 = xi_loc
     wxiP = (1 - xi_loc)
-    wx0 = x_loc
-    wxP = (1 - x_loc)
-    wy0 = y_loc
-    wyP = (1 - y_loc)
 
-    w000, w00P = wxi0 * wx0 * wy0, wxi0 * wx0 * wyP
-    w0P0, w0PP = wxi0 * wxP * wy0, wxi0 * wxP * wyP
-    wP00, wP0P = wxiP * wx0 * wy0, wxiP * wx0 * wyP
-    wPP0, wPPP = wxiP * wxP * wy0, wxiP * wxP * wyP
+    # Second order core along x and y axes
+    wx0, wy0 = .75 - x_loc**2, .75 - y_loc**2
+    wxP, wyP = (.5 + x_loc)**2 / 2, (.5 + y_loc)**2 / 2
+    wxM, wyM = (.5 - x_loc)**2 / 2, (.5 - y_loc)**2 / 2
 
-    return i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP
+    w0MP, w00P, w0PP = wxi0 * wxM * wyP, wxi0 * wx0 * wyP, wxi0 * wxP * wyP
+    w0M0, w000, w0P0 = wxi0 * wxM * wy0, wxi0 * wx0 * wy0, wxi0 * wxP * wy0
+    w0MM, w00M, w0PM = wxi0 * wxM * wyM, wxi0 * wx0 * wyM, wxi0 * wxP * wyM
+
+    wPMP, wP0P, wPPP = wxiP * wxM * wyP, wxiP * wx0 * wyP, wxiP * wxP * wyP
+    wPM0, wP00, wPP0 = wxiP * wxM * wy0, wxiP * wx0 * wy0, wxiP * wxP * wy0
+    wPMM, wP0M, wPPM = wxiP * wxM * wyM, wxiP * wx0 * wyM, wxiP * wxP * wyM
+
+    return (i, j,
+            w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+            wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+    )
 
 # TODO: we have similar functions for GPU in lcode3d code
 
 
-@nb.njit
-def deposit_particles(value, out0, out1, i, j, a000, a001, a010, a011,
-                                               a100, a101, a110, a111):
-    add_at_numba(out0, i + 0, j + 0, a000 * value)
-    add_at_numba(out0, i + 0, j + 1, a001 * value)
-    add_at_numba(out0, i + 1, j + 0, a010 * value)
-    add_at_numba(out0, i + 1, j + 1, a011 * value)
-    add_at_numba(out1, i + 0, j + 0, a100 * value)
-    add_at_numba(out1, i + 0, j + 1, a101 * value)
-    add_at_numba(out1, i + 1, j + 0, a110 * value)
-    add_at_numba(out1, i + 1, j + 1, a111 * value)
+# Deposition and field interpolation #
+
+@nb.njit #(parallel=True)
+def deposit_kernel(grid_steps, grid_step_size,
+                   x, y, xi_loc, q_norm,
+                   rho_layout_0, rho_layout_1):
+    """
+    Deposit beam particles onto the charge density grids.
+    """
+    for k in nb.prange(len(q_norm)):
+
+        # Calculate the weights for a particle
+        (i, j,
+        w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+        wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+        ) = weights(
+            x[k], y[k], xi_loc[k], grid_steps, grid_step_size
+        )
+
+        rho_layout_0[i - 1, j + 1] += q_norm[k] * w0MP
+        rho_layout_0[i + 0, j + 1] += q_norm[k] * w00P
+        rho_layout_0[i + 1, j + 1] += q_norm[k] * w0PP
+        rho_layout_0[i - 1, j + 0] += q_norm[k] * w0M0
+        rho_layout_0[i + 0, j + 0] += q_norm[k] * w000
+        rho_layout_0[i + 1, j + 0] += q_norm[k] * w0P0
+        rho_layout_0[i - 1, j - 1] += q_norm[k] * w0MM
+        rho_layout_0[i + 0, j - 1] += q_norm[k] * w00M
+        rho_layout_0[i + 1, j - 1] += q_norm[k] * w0PM
+
+        rho_layout_1[i - 1, j + 1] += q_norm[k] * wPMP
+        rho_layout_1[i + 0, j + 1] += q_norm[k] * wP0P
+        rho_layout_1[i + 1, j + 1] += q_norm[k] * wPPP
+        rho_layout_1[i - 1, j + 0] += q_norm[k] * wPM0
+        rho_layout_1[i + 0, j + 0] += q_norm[k] * wP00
+        rho_layout_1[i + 1, j + 0] += q_norm[k] * wPP0
+        rho_layout_1[i - 1, j - 1] += q_norm[k] * wPMM
+        rho_layout_1[i + 0, j - 1] += q_norm[k] * wP0M
+        rho_layout_1[i + 1, j - 1] += q_norm[k] * wPPM
+
+def deposit(grid_steps, grid_step_size,
+            x, y, xi_loc, q_norm,
+            rho_layout_0, rho_layout_1):
+    """
+    Deposit beam particles onto the charge density grid.
+    This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
+    """
+    deposit_kernel(grid_steps, grid_step_size,
+                        x.ravel(), y.ravel(),
+                        xi_loc.ravel(), q_norm.ravel(),
+                        rho_layout_0, rho_layout_1)
 
 
 @nb.njit
 def interp(value_0, value_1, i, j,
-                w000, w00P, w0P0, w0PP,
-                wP00, wP0P, wPP0, wPPP):
+           w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+           wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM):
     """
     Collect value from a cell and surrounding cells (using `weights` output).
     """
     return (
-        w000 * value_0[i + 0, j + 0] +
-        w00P * value_0[i + 0, j + 1] +
-        w0P0 * value_0[i + 1, j + 0] +
-        w0PP * value_0[i + 1, j + 1] +
-        wP00 * value_1[i + 0, j + 0] +
-        wP0P * value_1[i + 0, j + 1] +
-        wPP0 * value_1[i + 1, j + 0] +
-        wPPP * value_1[i + 1, j + 1]
+        value_0[i - 1, j + 1] * w0MP +
+        value_0[i + 0, j + 1] * w00P +
+        value_0[i + 1, j + 1] * w0PP +
+        value_0[i - 1, j + 0] * w0M0 +
+        value_0[i + 0, j + 0] * w000 +
+        value_0[i + 1, j + 0] * w0P0 +
+        value_0[i - 1, j - 1] * w0MM +
+        value_0[i + 0, j - 1] * w00M +
+        value_0[i + 1, j - 1] * w0PM +
+    
+        value_1[i - 1, j + 1] * wPMP +
+        value_1[i + 0, j + 1] * wP0P +
+        value_1[i + 1, j + 1] * wPPP +
+        value_1[i - 1, j + 0] * wPM0 +
+        value_1[i + 0, j + 0] * wP00 +
+        value_1[i + 1, j + 0] * wPP0 +
+        value_1[i - 1, j - 1] * wPMM +
+        value_1[i + 0, j - 1] * wP0M +
+        value_1[i + 1, j - 1] * wPPM
     )
 
 
@@ -279,24 +164,33 @@ def interp(value_0, value_1, i, j,
 def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
                     Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
                     Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
-    xi_loc = (xi_k - xi) / xi_step_size
+    xi_loc = (xi - xi_k) / xi_step_size
 
-    i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = weights(
+    (i, j,
+    w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+    wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
+    ) = weights(
         x, y, xi_loc, grid_steps, grid_step_size
     )
 
-    Ex = interp(Ex_k, Ex_k_1, i, j, 
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+    Ex = interp(Ex_k, Ex_k_1, i, j,
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Ey = interp(Ey_k, Ey_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Ez = interp(Ez_k, Ez_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Bx = interp(Bx_k, Bx_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     By = interp(By_k, By_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
     Bz = interp(Bz_k, Bz_k_1, i, j,
-                w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
+                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
 
     return Ex, Ey, Ez, Bx, By, Bz
 
@@ -418,7 +312,7 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
 
 def move_particles(grid_steps, grid_step_size, xi_step_size,
                    idxes, beam_xi_layer, lost_radius,
-                   beam, fields_k_1, fields_k,
+                   beam: BeamParticles, fields_k_1, fields_k,
                    lost_idxes, moved_idxes, fell_idxes):
     """
     This is a convenience wrapper around the `move_particles_kernel` CUDA kernel.
@@ -448,7 +342,7 @@ def move_particles(grid_steps, grid_step_size, xi_step_size,
 
 
 class BeamCalculator:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         # Get main calculation parameters.
         self.xi_step_size = config.getfloat('xi-step')
         self.grid_step_size = config.getfloat('window-width-step-size')
@@ -472,21 +366,18 @@ class BeamCalculator:
 
     # Helper functions for depositing beam particles of a layer:
 
-    def layout_beam_layer(self, beam_layer, plasma_layer_idx):
+    def layout_beam_layer(self, beam_layer: BeamParticles, plasma_layer_idx):
         rho_layout = np.zeros((self.grid_steps, self.grid_steps),
                                     dtype=np.float64)
 
         if beam_layer.id.size != 0:
             xi_plasma_layer = - self.xi_step_size * plasma_layer_idx
 
-            x, y = beam_layer.x, beam_layer.y
-            dxi  = (xi_plasma_layer - beam_layer.xi) / self.xi_step_size
-            i, j, w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP = \
-                particles_weights(x, y, dxi, self.grid_steps, self.grid_step_size)
-
-            deposit_particles(beam_layer.q_norm,
-                              self.rho_layout, rho_layout, i, j,
-                              w000, w00P, w0P0, w0PP, wP00, wP0P, wPP0, wPPP)
+            dxi = (xi_plasma_layer - beam_layer.xi) / self.xi_step_size
+            deposit(self.grid_steps, self.grid_step_size,
+                    beam_layer.x, beam_layer.y, dxi,
+                    beam_layer.q_norm,
+                    self.rho_layout, rho_layout)
 
         self.rho_layout, rho_layout = rho_layout, self.rho_layout
         rho_layout /= self.grid_step_size ** 2
@@ -495,7 +386,7 @@ class BeamCalculator:
 
     # Helper functions for moving beam particles of a layer:
 
-    def start_moving_layer(self, beam_layer, idxes):
+    def start_moving_layer(self, beam_layer: BeamParticles, idxes):
         """
         Perform necessary operations before moving a beam layer.
         """

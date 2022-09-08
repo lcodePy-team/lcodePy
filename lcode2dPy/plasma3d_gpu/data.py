@@ -76,12 +76,13 @@ class GPUArraysView:
         # TODO: just copy+reassign it without preserving identity and shape?
 
 
-def fields_average(fields1, fields2):
+def fields_average(fields1: GPUArrays, fields2: GPUArrays):
         return GPUArrays(
             Ex = (fields1.Ex + fields2.Ex) / 2,
             Ey = (fields1.Ey + fields2.Ey) / 2,
             Ez = (fields1.Ez + fields2.Ez) / 2,
             Bx = (fields1.Bx + fields2.Bx) / 2,
             By = (fields1.By + fields2.By) / 2,
-            Bz = (fields1.Bz + fields2.Bz) / 2
+            Bz = (fields1.Bz + fields2.Bz) / 2,
+            Phi = (fields1.Phi + fields2.Phi) / 2
         )

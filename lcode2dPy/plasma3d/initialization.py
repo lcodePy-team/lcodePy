@@ -1,8 +1,9 @@
 """Module for plasma (3d solver) initialization routines."""
 import numpy as np
 
-from lcode2dPy.plasma3d.data import Fields, Particles, Currents, Const_Arrays
-from lcode2dPy.plasma3d.weights import initial_deposition
+from ..config.config import Config
+from .data import Fields, Particles, Currents, Const_Arrays
+from .weights import initial_deposition
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -121,7 +122,7 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
-def init_plasma(config):
+def init_plasma(config: Config):
     """
     Initialize all the arrays needed (for what?).
     """
@@ -132,11 +133,14 @@ def init_plasma(config):
     plasma_fineness       = config.getint('plasma-fineness')
     solver_trick          = config.getint('field-solver-subtraction-trick')
 
-    # for convenient diagnostics, a cell should be in the center of the grid 
+    # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
-    
+
     # particles should not reach the window pre-boundary cells
-    assert reflect_padding_steps > 2
+    if reflect_padding_steps <= 2:
+        raise Exception("'reflect_padding_steps' parameter is too low.\n" +
+                        "Details: 'reflect_padding_steps' must be bigger than" +
+                        " 2. By default it is 5.")
     
     x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
         make_plasma(grid_steps - plasma_padding_steps * 2,
@@ -157,5 +161,26 @@ def init_plasma(config):
     particles = Particles(x_init, y_init, x_offt, y_offt, px, py, pz, q, m)
     currents = Currents(zeros(), zeros(), zeros(), zeros())
     const_arrays = Const_Arrays(ro_initial, dir_matrix, mix_matrix, neu_matrix)
+
+    return fields, particles, currents, const_arrays
+
+
+def load_plasma(config: Config, path_to_plasmastate: str):
+    fields, particles, currents, const_arrays = init_plasma(config)
+
+    with np.load(file=path_to_plasmastate) as state:
+        fields.Ex, fields.Ey, fields.Ez =\
+             state['Ex'], state['Ey'], state['Ez']
+        fields.Bx, fields.By, fields.Bz =\
+             state['Bx'], state['By'], state['Bz']
+        fields.Phi = state['Phi']
+
+        particles.x_offt, particles.x_offt =\
+            state['x_offt'], state['y_offt']
+        particles.px, particles.py, particles.pz =\
+            state['px'], state['py'], state['pz']
+
+        currents.ro, currents.jx, currents.jy, currents.jz = \
+            state['ro'], state['jx'], state['jy'], state['jz']
 
     return fields, particles, currents, const_arrays

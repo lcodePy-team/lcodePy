@@ -12,6 +12,7 @@ _fields_spec = [
     ('Bx', _float_array),
     ('By', _float_array),
     ('Bz', _float_array),
+    ('Phi', _float_array),
 ]
 
 
@@ -24,6 +25,7 @@ class Fields(object):
         self.Bx = np.zeros((n_cells, n_cells), dtype=np.float64)
         self.By = np.zeros((n_cells, n_cells), dtype=np.float64)
         self.Bz = np.zeros((n_cells, n_cells), dtype=np.float64)
+        self.Phi = np.zeros((n_cells, n_cells), dtype=np.float64)
 
     # Average operation is necessary on intermediate steps to have
     # better approximations of all fields
@@ -35,6 +37,7 @@ class Fields(object):
         fields.Bx = (self.Bx + other.Bx) / 2
         fields.By = (self.By + other.By) / 2
         fields.Bz = (self.Bz + other.Bz) / 2
+        fields.Phi = (self.Phi + other.Phi) / 2
         return fields
 
     def copy(self):
@@ -45,6 +48,7 @@ class Fields(object):
         new_fields.Bx = np.copy(self.Bx)
         new_fields.By = np.copy(self.By)
         new_fields.Bz = np.copy(self.Bz)
+        new_fields.Phi = np.copy(self.Phi)
         return new_fields
 
 

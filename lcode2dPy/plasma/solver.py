@@ -1,9 +1,9 @@
 import numpy as np
 from numba import njit
 
-from lcode2dPy.plasma.fields import FieldComputer
-from lcode2dPy.plasma.move import ParticleMover
-from lcode2dPy.plasma.rhoj import RhoJComputer
+from .fields import FieldComputer
+from .move import ParticleMover
+from .rhoj import RhoJComputer
 
 
 @njit

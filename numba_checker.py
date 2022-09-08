@@ -2,7 +2,7 @@ from numpy.lib.twodim_base import diag
 from lcode2dPy.simulation.interface import Simulation
 from lcode2dPy.diagnostics.targets import BeamDiagnostics, FieldDiagnostics, PlasmaDiagnostics
 from lcode2dPy.config.default_config import default_config
-from lcode2dPy.beam.beam_generator import make_beam, Gauss, rGauss
+from lcode2dPy.beam_generator.beam_generator import make_beam, Gauss, rGauss
 import numpy as np
 import pickle
 import subprocess

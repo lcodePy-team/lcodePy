@@ -1,14 +1,13 @@
 import numpy as np
 from numba import njit
-from lcode2dPy import beam
 
-from lcode2dPy.beam import (
+from ..beam import (
     BeamSlice,
     beam_slice_mover,
     #layout_beam_slice,
 )
-from lcode2dPy.beam.beam_calculate import layout_beam_slice
-from lcode2dPy.plasma.solver import CylindricalPlasmaSolver
+from ..beam.beam_calculate import layout_beam_slice
+from ..plasma.solver import CylindricalPlasmaSolver
 
 particle_dtype = np.dtype(
     [
