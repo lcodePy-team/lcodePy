@@ -189,7 +189,7 @@ def interpolate_particle(value0, value1, i, j, a000, a001, a010, a011,
          + a111 * value1[i + 1, j + 1]
 
 
-#@nb.njit
+@nb.njit
 def particle_fields(r_vec, grid_steps, grid_step_size, xi_step_size, xi_k,
                     fields_k_1, fields_k):
     dxi = (xi_k - r_vec[2]) / xi_step_size
@@ -248,7 +248,7 @@ def is_lost(r_vec, r_max):
 
 # Moves one particle as far as possible on current xi layer
 
-#@nb.njit
+@nb.njit
 def try_move_particle(beam, idx, fields_k_1, fields_k, max_radius, grid_steps,
                       r_step, xi_step_size, xi_layer):
     xi_k = xi_layer * -xi_step_size  # xi_{k}

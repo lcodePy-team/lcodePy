@@ -19,11 +19,12 @@ def Gauss(med=0, sigma=1, vmin=-1, vmax=0):
 
 def rGauss(sigma=1, vmin=0, vmax=1):
     def rgauss_maker(N):
-#         p1 = 0 if vmin is None else stats.weibull_min.cdf(vmin) # cdf doesn't work properly
-#         p2 = 1 if vmax is None else stats.weibull_min.cdf(vmax)
-        p1 = 0
-        p2 = 1
-        return sigma*np.sqrt(2.)*stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
+        p1 = 0 if vmin is None else stats.weibull_min.cdf(vmin, 2) # cdf doesn't work properly
+        p2 = 1 if vmax is None else stats.weibull_min.cdf(vmax, 2)
+        # p1 = 0
+        # p2 = 1
+        # return sigma*np.sqrt(2.)*stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
+        return stats.weibull_min.ppf(np.linspace(p1, p2, N+2)[1:-1], 2)
     rgauss_maker.med = 0
     rgauss_maker.sigma = sigma
     return rgauss_maker
@@ -56,8 +57,8 @@ def make_beam(config, xi_distr, pz_distr, Ipeak_kA,
             xi = xi[(xi >= -config.getfloat('window-length')) & (xi <= 0)]
             N = len(xi)
         partic_in_mid_layer = np.sum((xi > xi_distr.med - config.getfloat('xi-step')/2) & (xi < xi_distr.med + config.getfloat('xi-step')/2))
-        print('Number of particles:', N)
-        print('Number of particles in the middle layer:', partic_in_mid_layer)
+        # print('Number of particles:', N)
+        # print('Number of particles in the middle layer:', partic_in_mid_layer)
         xi = np.sort(xi)[::-1]
 
         if config.get('geometry') == 'c' or config.get('geometry') == 'circ':

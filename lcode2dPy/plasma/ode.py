@@ -64,7 +64,8 @@ def tridiagonal_solve(right_part, previous_factor, r_step, boundaries):
     c = boundaries[0]
     b = boundaries[1]
     d = r_step * right_part[nr]
-    beta[nr] = (c * beta[nr - 1] - d) / (b - c * alpha[nr - 1])
+    beta[nr] = (c * beta[nr - 1] - d * (-2/b-1)) / (b - c * alpha[nr - 1])
+    # beta[nr] = (c * beta[nr - 1] - d) / (b - c * alpha[nr - 1]) TODO: Check this
     for i in range(nr - 1, -1, -1):
         beta[i] += beta[i + 1] * alpha[i]
     return beta
