@@ -1,4 +1,4 @@
-"""Default values for a lcode2dPu config."""
+"""Default values for a lcodePy config."""
 
 default_config_values = {
     'geometry': 'circ', # or 3d or 2d_plane
@@ -68,8 +68,11 @@ default_config_values = {
     'field-solver-subtraction-trick': 1,
     'field-solver-variant-A': True,
 
-    'reflect-padding-steps': 5,
-    'plasma-padding-steps': 10,
+    'reflect-padding-steps': 10,
+    'plasma-padding-steps': 15,
+
+    'dual-plasma-approach': False,
+    'plasma-coarseness': 5,
 
     # Conflicts:
     'corrector-steps': 2, # Can we even change this???
