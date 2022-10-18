@@ -16,7 +16,7 @@ class MyDiagnostics:
             except AttributeError:
                 pass
     
-    def dxi(self,*param):
+    def process(self,*param):
         for diag in self.diag_list:
             diag.dxi(*param)
 
@@ -25,7 +25,7 @@ class MyDiagnostics:
             diag.dump()
 
 class FieldDiagnostics:
-    def __init__(self, name, r=0, 
+    def __init__(self, config, name, r=0, 
                  t_start=None, t_end=None, period=100, 
                  cl_mem = False, 
                  out = 'i f',img_format = 'png', is_merge = False,
@@ -34,13 +34,15 @@ class FieldDiagnostics:
             raise AttributeError("Name isn't corrected")
         self.name = name
         self.r = r
-        self.t_start = t_start 
-        self.t_end = t_end
+        self.t_start = t_start
+        if t_end is None:
+            self.t_end = config.getfloat('time-limit')
+        else:
+            self.t_end = t_end 
         self.period = period
         self.is_merge = is_merge
         self.out = out
         self.data = {}
-
 
     def config(self, config):
         self.dt = config.getfloat('time-step')
@@ -54,14 +56,12 @@ class FieldDiagnostics:
         self.w = int(config.getfloat('window-length')/xi_step)
         self.h = int(config.getfloat('window-width')/r_step)+1
         
-        self.last_idx = self.w - 1
+        self.last_idx = self.w - 1  
+
         
-    
-    
-    def dxi(self, t, layer_idx, \
+    def process(self, config, t, layer_idx, steps, \
                 plasma_particles, plasma_fields, rho_beam, \
                 beam_slice):
-        
         if t<self.t_start or t>self.t_end:
             return
         if (t-self.t_start)%self.period == 0:
@@ -128,12 +128,15 @@ class FieldDiagnostics:
     #     shutil.rmtree(path)
         
 class BeamDiagnostics:
-    def __init__(self, t_start=0, t_end=None, period=100, 
+    def __init__(self, config, t_start=0, t_end=None, period=100, 
                  cl_mem = False, 
                  output_type = 'i f', img_format = 'png',
                  make_gif = False, gif_name=None):
         self.t_start = t_start
-        self.t_end = t_end 
+        if t_end is None:
+            self.t_end = config.getfloat('time-limit') 
+        else:
+            self.t_end = t_end 
         self.period = period 
         self.cl_mem = cl_mem 
         self.output_type = output_type
@@ -147,12 +150,12 @@ class BeamDiagnostics:
         xi_step = config.getfloat('xi-step')
         self.last_idx = int(config.getfloat('window-length')/xi_step) - 1
 
-    def dxi(self, t, layer_idx, \
-            plasma_particles, plasma_fields, rho_beam, \
-            beam):
+    def process(self, config, t, layer_idx, steps, \
+                plasma_particles, plasma_fields, rho_beam, \
+                beam_slice):
         if t<self.t_start or t>self.t_end:
             return
-        beam_slice = beam
+        beam_slice = beam_slice
         #lost_slice = beam[1]
         
             #self.lost[t] = np.array([],dtype=particle_dtype)
@@ -166,12 +169,15 @@ class BeamDiagnostics:
             #self.test[t].append(rho_beam.tolist())
             
 class PlasmaDiagnostics:
-    def __init__(self, t_start=0, t_end=None, period=100, 
+    def __init__(self, config, t_start=0, t_end=None, period=100, 
                  cl_mem = False, 
                  output_type = 'i f', img_format = 'png',
                  make_gif = False, gif_name=None):
         self.t_start = t_start
-        self.t_end = t_end 
+        if t_end is None:
+            self.t_end = config.getfloat('time-limit') 
+        else:
+            self.t_end = t_end       
         self.period = period 
         self.cl_mem = cl_mem 
         self.output_type = output_type
@@ -185,9 +191,9 @@ class PlasmaDiagnostics:
         xi_step = config.getfloat('xi-step')
         self.last_idx = int(config.getfloat('window-length')/xi_step) - 1
 
-    def dxi(self, t, layer_idx, \
-            plasma_particles, plasma_fields, rho_beam, \
-            beam):
+    def process(self, config, t, layer_idx, steps, \
+                plasma_particles, plasma_fields, rho_beam, \
+                beam_slice):
         if t<self.t_start or t>self.t_end:
             return
         
