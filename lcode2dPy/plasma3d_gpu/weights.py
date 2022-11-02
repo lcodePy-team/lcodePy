@@ -2,8 +2,6 @@
 import numba as numba
 import numba.cuda
 
-import cupy as cp
-
 from math import sqrt, floor
 
 WARP_SIZE = 32
@@ -172,59 +170,71 @@ def coarse_to_fine(
 
 # Deposition in case of the single plasma approach #
 
-@numba.cuda.jit
-def deposit_single_kernel(grid_steps, grid_step_size,
-                   x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
-                   out_ro, out_jx, out_jy, out_jz):
-    """
-    Deposit plasma particles onto the charge density and current grids.
-    """
-    k = numba.cuda.grid(1)
-    if k >= m.size:
-        return   
-    
-    # Deposit the resulting fine particle on ro/j grids.
-    gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
-    dro = q[k] / (1 - pz[k] / gamma_m)
-    djx = px[k] * (dro / gamma_m)
-    djy = py[k] * (dro / gamma_m)
-    djz = pz[k] * (dro / gamma_m)
+weight_cupy = """
+__device__ inline T weight(T x, int place) {
+    if (place == -2)
+        return (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) / 24.;
+    else if (place == -1)
+        return (
+            19 / 96. - 11 / 24. * x + x * x / 4. + x * x * x / 6. -
+            x * x * x * x / 6.
+        );
+    else if (place == 0)
+        return 115 / 192. - 5 / 8. * x * x + x * x * x * x / 4.;
+    else if (place == 1)
+        return (
+            19 / 96. + 11 / 24. * x + x * x / 4. - x * x * x / 6. -
+            x * x * x * x / 6.
+        );
+    else if (place == 2)
+        return (1 / 2. + x) * (1 / 2. + x) * (1 / 2. + x) * (1 / 2. + x) / 24.;
+    else
+        return 0.;
+}
+"""
 
-    x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
-    (i, j, 
-        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-        w2M0,  w1M0,  w00,  w1P0,  w2P0,
-        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-        w2M2M, w1M2M, w02M, w1P2M, w2P2M
-    ) = weights(
-        x, y, grid_steps, grid_step_size
+
+# TODO: Doesn't look very smart to get a kernel this way.
+def get_deposit_single_kernel_cupy():
+    import cupy as cp
+
+    return cp.ElementwiseKernel(
+        in_params="""
+        float64 grid_steps, float64 grid_step_size,
+        raw T x_init, raw T y_init, raw T x_offt, raw T y_offt,
+        raw T px, raw T py, raw T pz, raw T q, raw T m
+        """,
+        out_params='raw T out_ro, raw T out_jx, raw T out_jy, raw T out_jz',
+        operation="""
+        const T gamma_m = sqrt(
+            m[i]*m[i] + px[i]*px[i] + py[i]*py[i] + pz[i]*pz[i]);
+        const T dro = q[i] / (1 - pz[i] / gamma_m);
+        const T djx = px[i] * (dro / gamma_m);
+        const T djy = py[i] * (dro / gamma_m);
+        const T djz = pz[i] * (dro / gamma_m);
+
+        const T x_h = (x_init[i] + x_offt[i]) / (T) grid_step_size + 0.5;
+        const T y_h = (y_init[i] + y_offt[i]) / (T) grid_step_size + 0.5;
+        const T x_loc = x_h - floor(x_h) - 0.5;
+        const T y_loc = y_h - floor(y_h) - 0.5;
+        const int ix = floor(x_h) + floor(grid_steps / 2);
+        const int iy = floor(y_h) + floor(grid_steps / 2);
+
+        for (int kx = -2; kx <= 2; kx++) {
+            const T wx = weight(x_loc, kx);
+            for (int ky = -2; ky <= 2; ky++) {
+                const T w = wx * weight(y_loc, ky);
+                const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
+
+                atomicAdd(&out_ro[idx], dro * w);
+                atomicAdd(&out_jx[idx], djx * w);
+                atomicAdd(&out_jy[idx], djy * w);
+                atomicAdd(&out_jz[idx], djz * w);
+            }
+        }
+        """,
+        name='deposit_cupy', preamble=weight_cupy
     )
-    
-    deposit25(out_ro, i, j, dro,
-                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-    deposit25(out_jx, i, j, djx,
-                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-    deposit25(out_jy, i, j, djy,
-                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-    deposit25(out_jz, i, j, djz, 
-                w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                w2M2M, w1M2M, w02M, w1P2M, w2P2M)
 
 
 # Deposition in case of the dual plasma approach #
@@ -303,6 +313,8 @@ def get_deposit_func(dual_plasma_approach, grid_steps, grid_step_size,
     Check if a user set dual-plasma-approach to True or False and return
     the deposition function for the set approach.
     """
+    import cupy as cp
+    
     if dual_plasma_approach:
         def deposit_dual(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
                          const_arrays):
@@ -332,23 +344,24 @@ def get_deposit_func(dual_plasma_approach, grid_steps, grid_step_size,
         return deposit_dual
 
     else:
+        deposit_kernel_cupy = get_deposit_single_kernel_cupy()
+
         def deposit_single(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
                            const_arrays):
             """
             Deposit plasma particles onto the charge density and current grids.
             This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
             """   
-            ro = cp.zeros((grid_steps, grid_steps))
-            jx = cp.zeros((grid_steps, grid_steps))
-            jy = cp.zeros((grid_steps, grid_steps))
-            jz = cp.zeros((grid_steps, grid_steps))
+            ro = cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
+            jx = cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
+            jy = cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
+            jz = cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
 
-            cfg = int(cp.ceil(m.size / WARP_SIZE)), WARP_SIZE
-            deposit_single_kernel[cfg](
-                grid_steps, grid_step_size, x_init.ravel(), y_init.ravel(),
-                x_offt.ravel(), y_offt.ravel(), m.ravel(), q.ravel(), 
-                px.ravel(), py.ravel(), pz.ravel(), ro, jx, jy, jz)
+            return deposit_kernel_cupy(
+                grid_steps, grid_step_size,
+                x_init, y_init, x_offt, y_offt,
+                px, py, pz, q, m, ro, jx, jy, jz,
+                size=m.size
+            )
 
-            return ro, jx, jy, jz
-        
         return deposit_single
