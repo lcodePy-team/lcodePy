@@ -3,18 +3,13 @@ from ..config.config import Config
 from .data import GPUArrays
 from .fields import FieldComputer
 from .move import ParticleMover
-from .rhoj import RhoJComputer_single, RhoJComputer_dual
+from .rhoj import RhoJComputer
 
 class Plane2d3vPlasmaSolver(object):
     def __init__(self, config: Config):
         self.FComputer = FieldComputer(config)
         self.PMover = ParticleMover(config)
-
-        dual_plasma_approach = config.getbool('dual-plasma-approach')
-        if dual_plasma_approach == False:
-            self.CComputer = RhoJComputer_single(config)
-        else:
-            self.CComputer = RhoJComputer_dual(config)
+        self.CComputer = RhoJComputer(config)
 
     # Perfoms one full step along xi.
     # To understand the numerical scheme, read values as following:

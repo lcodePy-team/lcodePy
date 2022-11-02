@@ -4,7 +4,7 @@ import cupy as cp
 
 from ..config.config import Config
 from .data import GPUArrays
-from .weights import initial_deposition
+from .weights import get_deposit_func
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -101,7 +101,7 @@ def make_plasma_grid(steps, step_size, fineness):
     return plasma_grid
 
 
-def make_plasma(steps, cell_size, fineness=2):
+def make_plasma_single(steps, cell_size, fineness=2):
     """
     Initialize default plasma state, fineness**2 particles per cell.
     """
@@ -123,6 +123,142 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
+# Coarse and fine plasma particles initialization #
+
+def make_coarse_plasma_grid(steps, step_size, coarseness):
+    """
+    Create initial coarse plasma particles coordinates
+    (a single 1D grid for both x and y).
+    """
+    assert coarseness == int(coarseness)  # TODO: why?
+    plasma_step = step_size * coarseness
+    right_half = np.arange(steps // (coarseness * 2)) * plasma_step
+    left_half = -right_half[:0:-1]  # invert, reverse, drop zero
+    plasma_grid = np.concatenate([left_half, right_half])
+    assert(np.array_equal(plasma_grid, -plasma_grid[::-1]))
+    return plasma_grid
+
+
+def make_fine_plasma_grid(steps, step_size, fineness):
+    """
+    Create initial fine plasma particles coordinates
+    (a single 1D grid for both x and y).
+    Avoids positioning particles at the cell edges and boundaries, example:
+    `fineness=3` (and `coarseness=2`):
+        +-----------+-----------+-----------+-----------+
+        | .   .   . | .   .   . | .   .   . | .   .   . |
+        |           |           |           |           |   . - fine particle
+        | .   .   . | .   *   . | .   .   . | .   *   . |
+        |           |           |           |           |   * - coarse particle
+        | .   .   . | .   .   . | .   .   . | .   .   . |
+        +-----------+-----------+-----------+-----------+
+    `fineness=2` (and `coarseness=2`):
+        +-------+-------+-------+-------+-------+
+        | .   . | .   . | .   . | .   . | .   . |           . - fine particle
+        |       |   *   |       |   *   |       |
+        | .   . | .   . | .   . | .   . | .   . |           * - coarse particle
+        +-------+-------+-------+-------+-------+
+    """
+    assert fineness == int(fineness)
+    plasma_step = step_size / fineness
+    if fineness % 2:  # some on zero axes, none on cell corners
+        right_half = np.arange(steps // 2 * fineness) * plasma_step
+        left_half = -right_half[:0:-1]  # invert, reverse, drop zero
+    else:  # none on zero axes, none on cell corners
+        right_half = (.5 + np.arange(steps // 2 * fineness)) * plasma_step
+        left_half = -right_half[::-1]  # invert, reverse
+    plasma_grid = np.concatenate([left_half, right_half])
+    assert(np.array_equal(plasma_grid, -plasma_grid[::-1]))
+    return plasma_grid
+
+
+def make_plasma_dual(steps, cell_size, coarseness=2, fineness=2):
+    """
+    Make coarse plasma initial state arrays and the arrays needed to intepolate
+    coarse plasma into fine plasma (`virt_params`).
+    Coarse is the one that will evolve and fine is the one to be bilinearly
+    interpolated from the coarse one based on the initial positions
+    (using 1 to 4 coarse plasma particles that initially were the closest).
+    """
+    coarse_step = cell_size * coarseness
+
+    # Make two initial grids of plasma particles, coarse and fine.
+    # Coarse is the one that will evolve and fine is the one to be bilinearly
+    # interpolated from the coarse one based on the initial positions.
+
+    coarse_grid = make_coarse_plasma_grid(steps, cell_size, coarseness)
+    coarse_grid_xs, coarse_grid_ys = coarse_grid[:, None], coarse_grid[None, :]
+
+    fine_grid = make_fine_plasma_grid(steps, cell_size, fineness)
+
+    Nc = len(coarse_grid)
+
+    # Create plasma electrons on the coarse grid, the ones that really move
+    coarse_x_init = cp.broadcast_to(cp.asarray(coarse_grid_xs), (Nc, Nc))
+    coarse_y_init = cp.broadcast_to(cp.asarray(coarse_grid_ys), (Nc, Nc))
+    coarse_x_offt = cp.zeros((Nc, Nc))
+    coarse_y_offt = cp.zeros((Nc, Nc))
+    coarse_px = cp.zeros((Nc, Nc))
+    coarse_py = cp.zeros((Nc, Nc))
+    coarse_pz = cp.zeros((Nc, Nc))
+    coarse_m = cp.ones((Nc, Nc)) * ELECTRON_MASS * coarseness**2
+    coarse_q = cp.ones((Nc, Nc)) * ELECTRON_CHARGE * coarseness**2
+
+    # Calculate indices for coarse -> fine bilinear interpolation
+
+    # Neighbour indices array, 1D, same in both x and y direction.
+    indices = np.searchsorted(coarse_grid, fine_grid)
+    # example:
+    #     coarse:  [-2., -1.,  0.,  1.,  2.]
+    #     fine:    [-2.4, -1.8, -1.2, -0.6,  0. ,  0.6,  1.2,  1.8,  2.4]
+    #     indices: [ 0  ,  1  ,  1  ,  2  ,  2  ,  3  ,  4  ,  4  ,  5 ]
+    # There is no coarse particle with index 5, so clip it to 4:
+    indices_next = np.clip(indices, 0, Nc - 1)  # [0, 1, 1, 2, 2, 3, 4, 4, 4]
+    # Clip to zero for indices of prev particles as well:
+    indices_prev = np.clip(indices - 1, 0, Nc - 1)  # [0, 0, 0, 1 ... 3, 3, 4]
+    # mixed from: [ 0&0 , 0&1 , 0&1 , 1&2 , 1&2 , 2&3 , 3&4 , 3&4, 4&4 ]
+
+    # Calculate weights for coarse->fine interpolation from initial positions.
+    # The further the fine particle is from closest right coarse particles,
+    # the more influence the left ones have.
+    influence_prev = (coarse_grid[indices_next] - fine_grid) / coarse_step
+    influence_next = (fine_grid - coarse_grid[indices_prev]) / coarse_step
+    # Fix for boundary cases of missing cornering particles.
+    influence_prev[indices_next == 0] = 0   # nothing on the left?
+    influence_next[indices_next == 0] = 1   # use right
+    influence_next[indices_prev == Nc - 1] = 0  # nothing on the right?
+    influence_prev[indices_prev == Nc - 1] = 1  # use left
+    # Same arrays are used for interpolating in y-direction.
+
+    # The virtualization formula is thus
+    # influence_prev[pi] * influence_prev[pj] * <bottom-left neighbour value> +
+    # influence_prev[pi] * influence_next[nj] * <top-left neighbour value> +
+    # influence_next[ni] * influence_prev[pj] * <bottom-right neighbour val> +
+    # influence_next[ni] * influence_next[nj] * <top-right neighbour value>
+    # where pi, pj are indices_prev[i], indices_prev[j],
+    #       ni, nj are indices_next[i], indices_next[j] and
+    #       i, j are indices of fine virtual particles
+
+    # This is what is employed inside mix() and deposit_kernel().
+
+    # An equivalent formula would be
+    # inf_prev[pi] * (inf_prev[pj] * <bot-left> + inf_next[nj] * <bot-right>) +
+    # inf_next[ni] * (inf_prev[pj] * <top-left> + inf_next[nj] * <top-right>)
+
+    # Values of m, q, px, py, pz should be scaled by 1/(fineness*coarseness)**2
+
+    virt_params = GPUArrays(
+        influence_prev=influence_prev, influence_next=influence_next,
+        indices_prev=indices_prev, indices_next=indices_next,
+        fine_grid=fine_grid,
+    )
+
+    return (
+        coarse_x_init, coarse_y_init, coarse_x_offt, coarse_y_offt,
+        coarse_px, coarse_py, coarse_pz, coarse_q, coarse_m, virt_params
+    )
+
+
 def init_plasma(config: Config):
     """
     Initialize all the arrays needed (for what?).
@@ -133,6 +269,7 @@ def init_plasma(config: Config):
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getint('plasma-fineness')
     solver_trick          = config.getint('field-solver-subtraction-trick')
+    dual_plasma_approach  = config.getbool('dual-plasma-approach')
 
     # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
@@ -143,21 +280,54 @@ def init_plasma(config: Config):
                         "Details: 'reflect_padding_steps' must be bigger than" +
                         " 2. By default it is 5.")
 
-    x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
-        make_plasma(grid_steps - plasma_padding_steps * 2,
-                    grid_step_size,
-                    fineness=plasma_fineness)
+    if dual_plasma_approach:
+        plasma_coarseness = config.getint('plasma-coarseness')
 
-    ro_initial = initial_deposition(grid_steps, grid_step_size,
-                                    x_init, y_init, x_offt, y_offt,
-                                    px, py, pz, m, q)
+        # virtual particles should not reach the window pre-boundary cells
+        assert reflect_padding_steps > plasma_coarseness + 1
+        # TODO: The (costly) alternative is to reflect after plasma virtualization,
+        #       but it's better for stabitily, or is it?
+
+        x_init, y_init, x_offt, y_offt, px, py, pz, q, m, virt_params = \
+            make_plasma_dual(
+                grid_steps - plasma_padding_steps * 2, grid_step_size,
+                coarseness=plasma_coarseness, fineness=plasma_fineness)
+    else:
+        plasma_coarseness, virt_params = None, None
+
+        x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
+            make_plasma_single(
+                grid_steps - plasma_padding_steps * 2, grid_step_size,
+                fineness=plasma_fineness)
+
+    # Determine the background ion charge density by depositing the electrons
+    # with their initial parameters and negating the result.
+    initial_deposition = get_deposit_func(
+        dual_plasma_approach, grid_steps, grid_step_size, plasma_coarseness,
+        plasma_fineness)
+
+    ro_electrons_initial, _, _, _ = initial_deposition(
+        x_init, y_init, x_offt, y_offt, px, py, pz, q, m, virt_params)
+    ro_initial = -ro_electrons_initial
+
     dir_matrix = dirichlet_matrix(grid_steps, grid_step_size)
     mix_matrix = mixed_matrix(grid_steps, grid_step_size, solver_trick)
     neu_matrix = neumann_matrix(grid_steps, grid_step_size)
 
-    const_arrays = GPUArrays(ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
-                             field_mixed_matrix=mix_matrix,
-                             neumann_matrix=neu_matrix)
+    if dual_plasma_approach:
+        const_arrays = GPUArrays(
+            ro_initial=ro_initial, dirichlet_matrix=dir_matrix, 
+            field_mixed_matrix=mix_matrix, neumann_matrix=neu_matrix,
+            influence_prev=virt_params.influence_prev,
+            influence_next=virt_params.influence_next,
+            indices_prev=virt_params.indices_prev,
+            indices_next=virt_params.indices_next,
+            fine_grid=virt_params.fine_grid)
+    else:
+        const_arrays = GPUArrays(
+            ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
+            field_mixed_matrix=mix_matrix,
+            neumann_matrix=neu_matrix)
 
     def zeros():
         return cp.zeros((grid_steps, grid_steps), dtype=cp.float64)
@@ -172,15 +342,11 @@ def init_plasma(config: Config):
 
     currents = GPUArrays(ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
 
-    const_arrays = GPUArrays(ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
-                             field_mixed_matrix=mix_matrix,
-                             neumann_matrix=neu_matrix)
-
     return fields, particles, currents, const_arrays
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents, const_arrays = init_plasma(config)
+    _, _, _, const_arrays = init_plasma(config)
 
     with np.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
@@ -197,3 +363,4 @@ def load_plasma(config: Config, path_to_plasmastate: str):
                              jy=state['jy'], jz=state['jz'])
 
     return fields, particles, currents, const_arrays
+
