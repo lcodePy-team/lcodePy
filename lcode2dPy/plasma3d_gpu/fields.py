@@ -101,7 +101,7 @@ def mix2d(a):
 
 def dx_dy(arr, grid_step_size):
     """
-    Calculate x and y derivatives simultaneously (like np.gradient does).
+    Calculate x and y derivatives simultaneously (like cp.gradient does).
     NOTE: use gradient instead if available (cupy doesn't have gradient yet).
     NOTE: arrays are assumed to have zeros on the perimeter.
     """
