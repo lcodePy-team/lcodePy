@@ -345,7 +345,7 @@ def init_plasma(config: Config):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    _, _, _, const_arrays = init_plasma(config)
+    _, particles, _, const_arrays = init_plasma(config)
 
     with cp.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
