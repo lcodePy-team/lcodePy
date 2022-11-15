@@ -22,6 +22,7 @@ from ..plasma3d.initialization import load_plasma as load_plasma_cpu
 
 from ..push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
 from .. import beam3d_gpu as beam3d_gpu_module
+
 from ..plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
 from ..plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
 
@@ -81,17 +82,17 @@ class Cartesian3dSimulation:
 
         # Here we get information about the type of processing unit (CPU or GPU)
         pu_type = self.__config.get('processing-unit-type').lower()
-
+        
         if pu_type == 'cpu':
+            self.__beam_module = beam3d_cpu_module
             self.__push_solver = PushAndSolver3dCPU(self.__config)
             self.__init_plasma = init_plasma_cpu
             self.__load_plasma = load_plasma_cpu
-            self.__beam_module = beam3d_cpu_module
         elif pu_type == 'gpu':
+            self.__beam_module = beam3d_gpu_module
             self.__push_solver = PushAndSolver3dGPU(self.__config)
             self.__init_plasma = init_plasma_gpu
             self.__load_plasma = load_plasma_gpu
-            self.__beam_module = beam3d_gpu_module
 
         # Finally, we set the diagnostics.
         if type(self.diagnostics) != list and self.diagnostics is not None:

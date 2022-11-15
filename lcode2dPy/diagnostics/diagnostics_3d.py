@@ -95,8 +95,7 @@ class DiagnosticsFXi:
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(
-        # self, output_period=100, saving_xi_period=1000, f_xi='Ez',
-        self, output_period=100, f_xi='Ez',
+        self, output_period=100, saving_xi_period=100, f_xi='Ez',
         f_xi_type='numbers', axis_x=0, axis_y=0, auxiliary_x=0, auxiliary_y=1
     ):
         # It creates a list of string elements such as Ez, Ex, By...
@@ -119,7 +118,7 @@ class DiagnosticsFXi:
 
         # Set time periodicity of detailed output and safving into a file:
         self.__output_period = output_period
-        # self.__saving_xi_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period
 
         # We store data as a simple Python dictionary of lists for f(xi) data.
         # But I'm not sure this is the best way to handle data storing!
@@ -129,7 +128,7 @@ class DiagnosticsFXi:
     def __repr__(self):
         return (
             f"DiagnosticsFXi(output_period={self.__output_period}, " +
-            # f"saving_xi_period={self.__saving_xi_period}, " + 
+            f"saving_xi_period={self.__saving_xi_period}, " + 
             f"f_xi='{','.join(self.__f_xi_names)}', " +
             f"f_xi_type='{self.__f_xi_type}', " +
             f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
@@ -157,8 +156,8 @@ class DiagnosticsFXi:
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
 
-        # if self.__saving_xi_period < self.__xi_step_size:
-        #     self.__saving_xi_period = self.__xi_step_size
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
 
         if self.__output_period % self.__time_step_size != 0:
             raise Exception(
@@ -199,8 +198,8 @@ class DiagnosticsFXi:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time)
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+            self.dump(current_time)
 
     def conditions_check(self, current_time, xi_pl_layer):
         return current_time % self.__output_period == 0
@@ -238,8 +237,7 @@ class DiagnosticsColormaps:
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(
-        # self, output_period=100, saving_xi_period=1000, colormaps='Ez',
-        self, output_period=100, colormaps='Ez',
+        self, output_period=100, saving_xi_period=1000, colormaps='Ez',
         colormaps_type='numbers', xi_from=inf, xi_to=-inf, r_from=-inf, r_to=inf,
         output_merging_r: int=1, output_merging_xi: int=1
     ):
@@ -258,7 +256,7 @@ class DiagnosticsColormaps:
 
         # Set time periodicity of detailed output:
         self.__output_period = output_period
-        # self.__saving_xi_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period
 
         # Set borders of a subwindow:
         self.__xi_from, self.__xi_to = xi_from, xi_to
@@ -356,8 +354,8 @@ class DiagnosticsColormaps:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time)
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+            self.dump(current_time)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
