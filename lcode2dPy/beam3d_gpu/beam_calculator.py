@@ -1,5 +1,6 @@
 import cupy as cp
 import numba
+import numba.cuda
 
 from math import floor, sqrt
 
