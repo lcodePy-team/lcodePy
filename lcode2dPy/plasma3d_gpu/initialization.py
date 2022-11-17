@@ -3,7 +3,7 @@ import cupy as cp
 
 from ..config.config import Config
 from .data import GPUArrays
-from .weights import get_deposit_func
+from .weights import get_deposit_plasma
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -301,7 +301,7 @@ def init_plasma(config: Config):
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
-    initial_deposition = get_deposit_func(
+    initial_deposition = get_deposit_plasma(
         dual_plasma_approach, grid_steps, grid_step_size, plasma_coarseness,
         plasma_fineness)
 

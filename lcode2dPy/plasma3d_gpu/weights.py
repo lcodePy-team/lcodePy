@@ -2,7 +2,7 @@
 
 # Helper function for dual plasma approach #
 
-def get_coarse_to_fine_func():
+def get_coarse_to_fine_cupy():
     import cupy as cp
 
     return cp.ElementwiseKernel(
@@ -60,8 +60,8 @@ def get_coarse_to_fine_func():
 
 # Deposition and interpolation helper function #
 
-weight_cupy = """
-__device__ inline T weight(T x, int place) {
+weight4_cupy = """
+__device__ inline T weight4(T x, int place) {
     if (place == -2)
         return (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) / 24.;
     else if (place == -1)
@@ -84,7 +84,7 @@ __device__ inline T weight(T x, int place) {
 """
 
 
-def get_deposit_single_kernel_cupy():
+def get_deposit_plasma_cupy():
     import cupy as cp
 
     return cp.ElementwiseKernel(
@@ -107,9 +107,9 @@ def get_deposit_single_kernel_cupy():
         const int iy = floor(y_h[i]) + floor(grid_steps / 2);
 
         for (int kx = -2; kx <= 2; kx++) {
-            const T wx = weight(x_loc, kx);
+            const T wx = weight4(x_loc, kx);
             for (int ky = -2; ky <= 2; ky++) {
-                const T w = wx * weight(y_loc, ky);
+                const T w = wx * weight4(y_loc, ky);
                 const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
                 atomicAdd(&out_ro[idx], dro * w);
@@ -119,22 +119,22 @@ def get_deposit_single_kernel_cupy():
             }
         }
         """,
-        name='deposit_cupy', preamble=weight_cupy
+        name='deposit_plasma_cupy', preamble=weight4_cupy
     )
 
 
-def get_deposit_func(dual_plasma_approach, grid_steps, grid_step_size,
-                     plasma_coarseness, plasma_fineness):
+def get_deposit_plasma(dual_plasma_approach, grid_steps, grid_step_size,
+                       plasma_coarseness, plasma_fineness):
     """
     Check if a user set dual-plasma-approach to True or False and return
     the deposition function for the set approach.
     """
     import cupy as cp
 
-    deposit_kernel_cupy = get_deposit_single_kernel_cupy()
+    deposit_plasma_cupy = get_deposit_plasma_cupy()
     
     if dual_plasma_approach:
-        coarse_to_fine = get_coarse_to_fine_func()
+        coarse_to_fine = get_coarse_to_fine_cupy()
 
         def deposit_dual(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
                          const_arrays):
@@ -174,7 +174,7 @@ def get_deposit_func(dual_plasma_approach, grid_steps, grid_step_size,
             x_h = x_fine / grid_step_size + 0.5
             y_h = y_fine / grid_step_size + 0.5
 
-            return deposit_kernel_cupy(
+            return deposit_plasma_cupy(
                 grid_steps, x_h, y_h, px_fine, py_fine, pz_fine,
                 q_fine, m_fine, ro, jx, jy, jz, size=fine_grid_size**2
             )
@@ -196,8 +196,9 @@ def get_deposit_func(dual_plasma_approach, grid_steps, grid_step_size,
             x_h = (x_init + x_offt) / grid_step_size + 0.5
             y_h = (y_init + y_offt) / grid_step_size + 0.5
 
-            return deposit_kernel_cupy(
-                grid_steps, x_h, y_h, px, py, pz, q, m, ro, jx, jy, jz, size=m.size
+            return deposit_plasma_cupy(
+                grid_steps, x_h, y_h, px, py, pz, q, m, ro, jx, jy, jz,
+                size=m.size
             )
 
         return deposit_single

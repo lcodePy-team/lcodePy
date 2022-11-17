@@ -1,6 +1,6 @@
 """Module for calculation of particles movement and interpolation of fields on particles positions."""
 from ..config.config import Config
-from .weights import weight_cupy
+from .weights import weight4_cupy
 from .data import GPUArrays
 
 
@@ -38,9 +38,9 @@ def get_move_smart_kernel_cupy():
 
         T Ex = 0, Ey = 0, Ez = 0, Bx = 0, By = 0, Bz = 0;
         for (int kx = -2; kx <= 2; kx++) {
-            const double wx = weight(x_loc, kx);
+            const double wx = weight4(x_loc, kx);
             for (int ky = -2; ky <= 2; ky++) {
-                const double w = wx * weight(y_loc, ky);
+                const double w = wx * weight4(y_loc, ky);
                 const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
                 Ex += Ex_avg[idx] * w; Bx += Bx_avg[idx] * w;
@@ -100,7 +100,7 @@ def get_move_smart_kernel_cupy():
         out_px[i] = px; out_py[i] = py; out_pz[i] = pz;
 
         """,
-        name='move_smart_cupy', preamble=weight_cupy
+        name='move_smart_cupy', preamble=weight4_cupy
     )
 
 

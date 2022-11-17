@@ -1,7 +1,7 @@
 """Routine to compute charge density and currents of particles."""
 from ..config.config import Config
 from .data import GPUArrays
-from .weights import get_deposit_func
+from .weights import get_deposit_plasma
 
 class RhoJComputer(object):
     def __init__(self, config: Config):
@@ -15,12 +15,12 @@ class RhoJComputer(object):
         else:
             self.plasma_coarseness = None
         
-        self.deposit_func = get_deposit_func(
+        self.deposit = get_deposit_plasma(
             dual_plasma_approach, self.grid_steps, self.grid_step_size,
             self.plasma_coarseness, self.plasma_fineness)
 
     def compute_rhoj(self, particles: GPUArrays, const_arrays: GPUArrays):
-        ro, jx, jy, jz = self.deposit_func(
+        ro, jx, jy, jz = self.deposit(
             particles.x_init, particles.y_init,
             particles.x_offt, particles.y_offt,
             particles.px, particles.py, particles.pz,
