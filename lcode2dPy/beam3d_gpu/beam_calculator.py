@@ -6,6 +6,7 @@ from math import floor, sqrt
 
 from ..config.config import Config
 from .data import BeamParticles
+from .weights import get_deposit_beam
 
 WARP_SIZE = 32
 
@@ -47,60 +48,6 @@ def weights(x, y, xi_loc, grid_steps, grid_step_size):
 
 
 # Deposition and field interpolation #
-
-@numba.cuda.jit
-def deposit_kernel(grid_steps, grid_step_size,
-                   x, y, xi_loc, q_norm,
-                   rho_layout_0, rho_layout_1):
-    """
-    Deposit beam particles onto the charge density grids.
-    """
-    k = numba.cuda.grid(1)
-    if k >= q_norm.size:
-        return
-
-    # Calculate the weights for a particle
-    (i, j,
-    w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-    wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
-    ) = weights(
-        x[k], y[k], xi_loc[k], grid_steps, grid_step_size
-    )
-
-    numba.cuda.atomic.add(rho_layout_0, (i - 1, j + 1), q_norm[k] * w0MP)
-    numba.cuda.atomic.add(rho_layout_0, (i + 0, j + 1), q_norm[k] * w00P)
-    numba.cuda.atomic.add(rho_layout_0, (i + 1, j + 1), q_norm[k] * w0PP)
-    numba.cuda.atomic.add(rho_layout_0, (i - 1, j + 0), q_norm[k] * w0M0)
-    numba.cuda.atomic.add(rho_layout_0, (i + 0, j + 0), q_norm[k] * w000)
-    numba.cuda.atomic.add(rho_layout_0, (i + 1, j + 0), q_norm[k] * w0P0)
-    numba.cuda.atomic.add(rho_layout_0, (i - 1, j - 1), q_norm[k] * w0MM)
-    numba.cuda.atomic.add(rho_layout_0, (i + 0, j - 1), q_norm[k] * w00M)
-    numba.cuda.atomic.add(rho_layout_0, (i + 1, j - 1), q_norm[k] * w0PM)
-
-    numba.cuda.atomic.add(rho_layout_1, (i - 1, j + 1), q_norm[k] * wPMP)
-    numba.cuda.atomic.add(rho_layout_1, (i + 0, j + 1), q_norm[k] * wP0P)
-    numba.cuda.atomic.add(rho_layout_1, (i + 1, j + 1), q_norm[k] * wPPP)
-    numba.cuda.atomic.add(rho_layout_1, (i - 1, j + 0), q_norm[k] * wPM0)
-    numba.cuda.atomic.add(rho_layout_1, (i + 0, j + 0), q_norm[k] * wP00)
-    numba.cuda.atomic.add(rho_layout_1, (i + 1, j + 0), q_norm[k] * wPP0)
-    numba.cuda.atomic.add(rho_layout_1, (i - 1, j - 1), q_norm[k] * wPMM)
-    numba.cuda.atomic.add(rho_layout_1, (i + 0, j - 1), q_norm[k] * wP0M)
-    numba.cuda.atomic.add(rho_layout_1, (i + 1, j - 1), q_norm[k] * wPPM)
-
-
-def deposit(grid_steps, grid_step_size,
-            x, y, xi_loc, q_norm,
-            rho_layout_0, rho_layout_1):
-    """
-    Deposit beam particles onto the charge density grid.
-    This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
-    """
-    cfg = int(cp.ceil(q_norm.size / WARP_SIZE)), WARP_SIZE
-    deposit_kernel[cfg](grid_steps, grid_step_size,
-                        x.ravel(), y.ravel(),
-                        xi_loc.ravel(), q_norm.ravel(),
-                        rho_layout_0, rho_layout_1)
-
 
 @numba.njit
 def interp(value_0, value_1, i, j,
@@ -359,6 +306,9 @@ class BeamCalculator:
         max_radius = self.grid_step_size * self.grid_steps / 2
         self.lost_radius = max(0.9 * max_radius, max_radius - 1) # or just max_radius?
 
+        self.deposit = get_deposit_beam(
+            self.grid_steps, self.grid_step_size, self.xi_step_size)
+
     # Helper functions for one time step cicle:
 
     def start_time_step(self):
@@ -376,13 +326,9 @@ class BeamCalculator:
                                     dtype=cp.float64)
 
         if beam_layer.id.size != 0:
-            xi_plasma_layer = - self.xi_step_size * plasma_layer_idx
-
-            dxi = (xi_plasma_layer - beam_layer.xi) / self.xi_step_size
-            deposit(self.grid_steps, self.grid_step_size,
-                    beam_layer.x, beam_layer.y, dxi,
-                    beam_layer.q_norm,
-                    self.rho_layout, rho_layout)
+            self.deposit(
+                plasma_layer_idx, beam_layer.x, beam_layer.y, beam_layer.xi,
+                beam_layer.q_norm, self.rho_layout, rho_layout)
 
         self.rho_layout, rho_layout = rho_layout, self.rho_layout
         rho_layout /= self.grid_step_size ** 2
