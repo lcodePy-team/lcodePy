@@ -223,7 +223,7 @@ def calculate_Bz(grid_step_size, const, currents):
     return Bz
 
 
-class FieldComputer(object):
+def getFieldComputer(config: Config):
     """
     Class to store some parameters for fields computing.
 
@@ -237,20 +237,17 @@ class FieldComputer(object):
         Plane grid step size.
 
     """
-    def __init__(self, config: Config):
-        self.grid_step_size = config.getfloat('window-width-step-size')
-        self.xi_step_size = config.getfloat('xi-step')
-        self.trick = config.getfloat('field-solver-subtraction-trick')
-        self.variant_A = config.getbool('field-solver-variant-A')
+    grid_step_size = config.getfloat('window-width-step-size')
+    xi_step_size = config.getfloat('xi-step')
 
     def compute_fields(
-        self, fields, fields_prev, const, rho_beam_full, rho_beam_prev,
+        fields, fields_prev, const, rho_beam_full, rho_beam_prev,
         currents_prev, currents_full
     ):
         # Looks terrible! TODO: rewrite this function entirely
 
         Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By(
-            self.grid_step_size, self.xi_step_size, const, fields,
+            grid_step_size, xi_step_size, const, fields,
             rho_beam_full, rho_beam_prev, currents_full, currents_prev
         )
 
@@ -259,8 +256,8 @@ class FieldComputer(object):
         Bx_full = 2 * Bx_half - fields_prev.Bx
         By_full = 2 * By_half - fields_prev.By
 
-        Ez_full = calculate_Ez(self.grid_step_size, const, currents_full)
-        Bz_full = calculate_Bz(self.grid_step_size, const, currents_full)
+        Ez_full = calculate_Ez(grid_step_size, const, currents_full)
+        Bz_full = calculate_Bz(grid_step_size, const, currents_full)
         Phi = calculate_Phi(const, currents_full)
 
         fields_full = GPUArrays(
@@ -279,3 +276,5 @@ class FieldComputer(object):
         )
 
         return fields_full, fields_half
+
+    return compute_fields
