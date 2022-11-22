@@ -156,9 +156,15 @@ def get_move_wo_fields_kernel_cupy():
     )
 
 
-def get_move_smart_func(xi_step_size, reflect_boundary, grid_step_size,
-                        grid_steps):
+def getParticleMover(config: Config):
     import cupy as cp
+
+    xi_step_size          = config.getfloat('xi-step')
+    reflect_padding_steps = config.getint('reflect-padding-steps')
+    grid_step_size   = config.getfloat('window-width-step-size')
+    grid_steps       = config.getint('window-width-steps')
+    reflect_boundary = grid_step_size * (
+        grid_steps / 2 - reflect_padding_steps)
 
     move_smart_kernel_cupy = get_move_smart_kernel_cupy()
 
@@ -221,17 +227,3 @@ def get_move_smart_func(xi_step_size, reflect_boundary, grid_step_size,
                         q=particles.q, m=particles.m)
 
     return move_smart, move_wo_fields
-
-
-class ParticleMover:
-    def __init__(self, config: Config):
-        xi_step_size          = config.getfloat('xi-step')
-        reflect_padding_steps = config.getint('reflect-padding-steps')
-        grid_step_size   = config.getfloat('window-width-step-size')
-        grid_steps       = config.getint('window-width-steps')
-        reflect_boundary = grid_step_size * (
-            grid_steps / 2 - reflect_padding_steps)
-
-        self.move_particles, self.move_particles_wo_fields =\
-            get_move_smart_func(xi_step_size, reflect_boundary, grid_step_size,
-                                grid_steps)
