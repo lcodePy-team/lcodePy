@@ -130,7 +130,7 @@ class Cartesian3dSimulation:
         else:
             # Initializes a plasma state:
             pl_fields, pl_particles, pl_currents, pl_const_arrays =\
-                self.__init_plasma(self.__config)
+                self.__init_plasma(self.__config, self.current_time)
 
         return pl_fields, pl_particles, pl_currents, pl_const_arrays
 

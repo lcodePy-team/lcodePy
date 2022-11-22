@@ -258,7 +258,11 @@ def make_plasma_dual(steps, cell_size, coarseness=2, fineness=2):
     )
 
 
-def init_plasma(config: Config):
+def change_by_plasma_zshape(config, current_time, q, m):
+    return q, m
+
+
+def init_plasma(config: Config, current_time=0):
     """
     Initialize all the arrays needed (for what?).
     """
@@ -298,6 +302,10 @@ def init_plasma(config: Config):
             make_plasma_single(
                 grid_steps - plasma_padding_steps * 2, grid_step_size,
                 fineness=plasma_fineness)
+
+    # Here we change q and m arrays of plasma particles according to
+    # set plasma_zhape:
+    q, m = change_by_plasma_zshape(config, current_time, q, m)
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
@@ -345,7 +353,7 @@ def init_plasma(config: Config):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    _, particles, _, const_arrays = init_plasma(config)
+    _, _, _, const_arrays = init_plasma(config)
 
     with cp.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
@@ -353,8 +361,8 @@ def load_plasma(config: Config, path_to_plasmastate: str):
                            By=state['By'], Bz=state['Bz'],
                            Phi=state['Phi'])
 
-        particles = GPUArrays(x_init=particles.x_init, y_init=particles.y_init,
-                              q=particles.q, m=particles.m,
+        particles = GPUArrays(x_init=state['x_init'], y_init=state['y_init'],
+                              q=state['q'], m=state['m'],
                               x_offt=state['x_offt'], y_offt=state['y_offt'],
                               px=state['px'], py=state['py'], pz=state['pz'])
 

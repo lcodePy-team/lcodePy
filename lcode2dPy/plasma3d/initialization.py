@@ -122,7 +122,7 @@ def make_plasma(steps, cell_size, fineness=2):
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
 
-def init_plasma(config: Config):
+def init_plasma(config: Config, current_time=0):
     """
     Initialize all the arrays needed (for what?).
     """
@@ -175,7 +175,11 @@ def load_plasma(config: Config, path_to_plasmastate: str):
              state['Bx'], state['By'], state['Bz']
         fields.Phi = state['Phi']
 
-        particles.x_offt, particles.x_offt =\
+        particles.x_init, particles.y_init =\
+            state['x_init'], state['y_init']
+        particles.q, particles.m =\
+            state['q'], state['m']
+        particles.x_offt, particles.y_offt =\
             state['x_offt'], state['y_offt']
         particles.px, particles.py, particles.pz =\
             state['px'], state['py'], state['pz']

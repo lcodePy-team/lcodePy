@@ -565,6 +565,8 @@ class SaveRunState:
 
                 np.savez_compressed(
                     file=f'./run_states/plasmastate_{current_time:08.2f}',
+                    x_init=pl_particles.x_init, y_init=pl_particles.y_init,
+                    q=pl_particles.q, m=pl_particles.m,
                     x_offt=pl_particles.x_offt, y_offt=pl_particles.y_offt,
                     px=pl_particles.px, py=pl_particles.py, pz=pl_particles.pz,
                     Ex=pl_fields.Ex, Ey=pl_fields.Ey, Ez=pl_fields.Ez,
