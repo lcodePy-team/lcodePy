@@ -1,4 +1,4 @@
-"""Module for weights calculation, interpolation and deposition routines."""
+"""Module for weights calculation and deposition routines."""
 
 # Calculate the weights for a particle
 
