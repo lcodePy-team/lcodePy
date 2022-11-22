@@ -258,7 +258,43 @@ def make_plasma_dual(steps, cell_size, coarseness=2, fineness=2):
     )
 
 
-def change_by_plasma_zshape(config, current_time, q, m):
+# TODO: when more zshapes are created, move this fun to a separate file.
+def change_by_plasma_zshape(config: Config, current_time, q, m):
+    # Get required parameters:
+    time_step_size = config.getfloat('time-step')
+    plasma_zshape  = config.get('plasma-zshape')
+    time_middle = current_time - time_step_size / 2 # Just like in lcode2d
+
+    # Check if plasma_zshape is empty and nothing should be done with q and m
+    if plasma_zshape.isspace():
+        return q, m
+
+    # List comprehension to create an array that is easy to handle
+    lines = [line.split() for line in plasma_zshape.splitlines()
+             if len(line) != 0] # without empty lines
+
+    # TODO: Do we need to check ValueError?
+    for line in lines:
+        # Check if time_middle lies in one of the regions:
+        if time_middle < float(line[0]):
+            if line[2] == 'L': # Only linear rise/decrease is implemented now
+                coef = (float(line[1]) * (float(line[0]) - time_middle) +
+                        float(line[3]) * time_middle) / float(line[0])
+                if coef >= 0:
+                    return q * coef, m * coef
+                else:
+                    print('A density that is < 0 is not available, ' +
+                          'a density of 1 is assumed.')
+                    break
+            else:
+                print(line[2], 'segment shape is not available, a density ' +
+                      'of 1 is assumed.')
+                break
+        else:
+            time_middle -= float(line[0])
+
+    # If the total length is too small, hence we finished the loop above,
+    # or we broke from the loop, a density of 1 is assumed:
     return q, m
 
 
@@ -370,4 +406,3 @@ def load_plasma(config: Config, path_to_plasmastate: str):
                              jy=state['jy'], jz=state['jz'])
 
     return fields, particles, currents, const_arrays
-
