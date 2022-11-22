@@ -1,10 +1,9 @@
 """Module for plasma (3d solver) initialization routines."""
-import numpy as np
 import cupy as cp
 
 from ..config.config import Config
 from .data import GPUArrays
-from .weights import get_deposit_func
+from .weights import get_deposit_plasma
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -20,8 +19,8 @@ def dirichlet_matrix(grid_steps, grid_step_size):
     """
     # mul[i, j] = 1 / (lam[i] + lam[j])
     # lam[k] = 4 / h**2 * sin(k * pi * h / (2 * L))**2, where L = h * (N - 1)
-    k = np.arange(1, grid_steps - 1)
-    lam = 4 / grid_step_size**2 * np.sin(k * np.pi / (2 * (grid_steps - 1)))**2
+    k = cp.arange(1, grid_steps - 1)
+    lam = 4 / grid_step_size**2 * cp.sin(k * cp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = lam[:, None], lam[None, :]
     mul = 1 / (lambda_i + lambda_j)
     return mul / (2 * (grid_steps - 1))**2  # additional 2xDST normalization
@@ -39,9 +38,9 @@ def mixed_matrix(grid_steps, grid_step_size, subtraction_trick):
     # mul[i, j] = 1 / (lam[i] + lam[j])
     # lam[k] = 4 / h**2 * sin(k * pi * h / (2 * L))**2, where L = h * (N - 1)
     # but k for lam_i spans from 1..N-2, while k for lam_j covers 0..N-1
-    ki, kj = np.arange(1, grid_steps - 1), np.arange(grid_steps)
-    li = 4 / grid_step_size**2 * np.sin(ki * np.pi / (2 * (grid_steps - 1)))**2
-    lj = 4 / grid_step_size**2 * np.sin(kj * np.pi / (2 * (grid_steps - 1)))**2
+    ki, kj = cp.arange(1, grid_steps - 1), cp.arange(grid_steps)
+    li = 4 / grid_step_size**2 * cp.sin(ki * cp.pi / (2 * (grid_steps - 1)))**2
+    lj = 4 / grid_step_size**2 * cp.sin(kj * cp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = li[:, None], lj[None, :]
     mul = 1 / (lambda_i + lambda_j + (1 if subtraction_trick else 0))
     return mul / (2 * (grid_steps - 1))**2  
@@ -59,8 +58,8 @@ def neumann_matrix(grid_steps, grid_step_size):
     # mul[i, j] = 1 / (lam[i] + lam[j])
     # lam[k] = 4 / h**2 * sin(k * pi * h / (2 * L))**2, where L = h * (N - 1)
 
-    k = np.arange(0, grid_steps)
-    lam = 4 / grid_step_size**2 * np.sin(k * np.pi / (2 * (grid_steps - 1)))**2
+    k = cp.arange(0, grid_steps)
+    lam = 4 / grid_step_size**2 * cp.sin(k * cp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = lam[:, None], lam[None, :]
     mul = 1 / (lambda_i + lambda_j)  # WARNING: zero division in mul[0, 0]!
     mul[0, 0] = 0  # doesn't matter anyway, just defines constant shift
@@ -91,13 +90,13 @@ def make_plasma_grid(steps, step_size, fineness):
     """
     plasma_step = step_size / fineness
     if fineness % 2:  # some on zero axes, none on cell corners
-        right_half = np.arange(steps // 2 * fineness) * plasma_step
+        right_half = cp.arange(steps // 2 * fineness) * plasma_step
         left_half = -right_half[:0:-1]  # invert, reverse, drop zero
     else:  # none on zero axes, none on cell corners
-        right_half = (.5 + np.arange(steps // 2 * fineness)) * plasma_step
+        right_half = (.5 + cp.arange(steps // 2 * fineness)) * plasma_step
         left_half = -right_half[::-1]  # invert, reverse
-    plasma_grid = np.concatenate([left_half, right_half])
-    assert(np.array_equal(plasma_grid, -plasma_grid[::-1]))
+    plasma_grid = cp.concatenate([left_half, right_half])
+    assert(cp.array_equal(plasma_grid, -plasma_grid[::-1]))
     return plasma_grid
 
 
@@ -109,16 +108,16 @@ def make_plasma_single(steps, cell_size, fineness=2):
 
     Np = len(pl_grid)
 
-    y_init = np.broadcast_to(pl_grid, (Np, Np))
+    y_init = cp.broadcast_to(pl_grid, (Np, Np))
     x_init = y_init.T
 
-    x_offt = np.zeros((Np, Np))
-    y_offt = np.zeros((Np, Np))
-    px = np.zeros((Np, Np))
-    py = np.zeros((Np, Np))
-    pz = np.zeros((Np, Np))
-    q = np.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2
-    m = np.ones((Np, Np)) * ELECTRON_MASS / fineness**2
+    x_offt = cp.zeros((Np, Np))
+    y_offt = cp.zeros((Np, Np))
+    px = cp.zeros((Np, Np))
+    py = cp.zeros((Np, Np))
+    pz = cp.zeros((Np, Np))
+    q = cp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2
+    m = cp.ones((Np, Np)) * ELECTRON_MASS / fineness**2
 
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
@@ -132,10 +131,10 @@ def make_coarse_plasma_grid(steps, step_size, coarseness):
     """
     assert coarseness == int(coarseness)  # TODO: why?
     plasma_step = step_size * coarseness
-    right_half = np.arange(steps // (coarseness * 2)) * plasma_step
+    right_half = cp.arange(steps // (coarseness * 2)) * plasma_step
     left_half = -right_half[:0:-1]  # invert, reverse, drop zero
-    plasma_grid = np.concatenate([left_half, right_half])
-    assert(np.array_equal(plasma_grid, -plasma_grid[::-1]))
+    plasma_grid = cp.concatenate([left_half, right_half])
+    assert(cp.array_equal(plasma_grid, -plasma_grid[::-1]))
     return plasma_grid
 
 
@@ -162,13 +161,13 @@ def make_fine_plasma_grid(steps, step_size, fineness):
     assert fineness == int(fineness)
     plasma_step = step_size / fineness
     if fineness % 2:  # some on zero axes, none on cell corners
-        right_half = np.arange(steps // 2 * fineness) * plasma_step
+        right_half = cp.arange(steps // 2 * fineness) * plasma_step
         left_half = -right_half[:0:-1]  # invert, reverse, drop zero
     else:  # none on zero axes, none on cell corners
-        right_half = (.5 + np.arange(steps // 2 * fineness)) * plasma_step
+        right_half = (.5 + cp.arange(steps // 2 * fineness)) * plasma_step
         left_half = -right_half[::-1]  # invert, reverse
-    plasma_grid = np.concatenate([left_half, right_half])
-    assert(np.array_equal(plasma_grid, -plasma_grid[::-1]))
+    plasma_grid = cp.concatenate([left_half, right_half])
+    assert(cp.array_equal(plasma_grid, -plasma_grid[::-1]))
     return plasma_grid
 
 
@@ -207,15 +206,15 @@ def make_plasma_dual(steps, cell_size, coarseness=2, fineness=2):
     # Calculate indices for coarse -> fine bilinear interpolation
 
     # Neighbour indices array, 1D, same in both x and y direction.
-    indices = np.searchsorted(coarse_grid, fine_grid)
+    indices = cp.searchsorted(coarse_grid, fine_grid)
     # example:
     #     coarse:  [-2., -1.,  0.,  1.,  2.]
     #     fine:    [-2.4, -1.8, -1.2, -0.6,  0. ,  0.6,  1.2,  1.8,  2.4]
     #     indices: [ 0  ,  1  ,  1  ,  2  ,  2  ,  3  ,  4  ,  4  ,  5 ]
     # There is no coarse particle with index 5, so clip it to 4:
-    indices_next = np.clip(indices, 0, Nc - 1)  # [0, 1, 1, 2, 2, 3, 4, 4, 4]
+    indices_next = cp.clip(indices, 0, Nc - 1)  # [0, 1, 1, 2, 2, 3, 4, 4, 4]
     # Clip to zero for indices of prev particles as well:
-    indices_prev = np.clip(indices - 1, 0, Nc - 1)  # [0, 0, 0, 1 ... 3, 3, 4]
+    indices_prev = cp.clip(indices - 1, 0, Nc - 1)  # [0, 0, 0, 1 ... 3, 3, 4]
     # mixed from: [ 0&0 , 0&1 , 0&1 , 1&2 , 1&2 , 2&3 , 3&4 , 3&4, 4&4 ]
 
     # Calculate weights for coarse->fine interpolation from initial positions.
@@ -302,7 +301,7 @@ def init_plasma(config: Config):
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
-    initial_deposition = get_deposit_func(
+    initial_deposition = get_deposit_plasma(
         dual_plasma_approach, grid_steps, grid_step_size, plasma_coarseness,
         plasma_fineness)
 
@@ -346,9 +345,9 @@ def init_plasma(config: Config):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    _, _, _, const_arrays = init_plasma(config)
+    _, particles, _, const_arrays = init_plasma(config)
 
-    with np.load(file=path_to_plasmastate) as state:
+    with cp.load(file=path_to_plasmastate) as state:
         fields = GPUArrays(Ex=state['Ex'], Ey=state['Ey'],
                            Ez=state['Ez'], Bx=state['Bx'],
                            By=state['By'], Bz=state['Bz'],
