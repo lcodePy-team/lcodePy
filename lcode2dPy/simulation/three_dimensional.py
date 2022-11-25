@@ -110,6 +110,8 @@ class Cartesian3dSimulation:
         self.__diagnostics = Diagnostics3d(config=self.__config,
                                            diag_list=self.diagnostics)
 
+    # TODO: Should we make load_beamfile just
+    #       another method of beam genetration?
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
         beam_particles = self.BeamParticles()
         beam_particles.load(path_to_beamfile)
@@ -124,28 +126,23 @@ class Cartesian3dSimulation:
     #     pass
 
     def __load_plasmastate(self):
-        (self.__loaded_fields, self.__loaded_particles,
-        self.__loaded_currents, self.__const_arrays) =\
+        # We use this function to load plasma only once and then use
+        # it while it is loaded into the device's memory (CPU or GPU).
+        self.__loaded_plasmastate =\
             self.__load_plasma(self.__config, self.path_to_plasmastate)
 
     def __init_plasmastate(self):
         # In case of an external plasma state, we set values
         # as the loaded values:
         if self.external_plasmastate:
-            pl_fields, pl_particles, pl_currents, pl_const_arrays = (
-                self.__loaded_fields, self.__loaded_particles,
-                self.__loaded_currents, self.__const_arrays
-            )
+            return self.__loaded_plasmastate
         else:
             # Initializes a plasma state:
-            pl_fields, pl_particles, pl_currents, pl_const_arrays =\
-                self.init_plasma(self.__config)
-                # The init_plasma function must be public so that a user
-                # can change it and generate a unique plasma.
-                # TODO: make the insides of init_plasma accessible for
-                #       modifications after copy-pasting.
-
-        return pl_fields, pl_particles, pl_currents, pl_const_arrays
+            return self.init_plasma(self.__config)
+            # The init_plasma function must be public so that a user
+            # can change it and generate a unique plasma.
+            # TODO: make the insides of init_plasma accessible for
+            #       modifications after copy-pasting.
 
     def step(self, N_steps=None):
         """Compute N time steps."""
@@ -194,18 +191,12 @@ class Cartesian3dSimulation:
 
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
-                # TODO: Check if it is correct!
-                self.current_time = \
-                    self.current_time + self.__time_step_size
-
-                pl_fields, pl_particles, pl_currents, pl_const_arrays = \
-                    self.__init_plasmastate()
+                plasmastate = self.__init_plasmastate()
 
                 # Calculates one time step:
                 self.__push_solver.step_dt(
-                    pl_fields, pl_particles, pl_currents, pl_const_arrays,
-                    self.beam_source, self.beam_drain, self.current_time,
-                    self.__diagnostics
+                    *plasmastate, self.beam_source, self.beam_drain,
+                    self.current_time, self.__diagnostics
                 )
 
                 # Here we transfer beam particles from beam_buffer to
@@ -215,10 +206,12 @@ class Cartesian3dSimulation:
                     self.__config, self.beam_drain.beam_buffer
                 )
                 self.beam_drain  = self.BeamDrain()
+                
+                self.current_time = self.current_time + self.__time_step_size
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
             # self.beam_source.beam.save('beamfile') # Do we need it?
-            # TODO: Make checkpoints when all simulation information,
+            # TODO: Make checkpoints where all simulation information,
             #       including beam and current time, is saved.
             print('The work is done!')
 

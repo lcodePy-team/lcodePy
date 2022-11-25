@@ -23,6 +23,11 @@ class PushAndSolver3d:
         self.xi_steps = int(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
+        # TODO: Get rid of time_step_size and how we change current_time
+        #       in step_dt method later, when we figure out how time
+        #       in diagnostics should work.
+        self.time_step_size = config.getfloat('time-step')
+
     def step_dt(self, pl_fields: GPUArrays, pl_particles: GPUArrays,
                 pl_currents: GPUArrays, pl_const_arrays: GPUArrays,
                 beam_source: BeamSource, beam_drain: BeamDrain,
@@ -30,6 +35,8 @@ class PushAndSolver3d:
         """
         Perform one time step of beam-plasma calculations.
         """
+        current_time = current_time + self.time_step_size
+
         self.beam_calc.start_time_step()
         beam_layer_to_move = BeamParticles(0)
         fell_size = 0
