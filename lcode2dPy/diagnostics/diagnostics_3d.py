@@ -4,9 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..config.config import Config
-from ..config.default_config import default_config
 
-from ..plasma3d_gpu.data import GPUArraysView
 
 # Auxiliary functions:
 
@@ -72,16 +70,12 @@ class Diagnostics3d:
 
     def dump(self, *parameters):
         for diag in self.diag_list:
-            diag.dump(*parameters)
-
-    def after_step_dt(self, *parameters):
-        for diag in self.diag_list:
             try:
-                diag.after_step_dt(*parameters)
+                diag.dump(*parameters)
             except AttributeError:
                 print(
                     f'{diag} type of diagnostics is not supported because' + 
-                    'it does not have attribute called after_step_dt(...).' +
+                    'it does not have attribute called dump(...).' +
                     'this attribute does not work correctly.'
                 )
 
@@ -205,7 +199,8 @@ class DiagnosticsFXi:
     def conditions_check(self, current_time, xi_pl_layer):
         return current_time % self.__output_period == 0
 
-    def dump(self, current_time):
+    def dump(self, current_time, pl_particles, pl_fields, pl_currents,
+             beam_drain):
         if self.conditions_check(current_time, inf):
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
@@ -221,8 +216,7 @@ class DiagnosticsFXi:
                                 # vmin=-1, vmax=1)
                     plt.close()
 
-    def after_step_dt(self, *params):
-        # We use this function to clean old data:
+        # We now clean old data:
         for name in self.__data:
             self.__data[name] = []
 
@@ -351,7 +345,7 @@ class DiagnosticsColormaps:
                         self.__steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
             
-                val = 0
+                val = None
 
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
@@ -364,7 +358,7 @@ class DiagnosticsColormaps:
         if (xi_plasma_layer <= self.__xi_to and
             (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to
         ):
-            self.dump(current_time)
+            self.dump(current_time, None, None, None, None)
 
             for name in self.__data:
                 self.__data[name] = []
@@ -375,7 +369,8 @@ class DiagnosticsColormaps:
                 xi_pl_layer <= self.__xi_from and xi_pl_layer >= self.__xi_to
         )
 
-    def dump(self, current_time):
+    def dump(self, current_time, pl_particles, pl_fields, pl_currents,
+             beam_drain):
         # In case of colormaps, we reshape every data list except for xi list.
         if self.conditions_check(current_time, inf):
             data_for_saving = (self.__data).copy()
@@ -390,7 +385,8 @@ class DiagnosticsColormaps:
             if self.__merging_r > 1 or self.__merging_xi > 1:
                 for name in self.__colormaps_names:
                     data_for_saving[name] = conv_2d(
-                        data_for_saving, self.__merging_xi, self.__merging_r
+                        data_for_saving[name], self.__merging_xi,
+                        self.__merging_r
                     )
 
             # TODO: If there is a file with the same name with important data 
@@ -407,8 +403,7 @@ class DiagnosticsColormaps:
             # Clean some memory. TODO: Better ways to do that?
             data_for_saving = 0
 
-    def after_step_dt(self, *params):
-        # We use this function to clean old data:
+        # We now clean old data:
         for name in self.__data:
             self.__data[name] = []
 
@@ -514,10 +509,8 @@ class DiagnosticsTransverse:
             xi_pl_layer  % self.__saving_xi_period <= self.__xi_step_size / 2
         )
     
-    def dump(self, current_time):
-        pass
-    
-    def after_step_dt(self, *params):
+    def dump(self, current_time, pl_particles, pl_fields, pl_currents,
+             beam_drain):
         pass
 
 
@@ -539,16 +532,15 @@ class SaveRunState:
 
         # Important for saving arrays from GPU:
         self.__pu_type = config.get('processing-unit-type').lower()
+        if self.__pu_type == 'gpu':
+            from ..plasma3d_gpu.data import GPUArraysView
+            self.__GPUArraysView = GPUArraysView
 
     def after_step_dxi(self, *parameters):
         pass
 
-    def dump(self, *parameeters):
-        pass
-
-    def after_step_dt(
-        self, current_time, pl_particles, pl_fields, pl_currents, beam_drain
-    ):
+    def dump(self, current_time, pl_particles, pl_fields, pl_currents,
+             beam_drain):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__saving_period <= self.__time_step_size / 2:
@@ -561,9 +553,9 @@ class SaveRunState:
             if self.__save_plasma:
                 # Important for saving arrays from GPU (is it really?)
                 if self.__pu_type == 'gpu':
-                    pl_particles = GPUArraysView(pl_particles)
-                    pl_fields    = GPUArraysView(pl_fields)
-                    pl_currents  = GPUArraysView(pl_currents)
+                    pl_particles = self.__GPUArraysView(pl_particles)
+                    pl_fields    = self.__GPUArraysView(pl_fields)
+                    pl_currents  = self.__GPUArraysView(pl_currents)
 
                 np.savez_compressed(
                     file=f'./run_states/plasmastate_{current_time:08.2f}',

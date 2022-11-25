@@ -9,11 +9,17 @@ class BeamSource:
     This class helps to extract a beam layer from beam particles array.
     """
     # Do we really need this class?
-    def __init__(self, config: Config, beam: BeamParticles):
+    def __init__(self, config: Config, beam_particles):
         # From config:
         self.xi_step_size = config.getfloat('xi-step')
         
-        # Get the whole beam or a beam layer:
+        # Get the whole beam or a beam layer:     
+        if type(beam_particles) == np.ndarray:
+            beam = BeamParticles()
+            beam.init_generated(beam_particles)
+        else:
+            beam = beam_particles
+            
         beam.xi_sorted()
         self.beam = beam
 

@@ -1,29 +1,47 @@
 """Top-level three-dimensional simulation class."""
-# General imports
-import numpy as np
-
-# Config
+# Import onfig
 from ..config.default_config_values import default_config_values
 from ..config.config import Config
 
 # Diagnostics
 from ..diagnostics.diagnostics_3d import Diagnostics3d
 
-# Imports for beam generating in 3d (can be used for 2d also)
+# Imports for beam generating in 3d (can be used for 2d too)
 from ..alt_beam_generator.beam_generator import generate_beam
-from ..alt_beam_generator.beam_generator import particle_dtype3d
-from ..alt_beam_generator.beam_shape import BeamShape, BeamSegmentShape
 
-# Imports for 3d simulation
-from ..push_solvers.push_solver_3d import PushAndSolver3d as PushAndSolver3dCPU
-from .. import beam3d as beam3d_cpu_module
-from ..plasma3d.initialization import init_plasma as init_plasma_cpu
-from ..plasma3d.initialization import load_plasma as load_plasma_cpu
 
-from ..push_solvers.push_solver_3d_gpu import PushAndSolver3d as PushAndSolver3dGPU
-from .. import beam3d_gpu as beam3d_gpu_module
-from ..plasma3d_gpu.initialization import init_plasma as init_plasma_gpu
-from ..plasma3d_gpu.initialization import load_plasma as load_plasma_gpu
+def import_libraries(config):
+    """Imports libraries according to the selected pu (processing unit) type."""
+    pu_type = config.get('processing-unit-type').lower()        
+
+    if pu_type == 'cpu':
+        from ..push_solvers.push_solver_3d import PushAndSolver3d
+        from ..import beam3d
+        from ..plasma3d.initialization import init_plasma
+        from ..plasma3d.initialization import load_plasma
+
+        push_solver = PushAndSolver3d(config)
+        beam_particles_class = beam3d.BeamParticles
+        beam_source_class = beam3d.BeamSource
+        beam_drain_class = beam3d.BeamDrain
+
+    elif pu_type == 'gpu':
+        from ..push_solvers.push_solver_3d_gpu import PushAndSolver3d
+        from .. import beam3d_gpu
+        from ..plasma3d_gpu.initialization import init_plasma
+        from ..plasma3d_gpu.initialization import load_plasma
+
+        push_solver = PushAndSolver3d(config)
+        beam_particles_class = beam3d_gpu.BeamParticles
+        beam_source_class = beam3d_gpu.BeamSource
+        beam_drain_class = beam3d_gpu.BeamDrain
+    
+    else:
+        Exception("We cannot use this type of processing unit." +
+                  "Please choose between CPU and GPU.")
+
+    return push_solver, init_plasma, load_plasma, beam_particles_class, \
+           beam_source_class, beam_drain_class
 
 
 class Cartesian3dSimulation:
@@ -79,19 +97,11 @@ class Cartesian3dSimulation:
         # Mode of plasma continuation:
         self.__cont_mode = self.__config.get('continuation')
 
-        # Here we get information about the type of processing unit (CPU or GPU)
-        pu_type = self.__config.get('processing-unit-type').lower()
-
-        if pu_type == 'cpu':
-            self.__push_solver = PushAndSolver3dCPU(self.__config)
-            self.__init_plasma = init_plasma_cpu
-            self.__load_plasma = load_plasma_cpu
-            self.__beam_module = beam3d_cpu_module
-        elif pu_type == 'gpu':
-            self.__push_solver = PushAndSolver3dGPU(self.__config)
-            self.__init_plasma = init_plasma_gpu
-            self.__load_plasma = load_plasma_gpu
-            self.__beam_module = beam3d_gpu_module
+        # Here we get information about the type of processor (CPU or GPU)
+        # and import libraries accordingly.
+        (self.__push_solver, self.init_plasma, self.__load_plasma,
+         self.BeamParticles, self.BeamSource, self.BeamDrain) =\
+            import_libraries(self.__config)
 
         # Finally, we set the diagnostics.
         if type(self.diagnostics) != list and self.diagnostics is not None:
@@ -101,12 +111,12 @@ class Cartesian3dSimulation:
                                            diag_list=self.diagnostics)
 
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
-        beam_particles = self.__beam_module.BeamParticles()
+        beam_particles = self.BeamParticles()
         beam_particles.load(path_to_beamfile)
 
-        self.beam_source = self.__beam_module.BeamSource(self.__config,
-                                                       beam_particles)
-        self.beam_drain  = self.__beam_module.BeamDrain()
+        self.beam_source = self.BeamSource(self.__config,
+                                           beam_particles)
+        self.beam_drain  = self.BeamDrain()
 
     # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
     #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
@@ -129,7 +139,11 @@ class Cartesian3dSimulation:
         else:
             # Initializes a plasma state:
             pl_fields, pl_particles, pl_currents, pl_const_arrays =\
-                self.__init_plasma(self.__config)
+                self.init_plasma(self.__config)
+                # The init_plasma function must be public so that a user
+                # can change it and generate a unique plasma.
+                # TODO: make the insides of init_plasma accessible for
+                #       modifications after copy-pasting.
 
         return pl_fields, pl_particles, pl_currents, pl_const_arrays
 
@@ -164,13 +178,12 @@ class Cartesian3dSimulation:
                 if self.__rigid_beam == 'n' or self.__rigid_beam == 'no':
                     # Generate all parameters for a beam:
                     beam_particles = generate_beam(self.__config,
-                                                   self.beam_parameters,
-                                                   self.__beam_module)
+                                                   self.beam_parameters)
 
                     # Here we create a beam source and a beam drain:
-                    self.beam_source = self.__beam_module.BeamSource(
-                                                self.__config, beam_particles)
-                    self.beam_drain  = self.__beam_module.BeamDrain()
+                    self.beam_source = self.BeamSource(self.__config,
+                                                       beam_particles)
+                    self.beam_drain  = self.BeamDrain()
 
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
@@ -195,22 +208,18 @@ class Cartesian3dSimulation:
                     self.__diagnostics
                 )
 
-                # Perform diagnostics
-                self.__diagnostics.after_step_dt(
-                    self.current_time, pl_particles, pl_fields, pl_currents,
-                    self.beam_drain
-                )
-
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                self.beam_source = self.__beam_module.BeamSource(
+                self.beam_source = self.BeamSource(
                     self.__config, self.beam_drain.beam_buffer
                 )
-                self.beam_drain  = self.__beam_module.BeamDrain()
+                self.beam_drain  = self.BeamDrain()
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
-            self.beam_source.beam.save('beamfile') # Do we need it?
+            # self.beam_source.beam.save('beamfile') # Do we need it?
+            # TODO: Make checkpoints when all simulation information,
+            #       including beam and current time, is saved.
             print('The work is done!')
 
         # Other plasma continuation mode has not been implemented yet.

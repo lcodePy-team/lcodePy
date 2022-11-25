@@ -89,5 +89,7 @@ class PushAndSolver3d:
                     f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
                 )
 
+        # Perform diagnostics
         if diagnostics:
-            diagnostics.dump(current_time)
+            diagnostics.dump(current_time, pl_particles, pl_fields,
+                             pl_currents, beam_drain)
