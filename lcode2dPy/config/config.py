@@ -1,5 +1,6 @@
 from copy import copy
 import numpy as np
+import re
 
 from typing import Any
 from .template import lcode_template
@@ -83,9 +84,37 @@ class Config:
         if path:
             with open(path, 'w') as cfg_f:
                 cfg_f.write(cfg)
-
         return cfg
-
+    
+    def update_from_c_config(self, path:str):
+        with open(path, 'r') as file:
+            cfg = file.read()
+        
+        config_values = self.config_values
+        parameters = list(config_values.keys())
+        
+        bad_parameters = []
+        for parameter in parameters:
+            try:
+                config_values[parameter] = find(cfg, parameter)
+            except:
+                try:
+                    config_values[parameter] = find_char(cfg, parameter)
+                except:
+                    bad_parameters.append(parameter)
+        self.update(config_values)
+        return bad_parameters
+    
+    def get_c_beam_profile(self, path:str):
+        with open(path, 'r') as file:
+            cfg = file.read()
+        return find_beam_profile(cfg)
+    
+    def get_float_from_c_config(self, path:str, par:str):
+        with open(path, 'r') as file:
+            cfg = file.read()
+        return find(cfg, par)
+    
     def adjust_config_values(self, option_name: str):
         """
         Adjusts config values in 3d.
@@ -158,3 +187,15 @@ def good_size(number):
     factors = factorize(number - 1)
     return (all([f in [2, 3, 4, 5, 7, 11, 13] for f in factors]) and
             factors.count(11) + factors.count(13) < 2 and number % 2)
+
+def find(cfg, par):
+    ans = re.search('\s' + par + '\s?=\s?[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', cfg)
+    return float(ans.group(0).replace(par,'').replace('=', ''))
+
+def find_char(cfg, par):
+    ans = re.search(par + '\s?=\s?[a-zA-Z][a-zA-Z]*', cfg)
+    return ans.group(0).replace(par,'').replace('=', '').replace(' ','')
+
+def find_beam_profile(cfg):
+    ans = re.search('beam-profile\s?=\s?"""([^\>]*)"""', cfg)
+    return ans.group(1)

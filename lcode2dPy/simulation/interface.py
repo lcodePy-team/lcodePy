@@ -2,7 +2,7 @@
 import numpy as np
 from ..config.default_config import default_config
 from ..config.config import Config
-from ..beam_generator.beam_generator import make_beam, Gauss, rGauss
+from ..beam_generator.beam_generator import make_beam
 
 # Diagnostics
 from ..diagnostics.targets import MyDiagnostics
@@ -70,7 +70,7 @@ class Simulation:
         if self.beam_source is None:
             beam_particles = self.beam_generator(self.config,
                                                     **self.beam_pars)
-            beam_particles = np.array(list(map(tuple, beam_particles.to_numpy())),
+            beam_particles = np.array(list(map(tuple, beam_particles)),
                                     dtype=self.beam_particle_dtype)
 
             beam_slice = BeamSlice(beam_particles.size, beam_particles)
@@ -91,10 +91,7 @@ class Simulation:
             self.beam_source = MemoryBeamSource(beam_slice)
             self.beam_drain = MemoryBeamDrain()
             self.current_time = self.current_time + self.time_step_size
-            # Every t step diagnostics 
-            # if self.diagnostics:
-            #     self.diagnostics.every_dt()
-
+        
 
 # class Diagnostics2d:
 #     def __init__(self, dt_diag, dxi_diag):
