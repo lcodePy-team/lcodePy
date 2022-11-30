@@ -64,11 +64,11 @@ def StepwiseXiDistr(distr, xi_max, vmin, vmax, amp=None):
         layers_borders = np.arange(v_max, v_min - dxi, -dxi)
         intervals = zip(layers_borders[1:], layers_borders)
         def N(xi): return int(partic_in_layer * distr(xi) / distr(xi_max))
-        xis = np.array([])
+        out = []
         for l, r in intervals:
             flat = stats.uniform.rvs(loc=l, scale=dxi, size=N((l+r)/2))
-            xis = np.hstack([xis, flat])
-        return xis
+            out.append(flat)
+        return np.hstack(out)
     distr_maker.name = 'arbitrary'
     distr_maker.max = xi_max
     distr_maker.f = distr

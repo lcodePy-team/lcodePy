@@ -5,4 +5,5 @@ venv
 *npz
 *png
 *jpg
+*.prof
 # *.ipynb
