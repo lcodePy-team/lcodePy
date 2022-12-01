@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..config.config import Config
+from ..plasma3d.data import ArraysView
 
 
 # Auxiliary functions:
@@ -528,12 +529,6 @@ class SaveRunState:
         if self.__saving_period < self.__time_step_size:
             self.__saving_period = self.__time_step_size
 
-        # Important for saving arrays from GPU:
-        self.__pu_type = config.get('processing-unit-type').lower()
-        if self.__pu_type == 'gpu':
-            from ..plasma3d_gpu.data import GPUArraysView
-            self.__GPUArraysView = GPUArraysView
-
     def after_step_dxi(self, *parameters):
         pass
 
@@ -550,10 +545,9 @@ class SaveRunState:
 
             if self.__save_plasma:
                 # Important for saving arrays from GPU (is it really?)
-                if self.__pu_type == 'gpu':
-                    pl_particles = self.__GPUArraysView(pl_particles)
-                    pl_fields    = self.__GPUArraysView(pl_fields)
-                    pl_currents  = self.__GPUArraysView(pl_currents)
+                pl_particles = ArraysView(pl_particles)
+                pl_fields    = ArraysView(pl_fields)
+                pl_currents  = ArraysView(pl_currents)
 
                 np.savez_compressed(
                     file=f'./run_states/plasmastate_{current_time:08.2f}',

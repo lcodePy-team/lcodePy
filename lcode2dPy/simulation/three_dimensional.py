@@ -1,47 +1,18 @@
 """Top-level three-dimensional simulation class."""
-# Import onfig
+# Imports config, diagnostics, alternative beam generator for 3d
+# (can be used for 2d too)
 from ..config.default_config_values import default_config_values
 from ..config.config import Config
-
-# Diagnostics
 from ..diagnostics.diagnostics_3d import Diagnostics3d
-
-# Imports for beam generating in 3d (can be used for 2d too)
 from ..alt_beam_generator.beam_generator import generate_beam
 
+# Imports plasma nodule
+from ..push_solvers.push_solver_3d import PushAndSolver3d
+from ..plasma3d.initialization import init_plasma
+from ..plasma3d.initialization import load_plasma
 
-def import_libraries(config):
-    """Imports libraries according to the selected pu (processing unit) type."""
-    pu_type = config.get('processing-unit-type').lower()        
-
-    if pu_type == 'cpu':
-        from ..push_solvers.push_solver_3d import PushAndSolver3d
-        from ..import beam3d
-        from ..plasma3d.initialization import init_plasma
-        from ..plasma3d.initialization import load_plasma
-
-        push_solver = PushAndSolver3d(config)
-        beam_particles_class = beam3d.BeamParticles
-        beam_source_class = beam3d.BeamSource
-        beam_drain_class = beam3d.BeamDrain
-
-    elif pu_type == 'gpu':
-        from ..push_solvers.push_solver_3d_gpu import PushAndSolver3d
-        from .. import beam3d_gpu
-        from ..plasma3d_gpu.initialization import init_plasma
-        from ..plasma3d_gpu.initialization import load_plasma
-
-        push_solver = PushAndSolver3d(config)
-        beam_particles_class = beam3d_gpu.BeamParticles
-        beam_source_class = beam3d_gpu.BeamSource
-        beam_drain_class = beam3d_gpu.BeamDrain
-    
-    else:
-        Exception("We cannot use this type of processing unit." +
-                  "Please choose between CPU and GPU.")
-
-    return push_solver, init_plasma, load_plasma, beam_particles_class, \
-           beam_source_class, beam_drain_class
+# Imports beam module
+from ..beam3d import BeamParticles, BeamSource, BeamDrain
 
 
 class Cartesian3dSimulation:
@@ -98,10 +69,19 @@ class Cartesian3dSimulation:
         self.__cont_mode = self.__config.get('continuation')
 
         # Here we get information about the type of processor (CPU or GPU)
-        # and import libraries accordingly.
-        (self.__push_solver, self.init_plasma, self.__load_plasma,
-         self.BeamParticles, self.BeamSource, self.BeamDrain) =\
-            import_libraries(self.__config)
+        # and import libraries accordingly.      
+        pu_type = self.__config.get('processing-unit-type').lower()
+        if pu_type == 'cpu':
+            import numpy as np
+            self.xp = np
+        elif pu_type == 'gpu':
+            import cupy as cp
+            self.xp = cp
+
+        self.__push_solver = PushAndSolver3d(xp=self.xp, config=self.__config)
+        self.init_plasma, self.__load_plasma = init_plasma, load_plasma
+        self.BeamParticles, self.BeamSource, self.BeamDrain = \
+            BeamParticles, BeamSource, BeamDrain
 
         # Finally, we set the diagnostics.
         if type(self.diagnostics) != list and self.diagnostics is not None:
@@ -113,12 +93,12 @@ class Cartesian3dSimulation:
     # TODO: Should we make load_beamfile just
     #       another method of beam genetration?
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
-        beam_particles = self.BeamParticles()
+        beam_particles = self.BeamParticles(self.xp)
         beam_particles.load(path_to_beamfile)
 
-        self.beam_source = self.BeamSource(self.__config,
+        self.beam_source = self.BeamSource(self.xp, self.__config,
                                            beam_particles)
-        self.beam_drain  = self.BeamDrain()
+        self.beam_drain  = self.BeamDrain(self.xp)
 
     # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
     #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
@@ -178,9 +158,9 @@ class Cartesian3dSimulation:
                                                    self.beam_parameters)
 
                     # Here we create a beam source and a beam drain:
-                    self.beam_source = self.BeamSource(self.__config,
+                    self.beam_source = self.BeamSource(self.xp, self.__config,
                                                        beam_particles)
-                    self.beam_drain  = self.BeamDrain()
+                    self.beam_drain  = self.BeamDrain(self.xp)
 
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
@@ -203,9 +183,9 @@ class Cartesian3dSimulation:
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
                 self.beam_source = self.BeamSource(
-                    self.__config, self.beam_drain.beam_buffer
+                    self.xp, self.__config, self.beam_drain.beam_buffer
                 )
-                self.beam_drain  = self.BeamDrain()
+                self.beam_drain  = self.BeamDrain(self.xp)
                 
                 self.current_time = self.current_time + self.__time_step_size
 

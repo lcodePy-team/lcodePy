@@ -9,13 +9,14 @@ class BeamSource:
     This class helps to extract a beam layer from beam particles array.
     """
     # Do we really need this class?
-    def __init__(self, config: Config, beam_particles):
-        # From config:
+    def __init__(self, xp: np, config: Config, beam_particles):
+        # From input parameters:
+        self.xp = xp
         self.xi_step_size = config.getfloat('xi-step')
         
         # Get the whole beam or a beam layer:     
         if type(beam_particles) == np.ndarray:
-            beam = BeamParticles()
+            beam = BeamParticles(self.xp)
             beam.init_generated(beam_particles)
         else:
             beam = beam_particles
@@ -44,16 +45,17 @@ class BeamSource:
         arr_to_search = self.beam.xi[begin:]
 
         # Here we find the length of a layer where requisite particles lay.
-        if len(arr_to_search) != 0:
-            layer_length = np.sum((xi_max <= arr_to_search) *
-                                  (arr_to_search < xi_min))
+        if arr_to_search.size != 0:
+            layer_length = self.xp.sum(
+                (self.xp.asarray(xi_max) <= arr_to_search) *
+                (arr_to_search < self.xp.asarray(xi_min)))
         else:
             layer_length = 0
-        self.layout_count += layer_length
+        self.layout_count += int(layer_length)
 
         # Here we create the array of indexes of requisite particles
         # and return the beam layer of these particles.
-        indexes_arr = np.arange(begin, begin + layer_length)
+        indexes_arr = self.xp.arange(begin, begin + layer_length)
         return self.beam.get_layer(indexes_arr)
 
 
@@ -62,11 +64,11 @@ class BeamDrain:
     This class is used to store beam particles when the calculation of their
     movement ends.
     """
-    def __init__(self):
+    def __init__(self, xp: np):
         # We create two empty BeamParticles classes. Don't really like how it
         # is done. We need to change this procces.
-        self.beam_buffer = BeamParticles(0)
-        self.lost_buffer = BeamParticles(0)
+        self.beam_buffer = BeamParticles(xp)
+        self.lost_buffer = BeamParticles(xp)
 
     def push_beam_layer(self, beam_layer: BeamParticles):
         """
