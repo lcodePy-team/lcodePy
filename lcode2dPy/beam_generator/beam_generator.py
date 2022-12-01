@@ -1,7 +1,5 @@
 import scipy.stats as stats
 import os
-import pandas as pd
-from pandas import DataFrame  as df
 import numpy as np
 from numpy import sqrt, pi
 from ..config.config import find 
@@ -66,7 +64,10 @@ def make_beam(config, distrs, q_m=1.0, partic_in_layer=200, identifier=0,
         vals['q_norm'] = q * np.ones(partic_num)
         vals['id'] = np.arange(partic_num, dtype=int)
         particles = np.array(list(vals.values()))
-        stub_particle = np.array([[-100000., 0., 0., 0., 0., 1.0, 0., 0.]])
+        stub_particle = np.zeros(len(particles))
+        stub_particle[0] = -100000.
+        stub_particle[-3] = 1.
+        stub_particle = np.array([stub_particle])
         particles = np.vstack([particles.T, stub_particle])
         particles = np.array(list(map(tuple, particles)),
                              dtype=particle_dtype)
@@ -74,22 +75,24 @@ def make_beam(config, distrs, q_m=1.0, partic_in_layer=200, identifier=0,
         ##### saving data ######
         beam = particles[particles['xi'] <= 0]
         if saveto:
-            beam.values.tofile(os.path.join(saveto, name))
+            beam.tofile(os.path.join(saveto, name))
         if savehead:
             head = particles[particles['xi'] > 0]
-            head.values.tofile(os.path.join(saveto, 'head-' + name))
+            head.tofile(os.path.join(saveto, 'head-' + name))
         return particles
 
-def make_beam_from_c_beam_profile(config, beam_profile, beam_current, partic_in_layer=200, savehead=False, saveto=False, name='beamfile.bin'):
+def make_beam_from_c_beam_profile(config, beam_profile, beam_current,
+ partic_in_layer=200, savehead=False, saveto=False, name='beamfile.bin'):
     beam_profile_parsed = find_beam_profile_pars(beam_profile)
     segments = split_into_segments(beam_profile_parsed)
     
     ##### beam generation ######
     beam = None
     for i, segment in enumerate(segments):
-        new_beam = make_beam(config, distrs_from_shapes(segment, beam_current), 
-                             q_m=1/segment['m/q'], identifier=i, 
-                             partic_in_layer=partic_in_layer)
+        new_beam = make_beam(config, 
+            distrs_from_shapes(segment, beam_current),
+              q_m=1/segment['m/q'], identifier=i,
+                partic_in_layer=partic_in_layer)
         if beam is None:
             beam = new_beam
         else:
@@ -99,10 +102,10 @@ def make_beam_from_c_beam_profile(config, beam_profile, beam_current, partic_in_
     ##### saving data ######
     if savehead:
         head = beam[beam['xi'] > 0]
-        head.values.tofile(os.path.join(saveto, 'head-' + name))
+        head.tofile(os.path.join(saveto, 'head-' + name))
     beam = beam[beam['xi'] <= 0]
     if saveto:
-        beam.values.tofile(os.path.join(saveto, name))
+        beam.tofile(os.path.join(saveto, name))
     return beam
 
 
@@ -114,25 +117,5 @@ def make_beam_from_c_config(config, path, partic_in_layer=None, savehead=False, 
         partic_in_layer = config.get_float_from_c_config(path, 'beam-particles-in-layer')
     
     beam = make_beam_from_c_beam_profile(config, beam_profile, beam_current, partic_in_layer=partic_in_layer, savehead=savehead, saveto=saveto, name=name)
-#     segments = get_segments_from_c_config(path)
-#     beam = None
-    
-#     ##### beam generation ######
-#     for i, segment in enumerate(segments):
-#         new_beam = make_beam(config, distrs_from_shapes(segment), 
-#                              q_m=1/segment['m/q'], identifier=i, 
-#                              partic_in_layer=partic_in_layer)
-#         if beam is None:
-#             beam = new_beam
-#         else:
-#             beam = beam[:-1].append(new_beam, ignore_index=True)
-#     beam.sort_values('xi', inplace=True, ascending=False)
-    
-#     ##### saving data ######
-#     head = beam[beam.eval('xi>0')]
-#     beam = beam[beam.eval('xi<=0')]
-#     if saveto:
-#         beam.values.tofile(os.path.join(saveto, name))
-#     if savehead:
-#         head.values.tofile(os.path.join(saveto, 'head-' + name))
+
     return beam
