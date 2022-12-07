@@ -1,25 +1,24 @@
 """Routine to compute charge density and currents of particles."""
 from ..config.config import Config
-from .data import Currents, Particles, Const_Arrays
-from .weights import deposit
+from .weights import get_deposit_plasma
+from .data import Arrays
 
-class RhoJComputer(object):
-    def __init__(self, config: Config):
-        self.grid_step_size = config.getfloat('window-width-step-size')
-        self.grid_steps = config.getint('window-width-steps')
 
-    def compute_rhoj(self, particles: Particles, const_arrays: Const_Arrays):
-        ro, jx, jy, jz = deposit(self.grid_steps, self.grid_step_size,
-                                 particles.x_init, particles.y_init,
-                                 particles.x_offt, particles.y_offt,
-                                 particles.px, particles.py,
-                                 particles.pz,
-                                 particles.q, particles.m)
-        
+def get_rhoj_computer(config: Config):
+    deposit = get_deposit_plasma(config)
+
+    def compute_rhoj(particles: Arrays, const_arrays: Arrays):
+        ro, jx, jy, jz = deposit(
+            particles.x_init, particles.y_init,
+            particles.x_offt, particles.y_offt,
+            particles.px, particles.py, particles.pz,
+            particles.q, particles.m, const_arrays
+        )
+
         # Also add the background ion charge density.
         # Do it last to preserve more float precision
         ro += const_arrays.ro_initial
 
-        return Currents(ro, jx, jy, jz)
+        return Arrays(particles.xp, ro=ro, jx=jx, jy=jy, jz=jz)
     
-
+    return compute_rhoj

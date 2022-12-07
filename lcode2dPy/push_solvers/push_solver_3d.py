@@ -1,44 +1,53 @@
 import numpy as np
 
 from ..config.config import Config
-from ..plasma3d.data import Fields, Currents, Particles, Const_Arrays
-from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import (
-    BeamCalculator, BeamParticles, concatenate_beam_layers, BeamSource,
-    BeamDrain
-)
 from ..diagnostics.diagnostics_3d import Diagnostics3d
+from ..plasma3d.data import Arrays, ArraysView
+from ..plasma3d.solver import Plane2d3vPlasmaSolver
+from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles, \
+                     concatenate_beam_layers
 
 
 class PushAndSolver3d:
-    def __init__(self, config: Config):
+    def __init__(self, xp: np, config: Config):
         self.config = config
 
-        # Import plasma solver and beam pusher, pl = plasma
         self.pl_solver = Plane2d3vPlasmaSolver(config)
-        self.beam_calc = BeamCalculator(config)
+        self.beam_particles_class = BeamParticles
+        self.beam_conc = concatenate_beam_layers
+        self.beam_calc = BeamCalculator(xp, config)
+
+        # Import plasma solver and beam pusher, pl = plasma
 
         self.xi_max = config.getfloat('window-length')
         self.xi_step_size = config.getfloat('xi-step')
         self.xi_steps = int(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
-    def step_dt(self, pl_fields: Fields, pl_particles: Particles,
-                pl_currents: Currents, pl_const_arrays: Const_Arrays,
-                beam_source: BeamSource, beam_drain: BeamDrain,
-                current_time, diagnostics: Diagnostics3d=None):
+        # TODO: Get rid of time_step_size and how we change current_time
+        #       in step_dt method later, when we figure out how time
+        #       in diagnostics should work.
+        self.time_step_size = config.getfloat('time-step')
+
+    def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
+                pl_currents: Arrays, pl_const_arrays: Arrays,
+                beam_source: BeamSource, beam_drain: BeamDrain, current_time,
+                diagnostics: Diagnostics3d=None):
         """
         Perform one time step of beam-plasma calculations.
         """
+        xp = pl_const_arrays.xp
+
+        current_time = current_time + self.time_step_size
+
         self.beam_calc.start_time_step()
-        beam_layer_to_move = BeamParticles(0)
+        beam_layer_to_move = self.beam_particles_class(xp)
         fell_size = 0
 
         # TODO: Not sure this is right if we start from a saved plasma state and
         #       with a saved beamfile.
-        ro_beam_prev  = np.zeros(
-            (self.grid_steps, self.grid_steps), dtype=np.float64
-        )
+        ro_beam_prev = xp.zeros(
+            (self.grid_steps, self.grid_steps), dtype=xp.float64)
 
         for xi_i in range(self.xi_steps + 1):
             beam_layer_to_layout = \
@@ -60,7 +69,7 @@ class PushAndSolver3d:
             ro_beam_prev = ro_beam_full.copy()
 
             # Beam layers operations:
-            beam_layer_to_move = concatenate_beam_layers(
+            beam_layer_to_move = self.beam_conc(
                 beam_layer_to_layout, fell_to_next_layer
             )
             fell_size = fell_to_next_layer.size
@@ -71,17 +80,27 @@ class PushAndSolver3d:
             # Diagnostics:
             if diagnostics:
                 xi_plasma_layer = - self.xi_step_size * xi_i
-                diagnostics.after_step_dxi(
-                    current_time, xi_plasma_layer,
-                    pl_particles, pl_fields, pl_currents, ro_beam_full
-                )
+                try: # cupy
+                    diagnostics.after_step_dxi(
+                        current_time, xi_plasma_layer, ArraysView(pl_particles),
+                        ArraysView(pl_fields), ArraysView(pl_currents),
+                        ro_beam_full.get())
+                except AttributeError: # numpy
+                    diagnostics.after_step_dxi(
+                        current_time, xi_plasma_layer, ArraysView(pl_particles),
+                        ArraysView(pl_fields), ArraysView(pl_currents),
+                        ro_beam_full)
 
-            Ez_00 = pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
+            # Some diagnostics:
+            view_pl_fields = ArraysView(pl_fields)
+            Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
             print(
                 f't={current_time:+.4f}, ' + 
                 f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
             )
 
+        # Perform diagnostics
         if diagnostics:
-            diagnostics.dump(current_time)
+            diagnostics.dump(current_time, pl_particles, pl_fields,
+                             pl_currents, beam_drain)

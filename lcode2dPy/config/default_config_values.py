@@ -43,7 +43,6 @@ default_config_values = {
     'magnetic-field': 0,
     'magnetic-field-type': 'c',
     'magnetic-field-period': 200,
-    'plasma-zshape': '',
 
     'plasma-temperature': 0,
     'ion-model': 'y',
@@ -65,6 +64,8 @@ default_config_values = {
     # TODO: add other parameters to 3d simulations
     # For more information about these parameters, look up the documentation manual
     # of lcode3d.
+    'plasma-zshape': '',
+    
     'field-solver-subtraction-trick': 1,
     'field-solver-variant-A': True,
 
