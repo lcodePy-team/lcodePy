@@ -77,4 +77,6 @@ default_config_values = {
 
     # Conflicts:
     'corrector-steps': 2, # Can we even change this???
+
+    'noise-reductor-amplitude': 0, # Amplitude of noise reduction
 }

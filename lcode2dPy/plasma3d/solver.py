@@ -24,9 +24,9 @@ class Plane2d3vPlasmaSolver(object):
     ):
         particles_full = self.move_particles_wo_fields(particles_prev)
 
-
+        rho_noisy = currents_prev.ro + rho_beam_prev
         particles_full = self.move_particles(
-            fields_prev, particles_prev, particles_full
+            fields_prev, particles_prev, particles_full, const_arrays, rho_noisy
         )
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
@@ -38,8 +38,10 @@ class Plane2d3vPlasmaSolver(object):
         )
 
 
+        rho_noisy = (currents_full.ro + rho_beam_full +
+                     currents_prev.ro + rho_beam_prev) / 2
         particles_full = self.move_particles(
-            fields_half, particles_prev, particles_full
+            fields_half, particles_prev, particles_full, const_arrays, rho_noisy
         )
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
@@ -50,8 +52,10 @@ class Plane2d3vPlasmaSolver(object):
             currents_prev, currents_full
         )
 
+        rho_noisy = (currents_full.ro + rho_beam_full +
+                     currents_prev.ro + rho_beam_prev) / 2
         particles_full = self.move_particles(
-            fields_half, particles_prev, particles_full
+            fields_half, particles_prev, particles_full, const_arrays, rho_noisy
         )
         currents_full = self.compute_rhoj(
             particles_full, const_arrays

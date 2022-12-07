@@ -2,7 +2,7 @@
 import numba as nb
 import numpy as np
 
-from math import sqrt
+from math import floor, sin, sqrt, pi
 
 from ..config.config import Config
 from .weights import weights, weight4_cupy
@@ -37,6 +37,27 @@ def interp25(a, i, j,
     )
 
 
+@nb.njit
+def noise_reductor(ro, i, j, Ex, Ey, x_half, y_half, grid,
+                   grid_step_size, noise_reductor_ampl):
+    # Density-based noise reductor
+    Ax = (+ (ro[i + 1, j - 1] + ro[i - 1, j - 1] - 2 * ro[i, j - 1]) / 4
+          + (ro[i + 1, j + 0] + ro[i - 1, j + 0] - 2 * ro[i, j + 0]) / 4
+          + (ro[i + 1, j + 1] + ro[i - 1, j + 1] - 2 * ro[i, j + 1]) / 4) / 3
+    x_i = grid[i]
+    dEx = Ax * grid_step_size * sin(pi * (x_half - x_i) / grid_step_size) / pi
+    Ex_new = Ex + dEx * noise_reductor_ampl
+
+    Ay = (+ (ro[i - 1, j + 1] + ro[i - 1, j - 1] - 2 * ro[i - 1, j]) / 4
+          + (ro[i + 0, j + 1] + ro[i + 0, j - 1] - 2 * ro[i + 0, j]) / 4
+          + (ro[i + 1, j + 1] + ro[i + 1, j - 1] - 2 * ro[i + 1, j]) / 4) / 3
+    y_j = grid[j]
+    dEy = Ay * grid_step_size * sin(pi * (y_half - y_j) / grid_step_size) / pi
+    Ey_new = Ey + dEy * noise_reductor_ampl
+
+    return Ex_new, Ey_new
+
+
 @nb.njit(parallel=True)
 def move_smart_kernel(xi_step_size, reflect_boundary,
                       grid_step_size, grid_steps,
@@ -46,7 +67,8 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
                       estimated_x_offt, estimated_y_offt,
                       prev_px, prev_py, prev_pz,
                       Ex_avg, Ey_avg, Ez_avg, Bx_avg, By_avg, Bz_avg,
-                      new_x_offt, new_y_offt, new_px, new_py, new_pz):
+                      new_x_offt, new_y_offt, new_px, new_py, new_pz,
+                      grid, ro_noisy, noise_reductor_ampl):
     """
     Update plasma particle coordinates and momenta according to the field
     values interpolated halfway between the previous plasma particle location
@@ -111,6 +133,9 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
                       w2M1M, w1M1M, w01M, w1P1M, w2P1M,
                       w2M2M, w1M2M, w02M, w1P2M, w2P2M)
 
+        Ex, Ey = noise_reductor(ro_noisy, i, j, Ex, Ey, x_halfstep, y_halfstep,
+                                grid, grid_step_size, noise_reductor_ampl)
+
         # Move the particles according the the fields
         gamma_m = sqrt(m**2 + pz**2 + px**2 + py**2)
         vx, vy, vz = px / gamma_m, py / gamma_m, pz / gamma_m
@@ -165,7 +190,8 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
 
 def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
                particles: Arrays, estimated_particles: Arrays,
-               fields: Arrays):
+               fields: Arrays, const_arrays: Arrays, ro_noisy: np.ndarray,
+               noise_reductor_ampl):
     """
     Update plasma particle coordinates and momenta according to the field
     values interpolated halfway between the previous plasma particle location
@@ -205,7 +231,8 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
                       fields.Ex, fields.Ey, fields.Ez,
                       fields.Bx, fields.By, fields.Bz,
                       x_offt_new.ravel(), y_offt_new.ravel(),
-                      px_new.ravel(), py_new.ravel(), pz_new.ravel())
+                      px_new.ravel(), py_new.ravel(), pz_new.ravel(),
+                      const_arrays.grid, ro_noisy, noise_reductor_ampl)
 
     return Arrays(fields.xp, x_init=x_init, y_init=y_init,
                   x_offt=x_offt_new, y_offt=y_offt_new,
@@ -403,11 +430,15 @@ def get_plasma_particles_mover(config: Config):
     reflect_boundary = grid_step_size * (grid_steps / 2 - reflect_padding_steps)
     pu_type = config.get('processing-unit-type').lower()
 
+    noise_reductor_ampl = config.getfloat('noise-reductor-amplitude')
+
     if pu_type == 'cpu':
-        def move_particles_smart(fields, particles, estimated_particles):
+        def move_particles_smart(fields, particles, estimated_particles,
+                                 const_arrays, ro_noisy):
             return move_smart(
                 xi_step_size, reflect_boundary, grid_step_size, grid_steps,
-                particles, estimated_particles, fields)
+                particles, estimated_particles, fields, const_arrays, ro_noisy,
+                noise_reductor_ampl)
 
         def move_particles_wo_fields(particles):
             return move_estimate_wo_fields(
@@ -417,7 +448,8 @@ def get_plasma_particles_mover(config: Config):
         move_smart_kernel = get_move_smart_kernel_cupy()
 
         def move_particles_smart(
-            fields: Arrays, particles: Arrays, estimated_particles: Arrays):
+            fields: Arrays, particles: Arrays, estimated_particles: Arrays,
+            const_arrays, ro_noisy):
             """
             Update plasma particle coordinates and momenta according to the
             field values interpolated halfway between the previous plasma
