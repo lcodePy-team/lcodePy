@@ -211,7 +211,7 @@ class DiagnosticsFXi:
                 for name in self.__f_xi_names:
                     plt.plot(self.__data['xi'], self.__data[name])
                     plt.savefig(
-                        f'./diagnostics/{name}_f_xi_{current_time:08.2f}.png'
+                        f'./diagnostics/{name}_f_xi_{current_time:08.2f}.jpg'
                     )
                                 # vmin=-1, vmax=1)
                     plt.close()
@@ -350,7 +350,7 @@ class DiagnosticsColormaps:
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
         # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time)
+        #     self.dump(current_time, None, None, None, None)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
@@ -479,7 +479,7 @@ class DiagnosticsTransverse:
                     parents=True, exist_ok=True
                 )
                 for name in self.__colormaps_names:
-                    fname = f'{name}_{xi_plasma_layer:+09.2f}.png'
+                    fname = f'{name}_{xi_plasma_layer:+09.2f}.jpg'
                 
                     # if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                     #     val = getattr(pl_fields, name)[
