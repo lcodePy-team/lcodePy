@@ -21,7 +21,7 @@ class PushAndSolver3d:
 
         self.xi_max = config.getfloat('window-length')
         self.xi_step_size = config.getfloat('xi-step')
-        self.xi_steps = int(self.xi_max / self.xi_step_size)
+        self.xi_steps = round(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
         # TODO: Get rid of time_step_size and how we change current_time
@@ -96,7 +96,7 @@ class PushAndSolver3d:
             Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
             print(
-                f't={current_time:+.4f}, ' + 
+                # f't={current_time:+.4f}, ' + 
                 f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
             )
 
