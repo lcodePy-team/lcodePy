@@ -68,17 +68,7 @@ class Cartesian3dSimulation:
         # Mode of plasma continuation:
         self.__cont_mode = self.__config.get('continuation')
 
-        # Here we get information about the type of processor (CPU or GPU)
-        # and import libraries accordingly.      
-        pu_type = self.__config.get('processing-unit-type').lower()
-        if pu_type == 'cpu':
-            import numpy as np
-            self.xp = np
-        elif pu_type == 'gpu':
-            import cupy as cp
-            self.xp = cp
-
-        self.__push_solver = PushAndSolver3d(xp=self.xp, config=self.__config)
+        self.__push_solver = PushAndSolver3d(config=self.__config)
         self.init_plasma, self.__load_plasma = init_plasma, load_plasma
         self.BeamParticles, self.BeamSource, self.BeamDrain = \
             BeamParticles, BeamSource, BeamDrain
@@ -93,12 +83,11 @@ class Cartesian3dSimulation:
     # TODO: Should we make load_beamfile just
     #       another method of beam genetration?
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
-        beam_particles = self.BeamParticles(self.xp)
+        beam_particles = self.BeamParticles(self.__config.xp)
         beam_particles.load(path_to_beamfile)
 
-        self.beam_source = self.BeamSource(self.xp, self.__config,
-                                           beam_particles)
-        self.beam_drain  = self.BeamDrain(self.xp)
+        self.beam_source = self.BeamSource(self.__config, beam_particles)
+        self.beam_drain  = self.BeamDrain(self.__config)
 
     # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
     #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
@@ -158,9 +147,9 @@ class Cartesian3dSimulation:
                                                    self.beam_parameters)
 
                     # Here we create a beam source and a beam drain:
-                    self.beam_source = self.BeamSource(self.xp, self.__config,
+                    self.beam_source = self.BeamSource(self.__config,
                                                        beam_particles)
-                    self.beam_drain  = self.BeamDrain(self.xp)
+                    self.beam_drain  = self.BeamDrain(self.__config)
 
                 # A rigid beam mode has not been implemented yet. If you are
                 # writing rigid beam mode, just use rigid_beam_current(...) from
@@ -182,10 +171,9 @@ class Cartesian3dSimulation:
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                self.beam_source = self.BeamSource(
-                    self.xp, self.__config, self.beam_drain.beam_buffer
-                )
-                self.beam_drain  = self.BeamDrain(self.xp)
+                self.beam_source = self.BeamSource(self.__config,
+                                                   self.beam_drain.beam_buffer)
+                self.beam_drain  = self.BeamDrain(self.__config)
                 
                 self.current_time = self.current_time + self.__time_step_size
 

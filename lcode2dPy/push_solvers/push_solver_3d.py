@@ -9,13 +9,13 @@ from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles, \
 
 
 class PushAndSolver3d:
-    def __init__(self, xp: np, config: Config):
+    def __init__(self, config: Config):
         self.config = config
 
         self.pl_solver = Plane2d3vPlasmaSolver(config)
         self.beam_particles_class = BeamParticles
         self.beam_conc = concatenate_beam_layers
-        self.beam_calc = BeamCalculator(xp, config)
+        self.beam_calc = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
 

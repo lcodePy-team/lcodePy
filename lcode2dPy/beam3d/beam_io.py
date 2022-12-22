@@ -9,9 +9,9 @@ class BeamSource:
     This class helps to extract a beam layer from beam particles array.
     """
     # Do we really need this class?
-    def __init__(self, xp: np, config: Config, beam_particles):
+    def __init__(self, config: Config, beam_particles):
         # From input parameters:
-        self.xp = xp
+        self.xp = config.xp
         self.xi_step_size = config.getfloat('xi-step')
         
         # Get the whole beam or a beam layer:     
@@ -64,11 +64,11 @@ class BeamDrain:
     This class is used to store beam particles when the calculation of their
     movement ends.
     """
-    def __init__(self, xp: np):
+    def __init__(self, config: Config):
         # We create two empty BeamParticles classes. Don't really like how it
         # is done. We need to change this procces.
-        self.beam_buffer = BeamParticles(xp)
-        self.lost_buffer = BeamParticles(xp)
+        self.beam_buffer = BeamParticles(config.xp)
+        self.lost_buffer = BeamParticles(config.xp)
 
     def push_beam_layer(self, beam_layer: BeamParticles):
         """
