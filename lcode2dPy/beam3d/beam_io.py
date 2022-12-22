@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..config.config import Config
-from .data import BeamParticles, concatenate_beam_layers
+from .data import BeamParticles
 
 
 class BeamSource:
@@ -13,14 +13,14 @@ class BeamSource:
         # From input parameters:
         self.xp = config.xp
         self.xi_step_size = config.getfloat('xi-step')
-        
-        # Get the whole beam or a beam layer:     
+
+        # Get the whole beam or a beam layer:
         if type(beam_particles) == np.ndarray:
-            beam = BeamParticles(self.xp)
+            beam = BeamParticles(xp = self.xp)
             beam.init_generated(beam_particles)
         else:
             beam = beam_particles
-            
+
         beam.xi_sorted()
         self.beam = beam
 
@@ -39,7 +39,7 @@ class BeamSource:
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
 
         # We use this only to speed up the search of requisite particles. Can
-        # be dropped by changing to arr_to_search = self.beam.xi and not using 
+        # be dropped by changing to arr_to_search = self.beam.xi and not using
         # layout_count at all.
         begin = self.layout_count
         arr_to_search = self.beam.xi[begin:]
@@ -67,21 +67,19 @@ class BeamDrain:
     def __init__(self, config: Config):
         # We create two empty BeamParticles classes. Don't really like how it
         # is done. We need to change this procces.
-        self.beam_buffer = BeamParticles(config.xp)
-        self.lost_buffer = BeamParticles(config.xp)
+        self.beam_buffer = BeamParticles(xp = config.xp)
+        self.lost_buffer = BeamParticles(xp = config.xp)
 
     def push_beam_layer(self, beam_layer: BeamParticles):
         """
         Add a beam layer that was moved to the beam buffer.
         """
         if beam_layer.size > 0:
-            self.beam_buffer = concatenate_beam_layers(self.beam_buffer,
-                                                       beam_layer)
+            self.beam_buffer.append(beam_layer)
 
     def push_beam_lost(self, lost_layer: BeamParticles):
         """
         Add lost beam particles to the buffer of lost particles.
         """
         if lost_layer.size > 0:
-            self.lost_buffer = concatenate_beam_layers(self.lost_buffer,
-                                                       lost_layer)
+            self.lost_buffer.append(lost_layer)

@@ -4,8 +4,7 @@ from ..config.config import Config
 from ..diagnostics.diagnostics_3d import Diagnostics3d
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles, \
-                     concatenate_beam_layers
+from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles
 
 
 class PushAndSolver3d:
@@ -14,7 +13,6 @@ class PushAndSolver3d:
 
         self.pl_solver = Plane2d3vPlasmaSolver(config)
         self.beam_particles_class = BeamParticles
-        self.beam_conc = concatenate_beam_layers
         self.beam_calc = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
@@ -50,8 +48,7 @@ class PushAndSolver3d:
             (self.grid_steps, self.grid_steps), dtype=xp.float64)
 
         for xi_i in range(self.xi_steps + 1):
-            beam_layer_to_layout = \
-                beam_source.get_beam_layer_to_layout(xi_i)
+            beam_layer_to_layout = beam_source.get_beam_layer_to_layout(xi_i)
             ro_beam_full = \
                 self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i)
 
@@ -69,9 +66,7 @@ class PushAndSolver3d:
             ro_beam_prev = ro_beam_full.copy()
 
             # Beam layers operations:
-            beam_layer_to_move = self.beam_conc(
-                beam_layer_to_layout, fell_to_next_layer
-            )
+            beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
             fell_size = fell_to_next_layer.size
 
             beam_drain.push_beam_layer(moved)
