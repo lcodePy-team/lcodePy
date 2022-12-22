@@ -67,7 +67,7 @@ class PushAndSolver3d:
 
             # Beam layers operations:
             beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
-            fell_size = fell_to_next_layer.size
+            fell_size = fell_to_next_layer.id.size
 
             beam_drain.push_beam_layer(moved)
             # beam_drain.push_beam_lost(lost)
