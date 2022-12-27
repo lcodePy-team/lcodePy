@@ -4,24 +4,22 @@ from ..config.config import Config
 from ..diagnostics.diagnostics_3d import Diagnostics3d
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles, \
-                     concatenate_beam_layers
+from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles
 
 
 class PushAndSolver3d:
-    def __init__(self, xp: np, config: Config):
+    def __init__(self, config: Config):
         self.config = config
 
         self.pl_solver = Plane2d3vPlasmaSolver(config)
         self.beam_particles_class = BeamParticles
-        self.beam_conc = concatenate_beam_layers
-        self.beam_calc = BeamCalculator(xp, config)
+        self.beam_calc = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
 
         self.xi_max = config.getfloat('window-length')
         self.xi_step_size = config.getfloat('xi-step')
-        self.xi_steps = int(self.xi_max / self.xi_step_size)
+        self.xi_steps = round(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
         # TODO: Get rid of time_step_size and how we change current_time
@@ -50,8 +48,7 @@ class PushAndSolver3d:
             (self.grid_steps, self.grid_steps), dtype=xp.float64)
 
         for xi_i in range(self.xi_steps + 1):
-            beam_layer_to_layout = \
-                beam_source.get_beam_layer_to_layout(xi_i)
+            beam_layer_to_layout = beam_source.get_beam_layer_to_layout(xi_i)
             ro_beam_full = \
                 self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i)
 
@@ -69,10 +66,8 @@ class PushAndSolver3d:
             ro_beam_prev = ro_beam_full.copy()
 
             # Beam layers operations:
-            beam_layer_to_move = self.beam_conc(
-                beam_layer_to_layout, fell_to_next_layer
-            )
-            fell_size = fell_to_next_layer.size
+            beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
+            fell_size = fell_to_next_layer.id.size
 
             beam_drain.push_beam_layer(moved)
             # beam_drain.push_beam_lost(lost)

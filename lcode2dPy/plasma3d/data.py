@@ -6,9 +6,9 @@ import numpy as np
 
 class Arrays:
     """
-    A convenient way to group several GPU arrays and access them with a dot.
+    A convenient way to group several CPU/GPU arrays and access them with a dot.
     `x = Arrays(xp=cupy, something=numpy_array, something_else=another_array)`
-    will create `x` with `x.something` and `x.something_else` being GPU arrays.
+    will create `x` with `x.something` and `x.something_else` being CPU/GPU arrays.
     Do not add more attributes later, specify them all at construction time.
     """
     def __init__(self, xp: np, **kwargs):

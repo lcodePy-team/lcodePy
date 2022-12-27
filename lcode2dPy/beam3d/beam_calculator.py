@@ -36,9 +36,9 @@ def get_beam_substepping_step(xp: np):
 
 
 class BeamCalculator:
-    def __init__(self, xp: np, config: Config):
+    def __init__(self, config: Config):
         # Get main calculation parameters.
-        self.xp = xp
+        self.xp = config.xp
 
         self.grid_step_size = config.getfloat('window-width-step-size')
         self.grid_steps = config.getint('window-width-steps')
