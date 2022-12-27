@@ -366,8 +366,11 @@ def init_plasma(config: Config, current_time=0):
     mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, solver_trick)
     neu_matrix = neumann_matrix(xp, grid_steps, grid_step_size)
 
+    grid = ((np.arange(grid_steps) - grid_steps // 2) * grid_step_size)
+
     if dual_plasma_approach:
         const_arrays = Arrays(xp,
+            grid=grid,
             ro_initial=ro_initial, dirichlet_matrix=dir_matrix, 
             field_mixed_matrix=mix_matrix, neumann_matrix=neu_matrix,
             influence_prev=virt_params.influence_prev,
@@ -377,6 +380,7 @@ def init_plasma(config: Config, current_time=0):
             fine_grid=virt_params.fine_grid)
     else:
         const_arrays = Arrays(xp,
+            grid=grid,
             ro_initial=ro_initial, dirichlet_matrix=dir_matrix,
             field_mixed_matrix=mix_matrix,
             neumann_matrix=neu_matrix)

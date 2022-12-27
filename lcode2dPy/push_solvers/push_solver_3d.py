@@ -19,7 +19,7 @@ class PushAndSolver3d:
 
         self.xi_max = config.getfloat('window-length')
         self.xi_step_size = config.getfloat('xi-step')
-        self.xi_steps = int(self.xi_max / self.xi_step_size)
+        self.xi_steps = round(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
 
         # TODO: Get rid of time_step_size and how we change current_time
