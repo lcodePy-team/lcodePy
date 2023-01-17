@@ -287,12 +287,12 @@ def get_move_beam_cupy():
                     const T w1 = w  * weight1(xi_loc, 1);
                     const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
-                    Ex += Ex_k[i] * w0 + Ex_k1[i] * w1;
-                    Bx += Bx_k[i] * w0 + Bx_k1[i] * w1;
-                    Ey += Ey_k[i] * w0 + Ey_k1[i] * w1;
-                    By += By_k[i] * w0 + By_k1[i] * w1;
-                    Ez += Ez_k[i] * w0 + Ez_k1[i] * w1;
-                    Bz += Bz_k[i] * w0 + Bz_k1[i] * w1;
+                    Ex += Ex_k[idx] * w0 + Ex_k1[idx] * w1;
+                    Bx += Bx_k[idx] * w0 + Bx_k1[idx] * w1;
+                    Ey += Ey_k[idx] * w0 + Ey_k1[idx] * w1;
+                    By += By_k[idx] * w0 + By_k1[idx] * w1;
+                    Ez += Ez_k[idx] * w0 + Ez_k1[idx] * w1;
+                    Bz += Bz_k[idx] * w0 + Bz_k1[idx] * w1;
                 }
             }
 
@@ -313,7 +313,7 @@ def get_move_beam_cupy():
             // 5. Calculate auxiliary values:
             T tx = bx / gamma_m, ty = by / gamma_m, tz = bz / gamma_m;
             T t_sq_pl = 1. + tx*tx + ty*ty + tz*tz;
-            T t_sq_mi = 1. - tx*tx + ty*ty + tz*tz;
+            T t_sq_mi = 1. - tx*tx - ty*ty - tz*tz;
             T sx = 2.*tx / t_sq_pl, sy = 2.*ty / t_sq_pl, sz = 2.*tz / t_sq_pl;
             T s_dot_p_m = sx * px_m + sy * py_m + sz * pz_m;
 
