@@ -100,14 +100,14 @@ class Cartesian3dSimulation:
         self.__loaded_plasmastate =\
             self.__load_plasma(self.__config, self.path_to_plasmastate)
 
-    def __init_plasmastate(self):
+    def __init_plasmastate(self, current_time):
         # In case of an external plasma state, we set values
         # as the loaded values:
         if self.external_plasmastate:
             return self.__loaded_plasmastate
         else:
             # Initializes a plasma state:
-            return self.init_plasma(self.__config)
+            return self.init_plasma(self.__config, current_time)
             # The init_plasma function must be public so that a user
             # can change it and generate a unique plasma.
             # TODO: make the insides of init_plasma accessible for
@@ -159,8 +159,10 @@ class Cartesian3dSimulation:
                                     "rigid-beam is supported.")
 
             # 4. A loop that calculates N time steps:
-            for t_i in range(N_steps):
-                plasmastate = self.__init_plasmastate()
+            for t_i in range(N_steps):                
+                self.current_time = self.current_time + self.__time_step_size
+                
+                plasmastate = self.__init_plasmastate(self.current_time)
 
                 # Calculates one time step:
                 self.__push_solver.step_dt(
@@ -174,8 +176,6 @@ class Cartesian3dSimulation:
                 self.beam_source = self.BeamSource(self.__config,
                                                    self.beam_drain.beam_buffer)
                 self.beam_drain  = self.BeamDrain(self.__config)
-                
-                self.current_time = self.current_time + self.__time_step_size
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
             # self.beam_source.beam.save('beamfile') # Do we need it?

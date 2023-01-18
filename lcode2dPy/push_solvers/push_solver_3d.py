@@ -25,7 +25,7 @@ class PushAndSolver3d:
         # TODO: Get rid of time_step_size and how we change current_time
         #       in step_dt method later, when we figure out how time
         #       in diagnostics should work.
-        self.time_step_size = config.getfloat('time-step')
+        # self.time_step_size = config.getfloat('time-step')
 
     def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
                 pl_currents: Arrays, pl_const_arrays: Arrays,
@@ -35,8 +35,6 @@ class PushAndSolver3d:
         Perform one time step of beam-plasma calculations.
         """
         xp = pl_const_arrays.xp
-
-        current_time = current_time + self.time_step_size
 
         self.beam_calc.start_time_step()
         beam_layer_to_move = self.beam_particles_class(xp)
