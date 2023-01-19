@@ -64,15 +64,16 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
         x_halfstep = x_init[k] + (prev_x_offt[k] + estimated_x_offt[k]) / 2
         y_halfstep = y_init[k] + (prev_y_offt[k] + estimated_y_offt[k]) / 2
 
+        x_h = x_halfstep / grid_step_size + .5
+        y_h = y_halfstep / grid_step_size + .5
+
         (i, j, 
          w2M2P, w1M2P, w02P, w1P2P, w2P2P,
          w2M1P, w1M1P, w01P, w1P1P, w2P1P,
          w2M0,  w1M0,  w00,  w1P0,  w2P0,
          w2M1M, w1M1M, w01M, w1P1M, w2P1M,
          w2M2M, w1M2M, w02M, w1P2M, w2P2M
-        ) = weights(
-            x_halfstep, y_halfstep, grid_steps, grid_step_size
-        )
+        ) = weights(x_h, y_h, grid_steps)
 
         Ex = interp25(Ex_avg, i, j,
                       w2M2P, w1M2P, w02P, w1P2P, w2P2P,
@@ -368,28 +369,25 @@ def get_move_wo_fields_kernel_cupy():
         T x = x_init[i] + x_offt, y = y_init[i] + y_offt;
         if (x > reflect_boundary) {
             x =  2 * reflect_boundary  - x;
-            x_offt = x - x_init[i];
             px = -px;
         }
         if (x < -reflect_boundary) {
             x = -2 * reflect_boundary - x;
-            x_offt = x - x_init[i];
             px = -px;
         }
         if (y > reflect_boundary) {
             y = 2 * reflect_boundary  - y;
-            y_offt = y - y_init[i];
             py = -py;
         }
         if (y < -reflect_boundary) {
             y = -2 * reflect_boundary - y;
-            y_offt = y - y_init[i];
             py = -py;
         }
 
+        x_offt = x - x_init[i]; y_offt = y - y_init[i];
+
         out_x_offt[i] = x_offt; out_y_offt[i] = y_offt;
         out_px[i] = px; out_py[i] = py; out_pz[i] = pz;
-
         """,
         name='move_wo_fields_cupy'
     )
