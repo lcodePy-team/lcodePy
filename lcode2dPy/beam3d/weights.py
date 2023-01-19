@@ -146,7 +146,8 @@ def get_deposit_beam_cupy():
             }
         }
         """,
-        name='deposit_beam_cupy', preamble=weight1_cupy+weight4_cupy
+        name='deposit_beam_cupy', preamble=weight1_cupy+weight4_cupy,
+        no_return=True
     )
 
 
@@ -166,7 +167,7 @@ def get_deposit_beam(config: Config):
             xi_plasma_layer = - xi_step_size * plasma_layer_idx
             xi_loc = (xi_plasma_layer - xi) / xi_step_size
 
-            return deposit_beam_cpu(
+            deposit_beam_cpu(
                 grid_steps, grid_step_size, x.ravel(), y.ravel(),
                 xi_loc.ravel(), q_norm.ravel(), rho_layout_0, rho_layout_1)
 
@@ -182,7 +183,7 @@ def get_deposit_beam(config: Config):
             xi_loc = (xi_plasma_layer - xi) / xi_step_size
             x_h, y_h = x / grid_step_size + 0.5, y / grid_step_size + 0.5
 
-            return deposit_beam_cupy(
+            deposit_beam_cupy(
                 grid_steps, x_h, y_h, xi_loc, q_norm, out_ro0, out_ro1,
                 size=q_norm.size)
 

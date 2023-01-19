@@ -204,7 +204,7 @@ def move_particles(grid_steps, grid_step_size, xi_step_size,
     beam.x[idxes],  beam.y[idxes],  beam.xi[idxes] = x_new,  y_new,  xi_new
     beam.px[idxes], beam.py[idxes], beam.pz[idxes] = px_new, py_new, pz_new
     beam.id[idxes], beam.remaining_steps[idxes] = id_new, remaining_steps_new
-    
+
     return lost_idxes, moved_idxes, fell_idxes
 
 
@@ -212,7 +212,7 @@ def move_particles(grid_steps, grid_step_size, xi_step_size,
 
 def get_move_beam_cupy():
     import cupy as cp
-    
+
     return cp.ElementwiseKernel(
         in_params="""
         float64 xi_step_size, float64 r_max, float64 beam_xi_layer,
@@ -355,7 +355,8 @@ def get_move_beam_cupy():
         
 
         """,
-        name='move_beam_cupy', preamble=weight1_cupy+weight4_cupy
+        name='move_beam_cupy', preamble=weight1_cupy+weight4_cupy,
+        no_return=True
     )
 
 
@@ -398,8 +399,7 @@ def get_move_beam(config: Config):
             py_new = cp.zeros_like(beam.py[idxes])
             pz_new = cp.zeros_like(beam.pz[idxes])
 
-            (rem_steps_new, id_new, x_new, y_new, xi_new, px_new, py_new, pz_new,
-            lost_idxes, moved_idxes, fell_idxes) = move_beam_cupy(
+            move_beam_cupy(
                 xi_step_size, lost_radius, beam_layer_idx, grid_step_size,
                 grid_steps, beam.q_m[idxes], beam.dt[idxes],
                 beam.remaining_steps[idxes], beam.id[idxes],

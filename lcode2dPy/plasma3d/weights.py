@@ -1,6 +1,6 @@
 """Module for weights calculation, interpolation and deposition routines."""
 import numba as nb
-import numpy as np
+
 from math import sqrt, floor
 
 from ..config.config import Config
@@ -10,6 +10,14 @@ from .data import Arrays
 
 @nb.njit
 def weight4(x, place):
+    """
+    Calculate the indices of a cell corresponding to the coordinates,
+    and the coefficients of interpolation and deposition for this cell
+    and 24 surrounding cells.
+    The weights correspond to ...
+    """
+    # TODO: Change to switch statement (match and case) when Python 3.10 is
+    #       supported by Anaconda.
     if place == -2:
         return (1 / 2 - x) ** 4 / 24
     elif place == -1:
@@ -20,51 +28,6 @@ def weight4(x, place):
         return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
     elif place == 2:
         return (1 / 2 + x) ** 4 / 24
-
-
-@nb.njit
-def weights(x_h, y_h, grid_steps):
-    """
-    Calculate the indices of a cell corresponding to the coordinates,
-    and the coefficients of interpolation and deposition for this cell
-    and 24 surrounding cells.
-    The weights correspond to ...
-    """
-    i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
-    x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
-    # centered to -.5 to 5, not 0 to 1, as formulas use offset from cell center
-    # TODO: get rid of this deoffsetting/reoffsetting festival
-
-    wx0 = 115/192 - x_loc**2 * 5/8 + x_loc**4 / 4
-    wy0 = 115/192 - y_loc**2 * 5/8 + y_loc**4 / 4
-    wx1P = 19/96 + 11/24 * x_loc + x_loc**2 / 4 - x_loc**3 / 6 - x_loc**4 / 6
-    wy1P = 19/96 + 11/24 * y_loc + y_loc**2 / 4 - y_loc**3 / 6 - y_loc**4 / 6
-    wx1M = 19/96 - 11/24 * x_loc + x_loc**2 / 4 + x_loc**3 / 6 - x_loc**4 / 6
-    wy1M = 19/96 - 11/24 * y_loc + y_loc**2 / 4 + y_loc**3 / 6 - y_loc**4 / 6
-    wx2P = (1 / 2 + x_loc)**4 / 24
-    wy2P = (1 / 2 + y_loc)**4 / 24
-    wx2M = (1 / 2 - x_loc)**4 / 24
-    wy2M = (1 / 2 - y_loc)**4 / 24
-
-    w2M2P, w1M2P, w02P, w1P2P, w2P2P = (wx2M * wy2P, wx1M * wy2P, wx0 * wy2P,
-                                        wx1P * wy2P, wx2P * wy2P)
-    w2M1P, w1M1P, w01P, w1P1P, w2P1P = (wx2M * wy1P, wx1M * wy1P, wx0 * wy1P,
-                                        wx1P * wy1P, wx2P * wy1P)
-    w2M0,  w1M0,  w00,  w1P0,  w2P0  = (wx2M * wy0 , wx1M * wy0 , wx0 * wy0 ,
-                                        wx1P * wy0 , wx2P * wy0 ) 
-    w2M1M, w1M1M, w01M, w1P1M, w2P1M = (wx2M * wy1M, wx1M * wy1M, wx0 * wy1M,
-                                        wx1P * wy1M, wx2P * wy1M)
-    w2M2M, w1M2M, w02M, w1P2M, w2P2M = (wx2M * wy2M, wx1M * wy2M, wx0 * wy2M,
-                                        wx1P * wy2M, wx2P * wy2M)
-
-    return (
-        i, j,
-        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-        w2M0,  w1M0,  w00,  w1P0,  w2P0,
-        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-        w2M2M, w1M2M, w02M, w1P2M, w2P2M
-    )
 
 
 # Deposition #
@@ -154,7 +117,7 @@ def get_coarse_to_fine_cupy():
             (wpp * c_m[ind1] + wpn * c_m[ind2] +
              wnp * c_m[ind3] + wnn * c_m[ind4]);
         """,
-        name='coarse_to_fine'
+        name='coarse_to_fine', no_return=True
     )
 
 
@@ -219,7 +182,7 @@ def get_deposit_plasma_cupy():
             }
         }
         """,
-        name='deposit_plasma_cupy', preamble=weight4_cupy
+        name='deposit_plasma_cupy', preamble=weight4_cupy, no_return=True
     )
 
 
@@ -290,17 +253,16 @@ def get_deposit_plasma(config: Config):
                 pz_fine = xp.zeros((fine_grid_size, fine_grid_size))
                 q_fine  = xp.zeros((fine_grid_size, fine_grid_size))
                 m_fine  = xp.zeros((fine_grid_size, fine_grid_size))
-
-                x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine =\
-                    coarse_to_fine(
-                        virtplasma_smallness_factor,
-                        fine_grid_size, coarse_grid_size,
-                        x_offt, y_offt, px, py, pz, q, m,
-                        const_arrays.fine_grid,
-                        const_arrays.influence_prev, const_arrays.influence_next,
-                        const_arrays.indices_prev, const_arrays.indices_next,
-                        x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine,
-                        size=fine_grid_size**2)
+                
+                coarse_to_fine(
+                    virtplasma_smallness_factor,
+                    fine_grid_size, coarse_grid_size,
+                    x_offt, y_offt, px, py, pz, q, m,
+                    const_arrays.fine_grid,
+                    const_arrays.influence_prev, const_arrays.influence_next,
+                    const_arrays.indices_prev, const_arrays.indices_next,
+                    x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine,
+                    size=fine_grid_size**2)
 
                 ro = xp.zeros((grid_steps, grid_steps))
                 jx = xp.zeros((grid_steps, grid_steps))
@@ -310,10 +272,11 @@ def get_deposit_plasma(config: Config):
                 x_h = x_fine / grid_step_size + 0.5
                 y_h = y_fine / grid_step_size + 0.5
 
-                return deposit_plasma_cupy(
+                deposit_plasma_cupy(
                     grid_steps, x_h, y_h, px_fine, py_fine, pz_fine,
-                    q_fine, m_fine, ro, jx, jy, jz, size=fine_grid_size**2
-                )
+                    q_fine, m_fine, ro, jx, jy, jz, size=fine_grid_size**2)
+
+                return ro, jx, jy, jz
 
             return deposit_dual
 
@@ -334,9 +297,10 @@ def get_deposit_plasma(config: Config):
                 x_h = (x_init + x_offt) / grid_step_size + 0.5
                 y_h = (y_init + y_offt) / grid_step_size + 0.5
 
-                return deposit_plasma_cupy(
+                deposit_plasma_cupy(
                     grid_steps, x_h, y_h, px, py, pz, q, m, ro, jx, jy, jz,
-                    size=m.size
-                )
+                    size=m.size)
+
+                return ro, jx, jy, jz
 
             return deposit_single

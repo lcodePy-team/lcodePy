@@ -2,40 +2,13 @@
 import numba as nb
 import numpy as np
 
-from math import sqrt
+from math import sqrt, floor
 
 from ..config.config import Config
-from .weights import weights, weight4_cupy
+from .weights import weight4, weight4_cupy
 from .data import Arrays
 
 # Field interpolation and particle movement (fused), for CPU #
-
-@nb.njit
-def interp25(a, i, j,
-             w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-             w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-             w2M0,  w1M0,  w00,  w1P0,  w2P0,
-             w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-             w2M2M, w1M2M, w02M, w1P2M, w2P2M):
-    """
-    Collect value from a cell and 8 surrounding cells (using `weights` output).
-    """
-    return (
-        a[i - 2, j + 2] * w2M2P + a[i - 1, j + 2] * w1M2P +
-        a[i + 0, j + 2] * w02P  + a[i + 1, j + 2] * w1P2P +
-        a[i + 2, j + 2] * w2P2P + a[i - 2, j + 1] * w2M1P +
-        a[i - 1, j + 1] * w1M1P + a[i + 0, j + 1] * w01P  +
-        a[i + 1, j + 1] * w1P1P + a[i + 2, j + 1] * w2P1P +
-        a[i - 2, j + 0] * w2M0  + a[i - 1, j + 0] * w1M0  +
-        a[i + 0, j + 0] * w00   + a[i + 1, j + 0] * w1P0  +
-        a[i + 2, j + 0] * w2P0  + a[i - 2, j - 1] * w2M1M +
-        a[i - 1, j - 1] * w1M1M + a[i + 0, j - 1] * w01M  +
-        a[i + 1, j - 1] * w1P1M + a[i + 2, j - 1] * w2P1M +
-        a[i - 2, j - 2] * w2M2M + a[i - 1, j - 2] * w1M2M +
-        a[i + 0, j - 2] * w02M  + a[i + 1, j - 2] * w1P2M +
-        a[i + 2, j - 2] * w2P2M
-    )
-
 
 @nb.njit(parallel=True)
 def move_smart_kernel(xi_step_size, reflect_boundary,
@@ -66,51 +39,22 @@ def move_smart_kernel(xi_step_size, reflect_boundary,
 
         x_h = x_halfstep / grid_step_size + .5
         y_h = y_halfstep / grid_step_size + .5
+        x_loc = x_h - floor(x_h) - .5
+        y_loc = y_h - floor(y_h) - .5
+        ix = int(floor(x_h) + grid_steps // 2)
+        iy = int(floor(y_h) + grid_steps // 2)
 
-        (i, j, 
-         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-         w2M0,  w1M0,  w00,  w1P0,  w2P0,
-         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-         w2M2M, w1M2M, w02M, w1P2M, w2P2M
-        ) = weights(x_h, y_h, grid_steps)
+        Ex, Ey, Ez, Bx, By, Bz = 0, 0, 0, 0, 0, 0
+        for kx in range(-2, 3):
+            wx = weight4(x_loc, kx)
+            for ky in range(-2, 3):
+                w = wx * weight4(y_loc, ky)
+                idx_x, idx_y = ix + kx, iy + ky
 
-        Ex = interp25(Ex_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        Ey = interp25(Ey_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        Ez = interp25(Ez_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        Bx = interp25(Bx_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        By = interp25(By_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        Bz = interp25(Bz_avg, i, j,
-                      w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                      w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                      w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                      w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                      w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+                # Collect value from a cell and 8 surrounding cells.
+                Ex += Ex_avg[idx_x, idx_y] * w; Bx += Bx_avg[idx_x, idx_y] * w
+                Ey += Ey_avg[idx_x, idx_y] * w; By += By_avg[idx_x, idx_y] * w
+                Ez += Ez_avg[idx_x, idx_y] * w; Bz += Bz_avg[idx_x, idx_y] * w
 
         # Move the particles according the the fields
         gamma_m = sqrt(m**2 + pz**2 + px**2 + py**2)
@@ -337,7 +281,7 @@ def get_move_smart_kernel_cupy():
         out_px[i] = px; out_py[i] = py; out_pz[i] = pz;
 
         """,
-        name='move_smart_cupy', preamble=weight4_cupy
+        name='move_smart_cupy', preamble=weight4_cupy, no_return=True
     )
 
 
@@ -386,7 +330,7 @@ def get_move_wo_fields_kernel_cupy():
         out_x_offt[i] = x_offt; out_y_offt[i] = y_offt;
         out_px[i] = px; out_py[i] = py; out_pz[i] = pz;
         """,
-        name='move_wo_fields_cupy'
+        name='move_wo_fields_cupy', no_return=True
     )
 
 
@@ -429,7 +373,7 @@ def get_plasma_particles_mover(config: Config):
             py_new = xp.zeros_like(particles.py)
             pz_new = xp.zeros_like(particles.pz)
 
-            x_offt_new, y_offt_new, px_new, py_new, pz_new = move_smart_kernel(
+            move_smart_kernel(
                 xi_step_size, reflect_boundary, grid_step_size, grid_steps,
                 particles.m, particles.q, particles.x_init, particles.y_init,
                 particles.x_offt, particles.y_offt,
@@ -439,8 +383,7 @@ def get_plasma_particles_mover(config: Config):
                 fields.Ex, fields.Ey, fields.Ez,
                 fields.Bx, fields.By, fields.Bz,
                 x_offt_new, y_offt_new, px_new, py_new, pz_new,
-                size=(particles.m).size
-            )
+                size=(particles.m).size)
 
             return Arrays(xp,
                           x_init=particles.x_init, y_init=particles.y_init,
@@ -462,15 +405,14 @@ def get_plasma_particles_mover(config: Config):
             px_new = xp.zeros_like(particles.px)
             py_new = xp.zeros_like(particles.py)
             pz_new = xp.zeros_like(particles.pz)
-
-            x_offt_new, y_offt_new, px_new, py_new, pz_new =\
-                move_wo_fields_kernel_cupy(
-                    xi_step_size, reflect_boundary, particles.m, particles.q,
-                    particles.x_init, particles.y_init,
-                    particles.x_offt, particles.y_offt,
-                    particles.px, particles.py, particles.pz,
-                    x_offt_new, y_offt_new, px_new, py_new, pz_new,
-                    size=(particles.m).size)
+            
+            move_wo_fields_kernel_cupy(
+                xi_step_size, reflect_boundary, particles.m, particles.q,
+                particles.x_init, particles.y_init,
+                particles.x_offt, particles.y_offt,
+                particles.px, particles.py, particles.pz,
+                x_offt_new, y_offt_new, px_new, py_new, pz_new,
+                size=(particles.m).size)
 
             return Arrays(xp,
                           x_init=particles.x_init, y_init=particles.y_init,
