@@ -9,14 +9,27 @@ from .data import Arrays
 # Deposition and interpolation functions, for CPU #
 
 @nb.njit
-def weights(x, y, grid_steps, grid_step_size):
+def weight4(x, place):
+    if place == -2:
+        return (1 / 2 - x) ** 4 / 24
+    elif place == -1:
+        return 19/96 - 11/24 * x + x ** 2 / 4 + x ** 3 / 6 - x ** 4 / 6
+    elif place == 0:
+        return 115/192 - x ** 2 * 5/8 + x ** 4 / 4
+    elif place == 1:
+        return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
+    elif place == 2:
+        return (1 / 2 + x) ** 4 / 24
+
+
+@nb.njit
+def weights(x_h, y_h, grid_steps):
     """
     Calculate the indices of a cell corresponding to the coordinates,
     and the coefficients of interpolation and deposition for this cell
     and 24 surrounding cells.
     The weights correspond to ...
     """
-    x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
     i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
     x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
     # centered to -.5 to 5, not 0 to 1, as formulas use offset from cell center
@@ -54,48 +67,10 @@ def weights(x, y, grid_steps, grid_step_size):
     )
 
 
-@nb.njit
-def deposit25(a, i, j, val, 
-        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-        w2M0,  w1M0,  w00,  w1P0,  w2P0,
-        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-        w2M2M, w1M2M, w02M, w1P2M, w2P2M):
-    """
-    Deposit value into a cell and 24 surrounding cells (using `weights` output).
-    """
-    a[i - 2, j + 2] += val * w2M2P
-    a[i - 1, j + 2] += val * w1M2P
-    a[i + 0, j + 2] += val * w02P
-    a[i + 1, j + 2] += val * w1P2P
-    a[i + 2, j + 2] += val * w2P2P
-    a[i - 2, j + 1] += val * w2M1P
-    a[i - 1, j + 1] += val * w1M1P
-    a[i + 0, j + 1] += val * w01P
-    a[i + 1, j + 1] += val * w1P1P
-    a[i + 2, j + 1] += val * w2P1P
-    a[i - 2, j + 0] += val * w2M0
-    a[i - 1, j + 0] += val * w1M0
-    a[i + 0, j + 0] += val * w00
-    a[i + 1, j + 0] += val * w1P0
-    a[i + 2, j + 0] += val * w2P0
-    a[i - 2, j - 1] += val * w2M1M
-    a[i - 1, j - 1] += val * w1M1M
-    a[i + 0, j - 1] += val * w01M
-    a[i + 1, j - 1] += val * w1P1M
-    a[i + 2, j - 1] += val * w2P1M
-    a[i - 2, j - 2] += val * w2M2M
-    a[i - 1, j - 2] += val * w1M2M
-    a[i + 0, j - 2] += val * w02M
-    a[i + 1, j - 2] += val * w1P2M
-    a[i + 2, j - 2] += val * w2P2M
-
-
 # Deposition #
 
 @nb.njit(parallel=True)
-def deposit_kernel(grid_steps, grid_step_size,
-                   x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
+def deposit_kernel(grid_steps, x_h, y_h, m, q, px, py, pz,
                    out_ro, out_jx, out_jy, out_jz):
     """
     Deposit plasma particles onto the charge density and current grids.
@@ -108,63 +83,21 @@ def deposit_kernel(grid_steps, grid_step_size,
         djy = py[k] * (dro / gamma_m)
         djz = pz[k] * (dro / gamma_m)
 
-        x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
-        (i, j, 
-         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-         w2M0,  w1M0,  w00,  w1P0,  w2P0,
-         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-         w2M2M, w1M2M, w02M, w1P2M, w2P2M
-        ) = weights(
-            x, y, grid_steps, grid_step_size
-        )
-        
-        deposit25(out_ro, i, j, dro,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jx, i, j, djx,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jy, i, j, djy,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jz, i, j, djz, 
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        x_loc = x_h[k] - floor(x_h[k]) - .5
+        y_loc = y_h[k] - floor(y_h[k]) - .5
+        ix = int(floor(x_h[k]) + grid_steps // 2)
+        iy = int(floor(y_h[k]) + grid_steps // 2)
 
+        for kx in range(-2, 3):
+            wx = weight4(x_loc, kx)
+            for ky in range(-2, 3):
+                w = wx * weight4(y_loc, ky)
+                index_x, index_y = ix + kx, iy + ky
 
-@nb.njit
-def deposit(grid_steps, grid_step_size, x_init, y_init,
-            x_offt, y_offt, px, py, pz, q, m):
-    """
-    Deposit plasma particles onto the charge density and current grids.
-    This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
-    """
-    ro = np.zeros((grid_steps, grid_steps))
-    jx = np.zeros((grid_steps, grid_steps))
-    jy = np.zeros((grid_steps, grid_steps))
-    jz = np.zeros((grid_steps, grid_steps))
-
-    deposit_kernel(grid_steps, grid_step_size,
-                   x_init.ravel(), y_init.ravel(),
-                   x_offt.ravel(), y_offt.ravel(),
-                   m.ravel(), q.ravel(),
-                   px.ravel(), py.ravel(), pz.ravel(),
-                   ro, jx, jy, jz)
-
-    return ro, jx, jy, jz
+                out_ro[index_x, index_y] += dro * w
+                out_jx[index_x, index_y] += djx * w
+                out_jy[index_x, index_y] += djy * w
+                out_jz[index_x, index_y] += djz * w
 
 
 # Helper function for dual plasma approach, for GPU #
@@ -302,13 +235,31 @@ def get_deposit_plasma(config: Config):
 
     pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
-        def deposit_template(x_init, y_init, x_offt, y_offt,
-                             px, py, pz, q, m, const_arrays):
-            return deposit(
-                grid_steps, grid_step_size, x_init, y_init,
-                x_offt, y_offt, px, py, pz, q, m)
+        def deposit_single(x_init, y_init, x_offt, y_offt,
+                           px, py, pz, q, m, const_arrays):
+            """
+            Deposit plasma particles onto the charge density and current
+            grids.
+            """
+            xp = const_arrays.xp
 
-        return deposit_template
+            ro = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+            jx = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+            jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+            jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+
+            x_h = (x_init + x_offt) / grid_step_size + 0.5
+            y_h = (y_init + y_offt) / grid_step_size + 0.5
+
+            deposit_kernel(grid_steps,
+                           x_h.ravel(), y_h.ravel(),
+                           m.ravel(), q.ravel(),
+                           px.ravel(), py.ravel(), pz.ravel(),
+                           ro, jx, jy, jz)
+
+            return ro, jx, jy, jz
+
+        return deposit_single
 
     elif pu_type == 'gpu':
         deposit_plasma_cupy = get_deposit_plasma_cupy()
