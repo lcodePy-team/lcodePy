@@ -198,8 +198,7 @@ def get_deposit_plasma(config: Config):
 
     pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
-        def deposit_single(x_init, y_init, x_offt, y_offt,
-                           px, py, pz, q, m, const_arrays):
+        def deposit_single(particles: Arrays, const_arrays: Arrays):
             """
             Deposit plasma particles onto the charge density and current
             grids.
@@ -211,14 +210,14 @@ def get_deposit_plasma(config: Config):
             jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
             jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
-            x_h = (x_init + x_offt) / grid_step_size + 0.5
-            y_h = (y_init + y_offt) / grid_step_size + 0.5
+            x_h = (particles.x_init + particles.x_offt) / grid_step_size + 0.5
+            y_h = (particles.y_init + particles.y_offt) / grid_step_size + 0.5
 
-            deposit_kernel(grid_steps,
-                           x_h.ravel(), y_h.ravel(),
-                           m.ravel(), q.ravel(),
-                           px.ravel(), py.ravel(), pz.ravel(),
-                           ro, jx, jy, jz)
+            deposit_kernel(
+                grid_steps, x_h.ravel(), y_h.ravel(),
+                particles.m.ravel(), particles.q.ravel(),
+                particles.px.ravel(), particles.py.ravel(), particles.pz.ravel(),
+                ro, jx, jy, jz)
 
             return ro, jx, jy, jz
 
@@ -232,8 +231,7 @@ def get_deposit_plasma(config: Config):
 
             coarse_to_fine = get_coarse_to_fine_cupy()
 
-            def deposit_dual(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
-                             const_arrays: Arrays):
+            def deposit_dual(particles: Arrays, const_arrays: Arrays):
                 """
                 Interpolate coarse plasma into fine plasma and deposit it on the
                 charge density and current grids. This is a convenience wrapper
@@ -244,7 +242,7 @@ def get_deposit_plasma(config: Config):
                 virtplasma_smallness_factor = 1 / (
                     plasma_coarseness * plasma_fineness)**2
                 fine_grid_size = const_arrays.fine_grid.size
-                coarse_grid_size = len(m)
+                coarse_grid_size = len(particles.m)
 
                 x_fine  = xp.zeros((fine_grid_size, fine_grid_size))
                 y_fine  = xp.zeros((fine_grid_size, fine_grid_size))
@@ -253,21 +251,23 @@ def get_deposit_plasma(config: Config):
                 pz_fine = xp.zeros((fine_grid_size, fine_grid_size))
                 q_fine  = xp.zeros((fine_grid_size, fine_grid_size))
                 m_fine  = xp.zeros((fine_grid_size, fine_grid_size))
-                
+
                 coarse_to_fine(
                     virtplasma_smallness_factor,
                     fine_grid_size, coarse_grid_size,
-                    x_offt, y_offt, px, py, pz, q, m,
+                    particles.x_offt, particles.y_offt,
+                    particles.px, particles.py, particles.pz,
+                    particles.q, particles.m,
                     const_arrays.fine_grid,
                     const_arrays.influence_prev, const_arrays.influence_next,
                     const_arrays.indices_prev, const_arrays.indices_next,
                     x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine,
                     size=fine_grid_size**2)
 
-                ro = xp.zeros((grid_steps, grid_steps))
-                jx = xp.zeros((grid_steps, grid_steps))
-                jy = xp.zeros((grid_steps, grid_steps))
-                jz = xp.zeros((grid_steps, grid_steps))
+                ro = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+                jx = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+                jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+                jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
                 x_h = x_fine / grid_step_size + 0.5
                 y_h = y_fine / grid_step_size + 0.5
@@ -281,8 +281,7 @@ def get_deposit_plasma(config: Config):
             return deposit_dual
 
         else:
-            def deposit_single(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
-                               const_arrays: Arrays):
+            def deposit_single(particles: Arrays, const_arrays: Arrays):
                 """
                 Deposit plasma particles onto the charge density and current
                 grids.
@@ -294,12 +293,16 @@ def get_deposit_plasma(config: Config):
                 jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
                 jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
-                x_h = (x_init + x_offt) / grid_step_size + 0.5
-                y_h = (y_init + y_offt) / grid_step_size + 0.5
+                x_h = (
+                    particles.x_init + particles.x_offt) / grid_step_size + 0.5
+                y_h = (
+                    particles.y_init + particles.y_offt) / grid_step_size + 0.5
 
                 deposit_plasma_cupy(
-                    grid_steps, x_h, y_h, px, py, pz, q, m, ro, jx, jy, jz,
-                    size=m.size)
+                    grid_steps, x_h, y_h,
+                    particles.px, particles.py, particles.pz,
+                    particles.q, particles.m, ro, jx, jy, jz,
+                    size=particles.m.size)
 
                 return ro, jx, jy, jz
 

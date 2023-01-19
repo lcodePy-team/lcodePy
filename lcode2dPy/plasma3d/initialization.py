@@ -352,14 +352,17 @@ def init_plasma(config: Config, current_time=0):
 
     # Here we change q and m arrays of plasma particles according to
     # set plasma_zhape:
-    q, m = change_by_plasma_zshape(config, current_time, q, m)
+    q, m = change_by_plasma_zshape(config, current_time, q, m)    
+
+    particles = Arrays(xp, x_init=x_init, y_init=y_init,
+                       x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
+                       q=q, m=m)
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
     initial_deposition = get_deposit_plasma(config)
 
-    ro_electrons_initial, _, _, _ = initial_deposition(
-        x_init, y_init, x_offt, y_offt, px, py, pz, q, m, virt_params)
+    ro_electrons_initial, _, _, _ = initial_deposition(particles, virt_params)
     ro_initial = -ro_electrons_initial
 
     dir_matrix = dirichlet_matrix(xp, grid_steps, grid_step_size)
@@ -390,10 +393,6 @@ def init_plasma(config: Config, current_time=0):
 
     fields = Arrays(xp, Ex=zeros(), Ey=zeros(), Ez=zeros(),
                     Bx=zeros(), By=zeros(), Bz=zeros(), Phi=zeros())
-
-    particles = Arrays(xp, x_init=x_init, y_init=y_init,
-                       x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
-                       q=q, m=m)
 
     currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
 
