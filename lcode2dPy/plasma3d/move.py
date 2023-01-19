@@ -220,28 +220,25 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Arrays):
     Move coarse plasma particles as if there were no fields.
     Also reflect the particles from `+-reflect_boundary`.
     """
-    m, q = particles.m, particles.q
-    x_init, y_init = particles.x_init, particles.y_init
-    prev_x_offt, prev_y_offt = particles.x_offt, particles.y_offt
-    px, py, pz = particles.px, particles.py, particles.pz
+    x = particles.x_init + particles.x_offt
+    y = particles.y_init + particles.y_offt
+    gamma_m = np.sqrt(
+        particles.m**2 + particles.pz**2 + particles.px**2 + particles.py**2)
 
-    x, y = x_init + prev_x_offt, y_init + prev_y_offt
-    gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)
-
-    x += px / (gamma_m - pz) * xi_step
-    y += py / (gamma_m - pz) * xi_step
+    x += particles.px / (gamma_m - particles.pz) * xi_step
+    y += particles.py / (gamma_m - particles.pz) * xi_step
 
     reflect = reflect_boundary
     x[x >= +reflect] = +2 * reflect - x[x >= +reflect]
     x[x <= -reflect] = -2 * reflect - x[x <= -reflect]
     y[y >= +reflect] = +2 * reflect - y[y >= +reflect]
     y[y <= -reflect] = -2 * reflect - y[y <= -reflect]
+    # TODO: Do we want to update momentum or is it not that important?
 
-    x_offt, y_offt = x - x_init, y - y_init
+    particles.x_offt = x - particles.x_init
+    particles.y_offt = y - particles.y_init
 
-    return Arrays(particles.xp, x_init=x_init, y_init=y_init,
-                  x_offt=x_offt, y_offt=y_offt,
-                  px=px, py=py, pz=pz, q=q, m=m)
+    return particles
 
 
 # Field interpolation and particle movement (fused), for GPU #
@@ -408,8 +405,10 @@ def get_plasma_particles_mover(config: Config):
                 particles, estimated_particles, fields)
 
         def move_particles_wo_fields(particles):
+            # NOTE: We need to copy particles to discriminate
+            #       particles_full and particles_prev.
             return move_estimate_wo_fields(
-                xi_step_size, reflect_boundary, particles)
+                xi_step_size, reflect_boundary, particles.copy())
 
     elif pu_type == 'gpu':
         move_smart_kernel = get_move_smart_kernel_cupy()
