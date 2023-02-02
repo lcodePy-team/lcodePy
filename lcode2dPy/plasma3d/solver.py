@@ -9,7 +9,7 @@ class Plane2d3vPlasmaSolver(object):
     def __init__(self, config: Config):
         self.compute_rhoj = get_rhoj_computer(config)
         self.compute_fields = get_field_computer(config)
-        self.move_particles, self.move_particles_wo_fields = \
+        self.move_particles_wo_fields, self.move_particles = \
             get_plasma_particles_mover(config)
 
     # Perfoms one full step along xi.
