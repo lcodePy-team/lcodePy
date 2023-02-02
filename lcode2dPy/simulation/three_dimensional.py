@@ -3,7 +3,6 @@
 # (can be used for 2d too)
 from ..config.default_config_values import default_config_values
 from ..config.config import Config
-from ..diagnostics.diagnostics_3d import Diagnostics3d
 from ..alt_beam_generator.beam_generator import generate_beam
 
 # Imports plasma nodule
@@ -22,10 +21,10 @@ class Cartesian3dSimulation:
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config=default_config_values, beam_parameters={},
-                 diagnostics=None):
+                 diagnostics=[]):
         self.config = config
         self.beam_parameters = beam_parameters
-        self.diagnostics = diagnostics
+        self.diagnostics_list = diagnostics
 
         # Here we set parameters for beam generation, where we will store beam
         # particles and where they will go after calculations
@@ -50,7 +49,6 @@ class Cartesian3dSimulation:
     def __pull_config(self):
         # 0. We set __config__ as a Config class instance:
         self.__config = Config(self.config)
-        self.full_config = self.__config.config_values
 
         # Firstly, we check that the geomtry was set right:
         geometry = self.__config.get('geometry').lower()
@@ -74,11 +72,8 @@ class Cartesian3dSimulation:
             BeamParticles, BeamSource, BeamDrain
 
         # Finally, we set the diagnostics.
-        if type(self.diagnostics) != list and self.diagnostics is not None:
-            # If a user set only one diag. class:
-            self.diagnostics = [self.diagnostics]
-        self.__diagnostics = Diagnostics3d(config=self.__config,
-                                           diag_list=self.diagnostics)
+        for diagnostic in self.diagnostics_list:
+            diagnostic.pull_config(config=self.__config)
 
     # TODO: Should we make load_beamfile just
     #       another method of beam genetration?
@@ -161,13 +156,13 @@ class Cartesian3dSimulation:
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):                
                 self.current_time = self.current_time + self.__time_step_size
-                
+
                 plasmastate = self.__init_plasmastate(self.current_time)
 
                 # Calculates one time step:
                 self.__push_solver.step_dt(
                     *plasmastate, self.beam_source, self.beam_drain,
-                    self.current_time, self.__diagnostics
+                    self.current_time, self.diagnostics_list
                 )
 
                 # Here we transfer beam particles from beam_buffer to

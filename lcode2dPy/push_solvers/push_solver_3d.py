@@ -1,7 +1,6 @@
 import numpy as np
 
 from ..config.config import Config
-from ..diagnostics.diagnostics_3d import Diagnostics3d
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
 from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles
@@ -30,7 +29,7 @@ class PushAndSolver3d:
     def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
                 pl_currents: Arrays, pl_const_arrays: Arrays,
                 beam_source: BeamSource, beam_drain: BeamDrain, current_time,
-                diagnostics: Diagnostics3d=None):
+                diagnostics_list=[]):
         """
         Perform one time step of beam-plasma calculations.
         """
@@ -71,18 +70,17 @@ class PushAndSolver3d:
             # beam_drain.push_beam_lost(lost)
 
             # Diagnostics:
-            if diagnostics:
-                xi_plasma_layer = - self.xi_step_size * xi_i
-                try: # cupy
-                    diagnostics.after_step_dxi(
-                        current_time, xi_plasma_layer, ArraysView(pl_particles),
-                        ArraysView(pl_fields), ArraysView(pl_currents),
-                        ro_beam_full.get())
-                except AttributeError: # numpy
-                    diagnostics.after_step_dxi(
-                        current_time, xi_plasma_layer, ArraysView(pl_particles),
-                        ArraysView(pl_fields), ArraysView(pl_currents),
-                        ro_beam_full)
+            xi_plasma_layer = - self.xi_step_size * xi_i
+            try: # cupy
+                ro_beam_full = ro_beam_full.get()
+            except AttributeError: # numpy
+                pass
+
+            for diagnostic in diagnostics_list:
+                diagnostic.after_step_dxi(
+                    current_time, xi_plasma_layer, ArraysView(pl_particles),
+                    ArraysView(pl_fields), ArraysView(pl_currents),
+                    ro_beam_full)
 
             # Some diagnostics:
             view_pl_fields = ArraysView(pl_fields)
@@ -94,6 +92,6 @@ class PushAndSolver3d:
             )
 
         # Perform diagnostics
-        if diagnostics:
-            diagnostics.dump(current_time, pl_particles, pl_fields,
-                             pl_currents, beam_drain)
+        for diagnostic in diagnostics_list:
+            diagnostic.dump(current_time, pl_particles, pl_fields,
+                            pl_currents, beam_drain)
