@@ -10,27 +10,19 @@ from .move import get_move_beam
 # Helper function #
 
 def get_beam_substepping_step(xp: np):
+    def beam_substepping_step(q_m, pz, substepping_energy):
+        dt = xp.ones_like(q_m, dtype=xp.float64)
+        max_dt = xp.sqrt(
+            xp.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
+
+        a = xp.ceil(xp.log2(dt / max_dt))
+        a[a < 0] = 0
+        dt /= 2 ** a
+
+        return dt
+
     if xp == np:
-        @nb.njit
-        def beam_substepping_step(q_m, pz, substepping_energy):
-            dt = xp.ones_like(q_m, dtype=xp.float64)
-            max_dt = xp.sqrt(
-                xp.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
-            for i in range(len(q_m)):
-                while dt[i] > max_dt[i]:
-                    dt[i] /= 2.0
-            return dt
-    else:
-        def beam_substepping_step(q_m, pz, substepping_energy):
-            dt = xp.ones_like(q_m, dtype=xp.float64)
-            max_dt = xp.sqrt(
-                xp.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
-
-            a = xp.ceil(xp.log2(dt / max_dt))
-            a[a < 0] = 0
-            dt /= 2 ** a
-
-            return dt
+        return nb.njit(beam_substepping_step)
 
     return beam_substepping_step
 
