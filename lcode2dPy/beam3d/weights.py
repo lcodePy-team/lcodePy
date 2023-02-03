@@ -2,7 +2,6 @@
 import numba as nb
 from math import floor
 
-from ..plasma3d.weights import weight4
 from ..config.config import Config
 
 
@@ -15,44 +14,32 @@ def weight1(x, place):
 
 
 @nb.njit
-def weights(x, y, xi_loc, grid_steps, grid_step_size):
+def weight4(x, place):
     """
-    Calculates the position and the weights of a beam particleon a 3d cartesian
-    grid.
+    Calculate the indices of a cell corresponding to the coordinates,
+    and the coefficients of interpolation and deposition for this cell
+    and 24 surrounding cells.
+    The weights correspond to ...
     """
-    x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
-    i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
-    x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
-    # xi_loc = dxi = (xi_prev - xi) / D_XIP
-
-    # First order core along xi axis
-    wxi0 = xi_loc
-    wxiP = (1 - xi_loc)
-
-    # Second order core along x and y axes
-    wx0, wy0 = .75 - x_loc**2, .75 - y_loc**2
-    wxP, wyP = (.5 + x_loc)**2 / 2, (.5 + y_loc)**2 / 2
-    wxM, wyM = (.5 - x_loc)**2 / 2, (.5 - y_loc)**2 / 2
-
-    w0MP, w00P, w0PP = wxi0 * wxM * wyP, wxi0 * wx0 * wyP, wxi0 * wxP * wyP
-    w0M0, w000, w0P0 = wxi0 * wxM * wy0, wxi0 * wx0 * wy0, wxi0 * wxP * wy0
-    w0MM, w00M, w0PM = wxi0 * wxM * wyM, wxi0 * wx0 * wyM, wxi0 * wxP * wyM
-
-    wPMP, wP0P, wPPP = wxiP * wxM * wyP, wxiP * wx0 * wyP, wxiP * wxP * wyP
-    wPM0, wP00, wPP0 = wxiP * wxM * wy0, wxiP * wx0 * wy0, wxiP * wxP * wy0
-    wPMM, wP0M, wPPM = wxiP * wxM * wyM, wxiP * wx0 * wyM, wxiP * wxP * wyM
-
-    return (i, j,
-            w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-            wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
-    )
+    # TODO: Change to switch statement (match and case) when Python 3.10 is
+    #       supported by Anaconda.
+    if place == -2:
+        return (1 / 2 - x) ** 4 / 24
+    elif place == -1:
+        return 19/96 - 11/24 * x + x ** 2 / 4 + x ** 3 / 6 - x ** 4 / 6
+    elif place == 0:
+        return 115/192 - x ** 2 * 5/8 + x ** 4 / 4
+    elif place == 1:
+        return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
+    elif place == 2:
+        return (1 / 2 + x) ** 4 / 24
 
 
 # Deposition and field interpolation #
 
 @nb.njit(parallel=True)
 def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
-                     out_ro0, out_ro1, size):
+                       out_ro0, out_ro1, size):
     """
     Deposit beam particles onto the charge density grids.
     """
