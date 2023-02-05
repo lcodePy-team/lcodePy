@@ -280,12 +280,12 @@ def get_move_beam_particles(config: Config):
     xi_step_size = config.getfloat('xi-step')
     grid_step_size = config.getfloat('window-width-step-size')
     grid_steps = config.getint('window-width-steps')
-    pu_type = config.get('processing-unit-type').lower()
 
     # Calculate the radius that marks that a particle is lost.
     max_radius = grid_step_size * grid_steps / 2
     lost_radius = max(0.9 * max_radius, max_radius - 1) # or just max_radius?
 
+    pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
         move_beam_particles_kernel = move_beam_particles_kernel_numba
     if pu_type == 'gpu':

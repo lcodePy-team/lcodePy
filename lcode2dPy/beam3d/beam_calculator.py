@@ -9,20 +9,39 @@ from .move import get_move_beam_particles
 
 # Helper function #
 
-def get_beam_substepping_step(xp: np):
+# NOTE: We have to write these functions separately and we don't merge them,
+#       because other implementation options (including from old commits) led
+#       to an illegal memory access when computing on a GPU. The problem is
+#       probably in the internals of the cupy library. The specific simulation
+#       settings will still create the problem, but in different places.
+
+@nb.njit
+def beam_substepping_step_numba(q_m, pz, substepping_energy):
+    dt = np.ones_like(q_m, dtype=np.float64)
+    max_dt = np.sqrt(np.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
+    for i in range(len(q_m)):
+        while dt[i] > max_dt[i]:
+            dt[i] /= 2.0
+    return dt
+
+
+def get_beam_substepping_step_cupy():
+    import cupy as cp
+
+    calculate_substepping_step = cp.ElementwiseKernel(
+        in_params="T q_m, T pz, float64 substepping_energy",
+        out_params="T dt",
+        operation="""
+        T max_dt = sqrt(sqrt(1 / (q_m*q_m) + pz*pz) / substepping_energy);
+        while (dt > max_dt){
+            dt /= 2;
+        }
+        """)
+
     def beam_substepping_step(q_m, pz, substepping_energy):
-        dt = xp.ones_like(q_m, dtype=xp.float64)
-        max_dt = xp.sqrt(
-            xp.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
-
-        a = xp.ceil(xp.log2(dt / max_dt))
-        a[a < 0] = 0
-        dt /= 2 ** a
-
+        dt = cp.ones_like(q_m, dtype=cp.float64)
+        calculate_substepping_step(q_m, pz, substepping_energy, dt)
         return dt
-
-    if xp is np:
-        return nb.njit(beam_substepping_step)
 
     return beam_substepping_step
 
@@ -39,7 +58,12 @@ class BeamCalculator:
 
         self.deposit = get_deposit_beam(config)
         self.move_particles = get_move_beam_particles(config)
-        self.beam_substepping_step = get_beam_substepping_step(self.xp)
+
+        pu_type = config.get('processing-unit-type').lower()
+        if pu_type == 'cpu':
+            self.beam_substepping_step = beam_substepping_step_numba
+        if pu_type == 'gpu':
+            self.beam_substepping_step = get_beam_substepping_step_cupy()
 
     # Helper functions for one time step cicle:
 
@@ -101,9 +125,8 @@ class BeamCalculator:
                 beam_layer_idx, beam_layer, fields_after_layer,
                 fields_before_layer, lost_idxes, moved_idxes, fell_idxes)
 
-        indexes = self.xp.arange(beam_layer.id.size)
-        lost  = beam_layer.get_layer(indexes[lost_idxes])
-        moved = beam_layer.get_layer(indexes[moved_idxes])
-        fell  = beam_layer.get_layer(indexes[fell_idxes])
+        lost  = beam_layer.get_layer(lost_idxes)
+        moved = beam_layer.get_layer(moved_idxes)
+        fell  = beam_layer.get_layer(fell_idxes)
 
         return lost, moved, fell
