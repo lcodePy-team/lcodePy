@@ -1,120 +1,80 @@
 """Module for setting classes for Fields, Currents and Partciles data types."""
 import numpy as np
-from numba import float64
-from numba.experimental import jitclass
-
-_float_array = float64[:, :]
-
-_fields_spec = [
-    ('Ex', _float_array),
-    ('Ey', _float_array),
-    ('Ez', _float_array),
-    ('Bx', _float_array),
-    ('By', _float_array),
-    ('Bz', _float_array),
-    ('Phi', _float_array),
-]
 
 
-@jitclass(spec=_fields_spec)
-class Fields(object):
-    def __init__(self, n_cells: int) -> None:
-        self.Ex = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.Ey = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.Ez = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.Bx = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.By = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.Bz = np.zeros((n_cells, n_cells), dtype=np.float64)
-        self.Phi = np.zeros((n_cells, n_cells), dtype=np.float64)
+# Grouping CPU/GPU arrays, with optional transparent RAM<->GPU copying #
 
-    # Average operation is necessary on intermediate steps to have
-    # better approximations of all fields
-    def average(self, other):
-        fields = Fields((self.Ex).shape[0])
-        fields.Ex = (self.Ex + other.Ex) / 2
-        fields.Ey = (self.Ey + other.Ey) / 2
-        fields.Ez = (self.Ez + other.Ez) / 2
-        fields.Bx = (self.Bx + other.Bx) / 2
-        fields.By = (self.By + other.By) / 2
-        fields.Bz = (self.Bz + other.Bz) / 2
-        fields.Phi = (self.Phi + other.Phi) / 2
-        return fields
+class Arrays:
+    """
+    A convenient way to group several CPU/GPU arrays and access them with a dot.
+    `x = Arrays(xp=cupy, something=numpy_array, something_else=another_array)`
+    will create `x` with `x.something` and `x.something_else` being CPU/GPU arrays.
+    Do not add more attributes later, specify them all at construction time.
+    """
+    def __init__(self, xp: np, **kwargs):
+        """
+        Convert the keyword arguments to `cupy` arrays and assign them
+        to the object attributes.
+        Amounts to, e.g., `self.something = cp.asarray(numpy_array)`,
+        and `self.something_else = cp.asarray(another_array)`,
+        see class doctring.
+        """
+        self.xp = xp
+        for name, array in kwargs.items():
+            setattr(self, name, xp.array(array)) # or asarray?
 
     def copy(self):
-        new_fields = Fields((self.Ex).shape[0])
-        new_fields.Ex = np.copy(self.Ex)
-        new_fields.Ey = np.copy(self.Ey)
-        new_fields.Ez = np.copy(self.Ez)
-        new_fields.Bx = np.copy(self.Bx)
-        new_fields.By = np.copy(self.By)
-        new_fields.Bz = np.copy(self.Bz)
-        new_fields.Phi = np.copy(self.Phi)
-        return new_fields
+        """
+        Create an indentical copy of the group of `cupy` arrays.
+        """
+        return Arrays(**self.__dict__)
 
 
-_currents_spec = [
-    ('ro', _float_array),
-    ('jx', _float_array),
-    ('jy', _float_array),
-    ('jz', _float_array),
-]
+# NOTE: The implementation may be complicated, but the usage is simple.
+class ArraysView:
+    """
+    This is a magical wrapper around Arrays that handles GPU-RAM data
+    transfer transparently.
+    Accessing `view.something` will automatically copy array to host RAM,
+    setting `view.something = ...` will copy the changes back to GPU RAM.
+    Usage: `view = ArraysView(gpu_arrays); view.something`
+    Do not add more attributes later, specify them all at construction time.
+    NOTE: repeatedly accessing an attribute will result in repeated copying!
+    """
+    def __init__(self, gpu_arrays):
+        """
+        Wrap `gpu_arrays` and transparently copy data to/from GPU.
+        """
+        # Could've been written as `self._arrs = gpu_arrays`
+        # if only `__setattr__` was not overwritten!
+        # `super(ArraysView) is the proper way to obtain the parent class
+        # (`object`), which has a regular boring `__setattr__` that we can use.
+        super(ArraysView, self).__setattr__('_arrs', gpu_arrays)
 
+    def __dir__(self):
+        """
+        Make `dir()` also show the wrapped `gpu_arrays` attributes.
+        """
+        # See `ArraysView.__init__` for the explanation how we access the
+        # parent's plain `__dir__()` implementation (and avoid recursion).
+        return list(set(super(ArraysView, self).__dir__() +
+                        dir(self._arrs)))
 
-@jitclass(spec=_currents_spec)
-class Currents(object):
-    def __init__(self, ro, jx, jy, jz):
-        self.ro = ro
-        self.jx = jx
-        self.jy = jy
-        self.jz = jz
+    def __getattr__(self, attrname):
+        """
+        Intercept access to (missing) attributes, access the wrapped object
+        attributes instead and copy the arrays from GPU to RAM.
+        """
+        try: # cupy
+            return getattr(self._arrs, attrname).get()  # auto-copies to host RAM
+        except AttributeError: # numpy
+            return getattr(self._arrs, attrname)
 
-
-_particles_spec = [
-    ('x_init', _float_array),
-    ('y_init', _float_array),
-    ('x_offt', _float_array),
-    ('y_offt', _float_array),
-    ('px', _float_array),
-    ('py', _float_array),
-    ('pz', _float_array),
-    ('q', _float_array),
-    ('m', _float_array),
-]
-
-
-@jitclass(spec=_particles_spec)
-class Particles(object):
-    def __init__(self, x_init, y_init, x_offt, y_offt, px, py, pz, q, m):
-        self.x_init = np.copy(x_init)
-        self.y_init = np.copy(y_init)
-        self.x_offt = np.copy(x_offt)
-        self.y_offt = np.copy(y_offt)
-        self.px = np.copy(px)
-        self.py = np.copy(py)
-        self.pz = np.copy(pz)
-        self.q = np.copy(q)
-        self.m = np.copy(m)
-
-    def copy(self):
-        return Particles(self.x_init, self.y_init,
-                         self.x_offt, self.y_offt,
-                         self.px, self.py, self.pz,
-                         self.q, self.m)
-
-
-_const_arr_spec = [
-    ('ro_initial', _float_array),
-    ('dirichlet_matrix', _float_array),
-    ('field_mixed_matrix', _float_array),
-    ('neumann_matrix', _float_array)
-]
-
-
-@jitclass(spec=_const_arr_spec)
-class Const_Arrays(object):
-    def __init__(self, ro_initial, dirichlet_matrix,
-                 field_mixed_matrix, neumann_matrix):
-        self.ro_initial = np.copy(ro_initial)
-        self.dirichlet_matrix = np.copy(dirichlet_matrix)
-        self.field_mixed_matrix = np.copy(field_mixed_matrix)
-        self.neumann_matrix = np.copy(neumann_matrix)
+    def __setattr__(self, attrname, value):
+        """
+        Intercept setting attributes, access the wrapped object attributes
+        instead and reassign their contents, copying the arrays from RAM
+        to GPU in the process.
+        """
+        getattr(self._arrs, attrname)[...] = value  # copies to GPU RAM
+        # TODO: just copy+reassign it without preserving identity and shape?

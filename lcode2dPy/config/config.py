@@ -16,6 +16,10 @@ class Config:
         # Initialize an empty dictionaty for config values:
         self.config_values = {}
 
+        # This value stores information about whether we use numpy or cupy in
+        # our code. Bu now, it is used only by 3d parts of lcodePy.
+        self.xp = np
+
         # If a user wants to set config_values over default ones, then he/she
         # just writes: config = Config() /If a user wants to create a new empty
         # config, then he/she writes: config = Config(default_config=False)
@@ -27,7 +31,8 @@ class Config:
             self.update(new_config_values)
 
     def get(self, option_name: str, fallback: str = '') -> str:
-        self.adjust_config_values(option_name)
+        # TODO: Should we move adjusting from get() to set()?
+        self.adjust_config_values_on_get(option_name)
 
         if option_name in self.config_values:
             return self.config_values.get(option_name)
@@ -58,6 +63,10 @@ class Config:
     def set(self, option_name: str, option_value: Any):
         self.config_values[option_name] = str(option_value)
 
+        # We intercept the setting of a new configuration value
+        # in order to adjust other values:
+        self.adjust_config_values_on_set(option_name)
+
     def update(self, new_config_values: dict=None): #, **kconfig_values):
         """
         Works similarly to the update() method of a Python dictionary:
@@ -85,52 +94,38 @@ class Config:
             with open(path, 'w') as cfg_f:
                 cfg_f.write(cfg)
         return cfg
-    
-    def update_from_c_config(self, path:str):
-        with open(path, 'r') as file:
-            cfg = file.read()
-        
-        config_values = self.config_values
-        parameters = list(config_values.keys())
-        
-        bad_parameters = []
-        for parameter in parameters:
-            try:
-                config_values[parameter] = find(cfg, parameter)
-            except:
-                try:
-                    config_values[parameter] = find_char(cfg, parameter)
-                except:
-                    bad_parameters.append(parameter)
-        self.update(config_values)
-        return bad_parameters
-    
-    def get_c_beam_profile(self, path:str):
-        with open(path, 'r') as file:
-            cfg = file.read()
-        return find_beam_profile(cfg)
-    
-    def get_float_from_c_config(self, path:str, par:str):
-        with open(path, 'r') as file:
-            cfg = file.read()
-        return find(cfg, par)
-    
-    def adjust_config_values(self, option_name: str):
+
+    def adjust_config_values_on_get(self, option_name: str):
         """
-        Adjusts config values in 3d.
+        Adjusts config values in 3d when we use config.get(...).
         Required for compatibility of 2d and 3d codes.
         """
         if (option_name == 'window-width-steps' and
-            self.get('geometry') == '3d'):
+            self.get('geometry').lower() == '3d'):
             # Goes here every time Config.get('window-width-steps') is
             # called in 3d to adjust window-width and window-width-steps.
             self.adjust_window_width_and_steps_3d()
 
         if (option_name == 'plasma-fineness' and
-            self.get('geometry') == '3d'):
+            self.get('geometry').lower() == '3d'):
             # Goes here every time Config.get('plasma-fineness') is called
             # in 3d to adjust it according to 'plasma-particles-per-cell'.
             self.adjust_plasma_fineness()
+
+    def adjust_config_values_on_set(self, option_name: str):
+        """
+        Adjusts config values when we use config.set(...).
+        """
+        if option_name == 'processing-unit-type':
+            # Goes here every time Config['processing-unit-type'] = 'cpu'/'gpu'
+            # or something similar is called to change the type of the main
+            # array manipulating library.
+            pu_type = self.get('processing-unit-type').lower()
+            if pu_type == 'cpu':
+                self.xp = np
+            elif pu_type == 'gpu':
+                import cupy as cp
+                self.xp = cp
 
     def adjust_window_width_and_steps_3d(self):
         """
