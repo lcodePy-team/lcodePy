@@ -1,78 +1,14 @@
 """Module for weights interpolation and movement routines."""
-import numpy as np
 import numba as nb
-from math import sqrt
+
+from math import sqrt, floor
 
 from ..config.config import Config
-from ..beam3d.weights import weights, weight1_cupy, weight4_cupy
+from ..beam3d.data import BeamParticles
+from ..beam3d.weights import weight1, weight4, weight1_cupy, weight4_cupy
 
 
-# Beam particles mover, for CPU #
-
-@nb.njit
-def interp(value_0, value_1, i, j,
-           w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-           wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM):
-    """
-    Collect value from a cell and surrounding cells (using `weights` output).
-    """
-    return (
-        value_0[i - 1, j + 1] * w0MP +
-        value_0[i + 0, j + 1] * w00P +
-        value_0[i + 1, j + 1] * w0PP +
-        value_0[i - 1, j + 0] * w0M0 +
-        value_0[i + 0, j + 0] * w000 +
-        value_0[i + 1, j + 0] * w0P0 +
-        value_0[i - 1, j - 1] * w0MM +
-        value_0[i + 0, j - 1] * w00M +
-        value_0[i + 1, j - 1] * w0PM +
-    
-        value_1[i - 1, j + 1] * wPMP +
-        value_1[i + 0, j + 1] * wP0P +
-        value_1[i + 1, j + 1] * wPPP +
-        value_1[i - 1, j + 0] * wPM0 +
-        value_1[i + 0, j + 0] * wP00 +
-        value_1[i + 1, j + 0] * wPP0 +
-        value_1[i - 1, j - 1] * wPMM +
-        value_1[i + 0, j - 1] * wP0M +
-        value_1[i + 1, j - 1] * wPPM
-    )
-
-
-@nb.njit
-def particle_fields(x, y, xi, grid_steps, grid_step_size, xi_step_size, xi_k,
-                    Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
-                    Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k):
-    xi_loc = (xi - xi_k) / xi_step_size
-
-    (i, j,
-    w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-    wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
-    ) = weights(
-        x, y, xi_loc, grid_steps, grid_step_size
-    )
-
-    Ex = interp(Ex_k, Ex_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-    Ey = interp(Ey_k, Ey_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-    Ez = interp(Ez_k, Ez_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-    Bx = interp(Bx_k, Bx_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-    By = interp(By_k, By_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-    Bz = interp(Bz_k, Bz_k_1, i, j,
-                w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-                wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM)
-
-    return Ex, Ey, Ez, Bx, By, Bz
-
+# Beam particles mover auxiliary functions, for CPU #
 
 @nb.njit
 def not_in_layer(xi, xi_k_1):
@@ -93,33 +29,28 @@ def sign(x):
 # Moves one particle as far as possible on current xi layer
 
 @nb.njit(parallel=True)
-def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
-                          beam_xi_layer, lost_radius,
-                          q_m_, dt_, remaining_steps,
-                          x, y, xi, px, py, pz, id,
-                          Ex_k_1, Ey_k_1, Ez_k_1, Bx_k_1, By_k_1, Bz_k_1,
-                          Ex_k,   Ey_k,   Ez_k,   Bx_k,   By_k,   Bz_k,
-                          lost_idxes, moved_idxes, fell_idxes):
+def move_beam_particles_kernel_numba(
+    xi_step_size, lost_radius, beam_layer_idx, grid_step_size, grid_steps,
+    q_m, dt,
+    Ex_k,  Ey_k,  Ez_k,  Bx_k,  By_k,  Bz_k,
+    Ex_k1, Ey_k1, Ez_k1, Bx_k1, By_k1, Bz_k1,
+    remaining_steps, id, x, y, xi, px, py, pz,
+    lost_idxes, moved_idxes, fell_idxes, size):
     """
     Moves one particle as far as possible on current xi layer.
     """
-    xi_k = beam_xi_layer * -xi_step_size  # xi_{k}
-    xi_k_1 = (beam_xi_layer + 1) * -xi_step_size  # xi_{k+1}
-    
-    for k in nb.prange(len(id)):
-        q_m = q_m_[k]; dt = dt_[k]
+    xi_k = beam_layer_idx * -xi_step_size  # xi_{k}
+    xi_k_1 = (beam_layer_idx + 1) * -xi_step_size  # xi_{k+1}
 
+    for k in nb.prange(size):
         while remaining_steps[k] > 0:
-            # Initial impulse and position vectors
-            opx, opy, opz = px[k], py[k], pz[k]
-            ox, oy, oxi = x[k], y[k], xi[k]
-
             # Compute approximate position of the particle in the middle of the step
-            gamma_m = sqrt((1 / q_m) ** 2 + opx ** 2 + opy ** 2 + opz ** 2)
+            gamma_m = sqrt(
+                (1 / q_m[k]) ** 2 + px[k] ** 2 + py[k]** 2 + pz[k] ** 2)
 
-            x_halfstep  = ox  + dt / 2 * (opx / gamma_m)
-            y_halfstep  = oy  + dt / 2 * (opy / gamma_m)
-            xi_halfstep = oxi + dt / 2 * (opz / gamma_m - 1)
+            x_halfstep  = x[k]  + dt[k] / 2 * (px[k] / gamma_m)
+            y_halfstep  = y[k]  + dt[k] / 2 * (py[k] / gamma_m)
+            xi_halfstep = xi[k] + dt[k] / 2 * (pz[k] / gamma_m - 1)
             # Add time shift correction (dxi = (v_z - c)*dt)
 
             if not_in_layer(xi_halfstep, xi_k_1):
@@ -133,33 +64,52 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                 remaining_steps[k] = 0
                 break
 
-            # Interpolate fields and compute new impulse
-            (Ex, Ey, Ez,
-            Bx, By, Bz) = particle_fields(x_halfstep, y_halfstep, xi_halfstep,
-                                                    grid_steps, grid_step_size,
-                                                    xi_step_size, xi_k,
-                                                    Ex_k_1, Ey_k_1, Ez_k_1,
-                                                    Bx_k_1, By_k_1, Bz_k_1,
-                                                    Ex_k, Ey_k, Ez_k,
-                                                    Bx_k, By_k, Bz_k)
+            # Interpolate fields
+            x_h = x_halfstep / grid_step_size + .5
+            y_h = y_halfstep / grid_step_size + .5
+            x_loc = x_h - floor(x_h) - .5
+            y_loc = y_h - floor(y_h) - .5
+            xi_loc = (xi_halfstep - xi_k) / xi_step_size
+            ix = int(floor(x_h) + grid_steps // 2)
+            iy = int(floor(y_h) + grid_steps // 2)
+
+            Ex, Ey, Ez, Bx, By, Bz = 0, 0, 0, 0, 0, 0
+            for kx in range(-2, 3):
+                wx = weight4(x_loc, kx)
+                for ky in range(-2, 3):
+                    w = wx * weight4(y_loc, ky)
+                    w0 = w * weight1(xi_loc, 0)
+                    w1 = w * weight1(xi_loc, 1)
+                    idx_x, idx_y = ix + kx, iy + ky
+
+                    # Collect value from a cell and 8 surrounding cells.
+                    Ex += Ex_k[idx_x, idx_y] * w0 + Ex_k1[idx_x, idx_y] * w1
+                    Ey += Ey_k[idx_x, idx_y] * w0 + Ey_k1[idx_x, idx_y] * w1
+                    Ez += Ez_k[idx_x, idx_y] * w0 + Ez_k1[idx_x, idx_y] * w1
+                    Bx += Bx_k[idx_x, idx_y] * w0 + Bx_k1[idx_x, idx_y] * w1
+                    By += By_k[idx_x, idx_y] * w0 + By_k1[idx_x, idx_y] * w1
+                    Bz += Bz_k[idx_x, idx_y] * w0 + Bz_k1[idx_x, idx_y] * w1
 
             # Compute new impulse
-            vx, vy, vz = opx / gamma_m, opy / gamma_m, opz / gamma_m
-            px_halfstep = (opx + sign(q_m) * dt / 2 * (Ex + vy * Bz - vz * By))
-            py_halfstep = (opy + sign(q_m) * dt / 2 * (Ey + vz * Bx - vx * Bz))
-            pz_halfstep = (opz + sign(q_m) * dt / 2 * (Ez + vx * By - vy * Bx))
+            vx, vy, vz = px[k] / gamma_m, py[k] / gamma_m, pz[k] / gamma_m
+            px_halfstep = (
+                px[k] + sign(q_m[k]) * dt[k] / 2 * (Ex + vy * Bz - vz * By))
+            py_halfstep = (
+                py[k] + sign(q_m[k]) * dt[k] / 2 * (Ey + vz * Bx - vx * Bz))
+            pz_halfstep = (
+                pz[k] + sign(q_m[k]) * dt[k] / 2 * (Ez + vx * By - vy * Bx))
 
             # Compute final coordinates and impulses
-            gamma_m = sqrt((1 / q_m) ** 2
+            gamma_m = sqrt((1 / q_m[k]) ** 2
                         + px_halfstep ** 2 + py_halfstep ** 2 + pz_halfstep ** 2)
 
-            x[k]  = ox  + dt * (px_halfstep / gamma_m)      #  x fullstep
-            y[k]  = oy  + dt * (py_halfstep / gamma_m)      #  y fullstep
-            xi[k] = oxi + dt * (pz_halfstep / gamma_m - 1)  # xi fullstep
+            x[k]  += dt[k] * (px_halfstep / gamma_m)      #  x fullstep
+            y[k]  += dt[k] * (py_halfstep / gamma_m)      #  y fullstep
+            xi[k] += dt[k] * (pz_halfstep / gamma_m - 1)  # xi fullstep
 
-            px[k] = 2 * px_halfstep - opx                   # px fullstep
-            py[k] = 2 * py_halfstep - opy                   # py fullstep
-            pz[k] = 2 * pz_halfstep - opz                   # pz fullstep
+            px[k] = 2 * px_halfstep - px[k]               # px fullstep
+            py[k] = 2 * py_halfstep - py[k]               # py fullstep
+            pz[k] = 2 * pz_halfstep - pz[k]               # pz fullstep
 
             if is_lost(x[k], y[k], lost_radius):
                 id[k] *= -1  # Particle hit the wall and is now lost
@@ -168,57 +118,29 @@ def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                 break
 
             remaining_steps[k] -= 1
-        
+
         # TODO: Do we need to add it here? (Yes, write why)
-        if remaining_steps[k] == 0 and not_in_layer(xi_halfstep, xi_k_1):
+        if remaining_steps[k] == 0 and not_in_layer(x[k], xi_k_1):
             fell_idxes[k] = True
 
         if fell_idxes[k] == False and lost_idxes[k] == False:
             moved_idxes[k] = True
 
 
-def move_particles(grid_steps, grid_step_size, xi_step_size,
-                   idxes, beam_xi_layer, lost_radius,
-                   beam, fields_k_1, fields_k,
-                   lost_idxes, moved_idxes, fell_idxes):
-    """
-    This is a convenience wrapper around the `move_particles_kernel` CUDA kernel.
-    """
-    x_new,  y_new,  xi_new = beam.x[idxes],  beam.y[idxes],  beam.xi[idxes]
-    px_new, py_new, pz_new = beam.px[idxes], beam.py[idxes], beam.pz[idxes]
-    id_new, remaining_steps_new = beam.id[idxes], beam.remaining_steps[idxes]
-
-    move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
-                          beam_xi_layer, lost_radius,
-                          beam.q_m[idxes], beam.dt[idxes],
-                          remaining_steps_new,
-                          x_new, y_new, xi_new,
-                          px_new, py_new, pz_new,
-                          id_new,
-                          fields_k_1.Ex, fields_k_1.Ey, fields_k_1.Ez,
-                          fields_k_1.Bx, fields_k_1.By, fields_k_1.Bz,
-                          fields_k.Ex, fields_k.Ey, fields_k.Ez,
-                          fields_k.Bx, fields_k.By, fields_k.Bz,
-                          lost_idxes, moved_idxes, fell_idxes)
-
-    beam.x[idxes],  beam.y[idxes],  beam.xi[idxes] = x_new,  y_new,  xi_new
-    beam.px[idxes], beam.py[idxes], beam.pz[idxes] = px_new, py_new, pz_new
-    beam.id[idxes], beam.remaining_steps[idxes] = id_new, remaining_steps_new
-    
-    return lost_idxes, moved_idxes, fell_idxes
-
-
 # Beam particles mover, for GPU #
 
-def get_move_beam_cupy():
+def get_move_beam_particles_kernel_cupy():
+    """
+    Moves beam particles as far as possible on current xi layer. Based on
+    Higuera-Cary method (https://doi.org/10.1063/1.4979989)
+    """
     import cupy as cp
-    
+
     return cp.ElementwiseKernel(
         in_params="""
-        float64 xi_step_size, float64 r_max, float64 beam_xi_layer,
+        float64 xi_step_size, float64 r_max, float64 beam_layer_idx,
         float64 grid_step_size, float64 grid_steps,
-        raw T q_m, raw T dt, raw int64 remaining_steps, raw int64 id,
-        raw T x, raw T y, raw T xi, raw T px, raw T py, raw T pz,
+        raw T q_m, raw T dt,
         raw T Ex_k,  raw T Ey_k,  raw T Ez_k,
         raw T Bx_k,  raw T By_k,  raw T Bz_k,
         raw T Ex_k1, raw T Ey_k1, raw T Ez_k1,
@@ -231,14 +153,10 @@ def get_move_beam_cupy():
         raw bool lost_idxes, raw bool moved_idxes, raw bool fell_idxes
         """,
         operation="""
-        const double xi_k   = beam_xi_layer       * (-xi_step_size);
-        const double xi_k_1 = (beam_xi_layer + 1) * (-xi_step_size);
+        const double xi_k   = beam_layer_idx       * (-xi_step_size);
+        const double xi_k_1 = (beam_layer_idx + 1) * (-xi_step_size);
 
         double q = copysign(1.0, q_m[i]);
-
-        out_remaining_steps[i] = remaining_steps[i], out_id[i] = id[i];
-        out_px[i] = px[i], out_py[i] = py[i], out_pz[i] = pz[i];
-        out_x[i]  = x[i],  out_y[i]  = y[i],  out_xi[i] = xi[i];
 
         while (out_remaining_steps[i] > 0) {
             // 1. We have an initial momentum and an initial position vector:
@@ -287,12 +205,12 @@ def get_move_beam_cupy():
                     const T w1 = w  * weight1(xi_loc, 1);
                     const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
-                    Ex += Ex_k[i] * w0 + Ex_k1[i] * w1;
-                    Bx += Bx_k[i] * w0 + Bx_k1[i] * w1;
-                    Ey += Ey_k[i] * w0 + Ey_k1[i] * w1;
-                    By += By_k[i] * w0 + By_k1[i] * w1;
-                    Ez += Ez_k[i] * w0 + Ez_k1[i] * w1;
-                    Bz += Bz_k[i] * w0 + Bz_k1[i] * w1;
+                    Ex += Ex_k[idx] * w0 + Ex_k1[idx] * w1;
+                    Bx += Bx_k[idx] * w0 + Bx_k1[idx] * w1;
+                    Ey += Ey_k[idx] * w0 + Ey_k1[idx] * w1;
+                    By += By_k[idx] * w0 + By_k1[idx] * w1;
+                    Ez += Ez_k[idx] * w0 + Ez_k1[idx] * w1;
+                    Bz += Bz_k[idx] * w0 + Bz_k1[idx] * w1;
                 }
             }
 
@@ -313,7 +231,7 @@ def get_move_beam_cupy():
             // 5. Calculate auxiliary values:
             T tx = bx / gamma_m, ty = by / gamma_m, tz = bz / gamma_m;
             T t_sq_pl = 1. + tx*tx + ty*ty + tz*tz;
-            T t_sq_mi = 1. - tx*tx + ty*ty + tz*tz;
+            T t_sq_mi = 1. - tx*tx - ty*ty - tz*tz;
             T sx = 2.*tx / t_sq_pl, sy = 2.*ty / t_sq_pl, sz = 2.*tz / t_sq_pl;
             T s_dot_p_m = sx * px_m + sy * py_m + sz * pz_m;
 
@@ -345,82 +263,49 @@ def get_move_beam_cupy():
         }
 
         // TODO: Do we need to add it here? (Yes, write why)
-        if (remaining_steps[i] == 0 && out_xi[i] < xi_k_1) {
+        if (out_remaining_steps[i] == 0 && out_xi[i] < xi_k_1) {
             fell_idxes[i] = true;
         }
 
         if (fell_idxes[i] == false && lost_idxes[i] == false) {
             moved_idxes[i] = true;
         }
-        
-
         """,
-        name='move_beam_cupy', preamble=weight1_cupy+weight4_cupy
+        name='move_beam_cupy', preamble=weight1_cupy+weight4_cupy,
+        no_return=True
     )
 
 
-def get_move_beam(config: Config):
+def get_move_beam_particles(config: Config):
     xi_step_size = config.getfloat('xi-step')
     grid_step_size = config.getfloat('window-width-step-size')
     grid_steps = config.getint('window-width-steps')
-    pu_type = config.get('processing-unit-type').lower()
 
     # Calculate the radius that marks that a particle is lost.
     max_radius = grid_step_size * grid_steps / 2
     lost_radius = max(0.9 * max_radius, max_radius - 1) # or just max_radius?
 
+    pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
-        def move_beam(idxes, beam_layer_idx, beam,
-                      fields_k, fields_k_1, lost_idxes, moved_idxes, fell_idxes):
-            return move_particles(grid_steps, grid_step_size, xi_step_size,
-                                  idxes, beam_layer_idx, lost_radius,
-                                  beam, fields_k_1, fields_k,
-                                  lost_idxes, moved_idxes, fell_idxes)
-
+        move_beam_particles_kernel = move_beam_particles_kernel_numba
     if pu_type == 'gpu':
-        import cupy as cp
+        move_beam_particles_kernel = get_move_beam_particles_kernel_cupy()
 
-        move_beam_cupy = get_move_beam_cupy()
+    def move_beam_particles(beam_layer_idx, beam_layer: BeamParticles, fields_k,
+                            fields_k_1, lost_idxes, moved_idxes, fell_idxes):
+        move_beam_particles_kernel(
+            xi_step_size, lost_radius, beam_layer_idx, grid_step_size,
+            grid_steps, beam_layer.q_m, beam_layer.dt,
+            fields_k.Ex, fields_k.Ey, fields_k.Ez,
+            fields_k.Bx, fields_k.By, fields_k.Bz,
+            fields_k_1.Ex, fields_k_1.Ey, fields_k_1.Ez,
+            fields_k_1.Bx, fields_k_1.By, fields_k_1.Bz,
 
-        def move_beam(idxes, beam_layer_idx, beam,
-                      fields_k, fields_k_1, lost_idxes, moved_idxes, fell_idxes):
-            """
-            Moves beam particles as far as possible on current xi layer. Based on
-            Higuera-Cary method (https://doi.org/10.1063/1.4979989)
-            """
-            # TODO: This is horribly unoptimized!
-            rem_steps_new = cp.zeros_like(beam.remaining_steps[idxes])
-            id_new = cp.zeros_like(beam.id[idxes])
-            x_new  = cp.zeros_like(beam.x[idxes])
-            y_new  = cp.zeros_like(beam.y[idxes])
-            xi_new = cp.zeros_like(beam.xi[idxes])
-            px_new = cp.zeros_like(beam.px[idxes])
-            py_new = cp.zeros_like(beam.py[idxes])
-            pz_new = cp.zeros_like(beam.pz[idxes])
+            beam_layer.remaining_steps, beam_layer.id,
+            beam_layer.x, beam_layer.y, beam_layer.xi,
+            beam_layer.px, beam_layer.py, beam_layer.pz,
+            lost_idxes, moved_idxes, fell_idxes,
 
-            (rem_steps_new, id_new, x_new, y_new, xi_new, px_new, py_new, pz_new,
-            lost_idxes, moved_idxes, fell_idxes) = move_beam_cupy(
-                xi_step_size, lost_radius, beam_layer_idx, grid_step_size,
-                grid_steps, beam.q_m[idxes], beam.dt[idxes],
-                beam.remaining_steps[idxes], beam.id[idxes],
-                beam.x[idxes],  beam.y[idxes],  beam.xi[idxes],
-                beam.px[idxes], beam.py[idxes], beam.pz[idxes],
-                fields_k.Ex, fields_k.Ey, fields_k.Ez,
-                fields_k.Bx, fields_k.By, fields_k.Bz,
-                fields_k_1.Ex, fields_k_1.Ey, fields_k_1.Ez,
-                fields_k_1.Bx, fields_k_1.By, fields_k_1.Bz,
+            size=beam_layer.id.size)
 
-                rem_steps_new, id_new,
-                x_new, y_new, xi_new, px_new, py_new, pz_new,
-                lost_idxes, moved_idxes, fell_idxes,
-
-                size=idxes.size
-            )
-
-            beam.remaining_steps[idxes], beam.id[idxes] = rem_steps_new, id_new
-            beam.x[idxes],  beam.y[idxes],  beam.xi[idxes] = x_new,  y_new,  xi_new
-            beam.px[idxes], beam.py[idxes], beam.pz[idxes] = px_new, py_new, pz_new
-
-            return lost_idxes, moved_idxes, fell_idxes
-
-    return move_beam
+    return move_beam_particles

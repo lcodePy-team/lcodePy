@@ -6,76 +6,62 @@ from ..config.config import Config
 
 
 @nb.njit
-def weights(x, y, xi_loc, grid_steps, grid_step_size):
+def weight1(x, place):
+    if place == 0:
+        return x
+    elif place == 1:
+        return 1 - x
+
+
+@nb.njit
+def weight4(x, place):
     """
-    Calculates the position and the weights of a beam particleon a 3d cartesian
-    grid.
+    Calculate the indices of a cell corresponding to the coordinates,
+    and the coefficients of interpolation and deposition for this cell
+    and 24 surrounding cells.
+    The weights correspond to ...
     """
-    x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
-    i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
-    x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
-    # xi_loc = dxi = (xi_prev - xi) / D_XIP
-
-    # First order core along xi axis
-    wxi0 = xi_loc
-    wxiP = (1 - xi_loc)
-
-    # Second order core along x and y axes
-    wx0, wy0 = .75 - x_loc**2, .75 - y_loc**2
-    wxP, wyP = (.5 + x_loc)**2 / 2, (.5 + y_loc)**2 / 2
-    wxM, wyM = (.5 - x_loc)**2 / 2, (.5 - y_loc)**2 / 2
-
-    w0MP, w00P, w0PP = wxi0 * wxM * wyP, wxi0 * wx0 * wyP, wxi0 * wxP * wyP
-    w0M0, w000, w0P0 = wxi0 * wxM * wy0, wxi0 * wx0 * wy0, wxi0 * wxP * wy0
-    w0MM, w00M, w0PM = wxi0 * wxM * wyM, wxi0 * wx0 * wyM, wxi0 * wxP * wyM
-
-    wPMP, wP0P, wPPP = wxiP * wxM * wyP, wxiP * wx0 * wyP, wxiP * wxP * wyP
-    wPM0, wP00, wPP0 = wxiP * wxM * wy0, wxiP * wx0 * wy0, wxiP * wxP * wy0
-    wPMM, wP0M, wPPM = wxiP * wxM * wyM, wxiP * wx0 * wyM, wxiP * wxP * wyM
-
-    return (i, j,
-            w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-            wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
-    )
+    # TODO: Change to switch statement (match and case) when Python 3.10 is
+    #       supported by Anaconda.
+    if place == -2:
+        return (1 / 2 - x) ** 4 / 24
+    elif place == -1:
+        return 19/96 - 11/24 * x + x ** 2 / 4 + x ** 3 / 6 - x ** 4 / 6
+    elif place == 0:
+        return 115/192 - x ** 2 * 5/8 + x ** 4 / 4
+    elif place == 1:
+        return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
+    elif place == 2:
+        return (1 / 2 + x) ** 4 / 24
 
 
 # Deposition and field interpolation #
 
 @nb.njit(parallel=True)
-def deposit_beam_cpu(grid_steps, grid_step_size, x, y, xi_loc, q_norm,
-                     rho_layout_0, rho_layout_1):
+def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
+                       out_ro0, out_ro1, size):
     """
     Deposit beam particles onto the charge density grids.
     """
-    for k in nb.prange(len(q_norm)):
+    x_h, y_h = x_h.ravel(), y_h.ravel()
+    xi_loc, q_norm = xi_loc.ravel(), q_norm.ravel()
 
-        # Calculate the weights for a particle
-        (i, j,
-        w0MP, w00P, w0PP, w0M0, w000, w0P0, w0MM, w00M, w0PM,
-        wPMP, wP0P, wPPP, wPM0, wP00, wPP0, wPMM, wP0M, wPPM
-        ) = weights(
-            x[k], y[k], xi_loc[k], grid_steps, grid_step_size
-        )
+    for k in nb.prange(size):
+        x_loc = x_h[k] - floor(x_h[k]) - .5
+        y_loc = y_h[k] - floor(y_h[k]) - .5
+        ix = int(floor(x_h[k]) + grid_steps // 2)
+        iy = int(floor(y_h[k]) + grid_steps // 2)
 
-        rho_layout_0[i - 1, j + 1] += q_norm[k] * w0MP
-        rho_layout_0[i + 0, j + 1] += q_norm[k] * w00P
-        rho_layout_0[i + 1, j + 1] += q_norm[k] * w0PP
-        rho_layout_0[i - 1, j + 0] += q_norm[k] * w0M0
-        rho_layout_0[i + 0, j + 0] += q_norm[k] * w000
-        rho_layout_0[i + 1, j + 0] += q_norm[k] * w0P0
-        rho_layout_0[i - 1, j - 1] += q_norm[k] * w0MM
-        rho_layout_0[i + 0, j - 1] += q_norm[k] * w00M
-        rho_layout_0[i + 1, j - 1] += q_norm[k] * w0PM
+        for kx in range(-2, 3):
+            wx = weight4(x_loc, kx)
+            for ky in range(-2, 3):
+                w = wx * weight4(y_loc, ky)
+                w0 = w * weight1(xi_loc[k], 0)
+                w1 = w * weight1(xi_loc[k], 1)
+                index_x, index_y = ix + kx, iy + ky
 
-        rho_layout_1[i - 1, j + 1] += q_norm[k] * wPMP
-        rho_layout_1[i + 0, j + 1] += q_norm[k] * wP0P
-        rho_layout_1[i + 1, j + 1] += q_norm[k] * wPPP
-        rho_layout_1[i - 1, j + 0] += q_norm[k] * wPM0
-        rho_layout_1[i + 0, j + 0] += q_norm[k] * wP00
-        rho_layout_1[i + 1, j + 0] += q_norm[k] * wPP0
-        rho_layout_1[i - 1, j - 1] += q_norm[k] * wPMM
-        rho_layout_1[i + 0, j - 1] += q_norm[k] * wP0M
-        rho_layout_1[i + 1, j - 1] += q_norm[k] * wPPM
+                out_ro0[index_x, index_y] += q_norm[k] * w0
+                out_ro1[index_x, index_y] += q_norm[k] * w1
 
 
 # Calculates the weights for a particle, for GPU #
@@ -146,7 +132,8 @@ def get_deposit_beam_cupy():
             }
         }
         """,
-        name='deposit_beam_cupy', preamble=weight1_cupy+weight4_cupy
+        name='deposit_beam_cupy', preamble=weight1_cupy+weight4_cupy,
+        no_return=True
     )
 
 
@@ -154,36 +141,24 @@ def get_deposit_beam(config: Config):
     xi_step_size = config.getfloat('xi-step')
     grid_step_size = config.getfloat('window-width-step-size')
     grid_steps = config.getint('window-width-steps')
+
     pu_type = config.get('processing-unit-type').lower()
-
     if pu_type == 'cpu':
-        def deposit_beam(plasma_layer_idx, x, y, xi, q_norm,
-                         rho_layout_0, rho_layout_1):
-            """
-            Deposit beam particles onto the charge density grid.
-            This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
-            """
-            xi_plasma_layer = - xi_step_size * plasma_layer_idx
-            xi_loc = (xi_plasma_layer - xi) / xi_step_size
-
-            return deposit_beam_cpu(
-                grid_steps, grid_step_size, x.ravel(), y.ravel(),
-                xi_loc.ravel(), q_norm.ravel(), rho_layout_0, rho_layout_1)
-
+        deposit_beam_kernel = deposit_beam_numba
     elif pu_type == 'gpu':
-        deposit_beam_cupy = get_deposit_beam_cupy()
+        deposit_beam_kernel = get_deposit_beam_cupy()
 
-        def deposit_beam(plasma_layer_idx, x, y, xi, q_norm,
-                         out_ro0, out_ro1):
-            """
-            Deposit beam particles onto the charge density grids.
-            """
-            xi_plasma_layer = - xi_step_size * plasma_layer_idx
-            xi_loc = (xi_plasma_layer - xi) / xi_step_size
-            x_h, y_h = x / grid_step_size + 0.5, y / grid_step_size + 0.5
+    def deposit_beam(plasma_layer_idx, x, y, xi, q_norm,
+                     out_ro0, out_ro1):
+        """
+        Deposit beam particles onto the charge density grid.
+        """
+        xi_plasma_layer = - xi_step_size * plasma_layer_idx
+        xi_loc = (xi_plasma_layer - xi) / xi_step_size
+        x_h, y_h = x / grid_step_size + 0.5, y / grid_step_size + 0.5
 
-            return deposit_beam_cupy(
-                grid_steps, x_h, y_h, xi_loc, q_norm, out_ro0, out_ro1,
-                size=q_norm.size)
+        deposit_beam_kernel(
+            grid_steps, x_h, y_h, xi_loc, q_norm, out_ro0, out_ro1,
+            size=q_norm.size)
 
     return deposit_beam

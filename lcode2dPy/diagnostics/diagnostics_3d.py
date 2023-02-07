@@ -37,46 +37,7 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
 
 
 # Diagnostics classes:
-
-class Diagnostics3d:
-    def __init__(self, config: Config, diag_list=None):
-        """The main class of 3d diagnostics."""
-        self.config = config
-        if diag_list is None:
-            self.diag_list = []
-        else:
-            self.diag_list = diag_list
-
-        # Pushes a config to all choosen diagnostics classes:
-        for diag in self.diag_list:
-            try:
-                diag.pull_config(self.config)
-            except AttributeError:
-                print(
-                    f'{diag} type of diagnostics is not supported because ' + 
-                    'it does not have attribute called pull_config(...) or ' +
-                    'this attribute does not work correctly.')
-
-    def after_step_dxi(self, *parameters):
-        for diag in self.diag_list:
-            try:
-                diag.after_step_dxi(*parameters)
-            except AttributeError:
-                print(
-                    f'{diag} type of diagnostics is not supported because ' + 
-                    'it does not have attribute called after_step_dxi(...) ' +
-                    'or this attribute does not work correctly.')
-
-    def dump(self, *parameters):
-        for diag in self.diag_list:
-            try:
-                diag.dump(*parameters)
-            except AttributeError:
-                print(
-                    f'{diag} type of diagnostics is not supported because ' + 
-                    'it does not have attribute called dump(...) or ' +
-                    'this attribute does not work correctly.')
-
+# TODO: Add a template class for diagnostics.
 
 class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
