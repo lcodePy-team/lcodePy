@@ -57,7 +57,7 @@ class PushAndSolver3d:
             )
 
             lost, moved, fell_to_next_layer = self.beam_calc.move_beam_layer(
-                beam_layer_to_move, fell_size, xi_i, pl_fields, prev_pl_fields
+                beam_layer_to_move, fell_size, xi_i, prev_pl_fields, pl_fields
             )
 
             ro_beam_prev = ro_beam_full.copy()
