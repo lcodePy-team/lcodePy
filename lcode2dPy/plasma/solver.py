@@ -31,13 +31,12 @@ class CylindricalPlasmaSolver(object):
         self.corrector_steps = config.getint('corrector-steps')
 
     # Performs one full step along xi
-    def step_dxi(self, particles, fields, rho_beam):
+    def step_dxi(self, particles, fields, currents, rho_beam):
         substeps = 0
         substepping_depth = 0
         step_begin = True
         substepping_state = np.zeros(self.substepping_max_depth + 1)
         xi_step_p = self.xi_step_p
-        currents = self.currents_computer.compute_rhoj(particles)
         fields_new = fields
 
         while True:
@@ -89,4 +88,5 @@ class CylindricalPlasmaSolver(object):
             fields = fields_new
             particles = particles_new
             currents = currents_new
-        return particles_new, fields_new, substeps
+
+        return particles_new, fields_new, currents_new, substeps

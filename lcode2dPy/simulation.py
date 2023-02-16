@@ -1,20 +1,26 @@
 """Top-level three-dimensional simulation class."""
 # Imports config, diagnostics, alternative beam generator for 3d
 # (can be used for 2d too)
-from ..config.default_config_values import default_config_values
-from ..config.config import Config
-from ..alt_beam_generator.beam_generator import generate_beam
+from .config.default_config_values import default_config_values
+from .config.config import Config
+from .alt_beam_generator.beam_generator import generate_beam
 
-# Imports plasma nodule
-from ..push_solvers.push_solver_3d import PushAndSolver3d
-from ..plasma3d.initialization import init_plasma
-from ..plasma3d.initialization import load_plasma
+# Imports plasma nodule, 3d:
+from .push_solvers.push_solver_3d import PusherAndSolver3D
+from .plasma3d import init_plasma_3d, load_plasma_3d
 
-# Imports beam module
-from ..beam3d import BeamParticles, BeamSource, BeamDrain
+# Imports beam module, 3d:
+from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D
+
+# Imports plasma module, 2d:
+from .push_solvers.push_solver_2d import PusherAndSolver2D
+from .plasma import init_plasma_2d
+
+# Imports beam module, 3d:
+from .beam import BeamParticles2D, BeamSource2D, BeamDrain2D
 
 
-class Cartesian3dSimulation:
+class Simulation:
     """
     Top-level lcodePy simulation class for cartesian 3d geometry.
 
@@ -50,14 +56,6 @@ class Cartesian3dSimulation:
         # 0. We set __config__ as a Config class instance:
         self.__config = Config(self.config)
 
-        # Firstly, we check that the geomtry was set right:
-        geometry = self.__config.get('geometry').lower()
-        if geometry != '3d':
-            raise Exception("Sorry, you set a wrong type of geometry. If you" +
-                            "want to use Cartesian3dSimulation, change" +
-                            f"geometry from {geometry} to 3d in your config." +
-                            "(your_config['geometry'] = '3d')")
-
         # We set some instance variables:
         self.__time_limit = self.__config.getfloat('time-limit')
         self.__time_step_size = self.__config.getfloat('time-step')
@@ -66,10 +64,24 @@ class Cartesian3dSimulation:
         # Mode of plasma continuation:
         self.__cont_mode = self.__config.get('continuation')
 
-        self.__push_solver = PushAndSolver3d(config=self.__config)
-        self.init_plasma, self.__load_plasma = init_plasma, load_plasma
-        self.BeamParticles, self.BeamSource, self.BeamDrain = \
-            BeamParticles, BeamSource, BeamDrain
+        # Firstly, we check that the geomtry was set right:
+        geometry = self.__config.get('geometry').lower()
+
+        if geometry == '3d':
+            self.__push_solver = PusherAndSolver3D(config=self.__config)
+            self.init_plasma, self.__load_plasma = \
+                init_plasma_3d, load_plasma_3d
+            self.BeamParticles, self.BeamSource, self.BeamDrain = \
+                BeamParticles3D, BeamSource3D, BeamDrain3D
+        elif geometry == '2d':
+            self.__push_solver = PusherAndSolver2D(config=self.__config)
+            self.init_plasma, self.__load_plasma = \
+                init_plasma_2d, None #TODO: Add load_plasma functionality for 2d.
+            self.BeamParticles, self.BeamSource, self.BeamDrain = \
+                BeamParticles2D, BeamSource2D, BeamDrain2D
+        else:
+            raise Exception("Sorry, you set a wrong type of geometry. " +
+                            "For now, we support only 2d and 3d geometry.")
 
         # Finally, we set the diagnostics.
         for diagnostic in self.diagnostics_list:
@@ -154,7 +166,7 @@ class Cartesian3dSimulation:
                                     "rigid-beam is supported.")
 
             # 4. A loop that calculates N time steps:
-            for t_i in range(N_steps):                
+            for t_i in range(N_steps):
                 self.current_time = self.current_time + self.__time_step_size
 
                 plasmastate = self.__init_plasmastate(self.current_time)
@@ -168,8 +180,9 @@ class Cartesian3dSimulation:
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                self.beam_source = self.BeamSource(self.__config,
-                                                   self.beam_drain.beam_buffer)
+                beam_particles = self.beam_drain.beam_slice()
+                self.beam_source = self.BeamSource(self.__config, 
+                                                   beam_particles)
                 self.beam_drain  = self.BeamDrain(self.__config)
 
             # 4. As in lcode2d, we save the beam state on reaching the time limit:

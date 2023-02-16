@@ -1,11 +1,11 @@
 """Module for plasma initialization routines."""
 import numpy as np
 
-from .data import Fields, Particles
+from .data import Fields, Particles, Currents
 from .profiles import get_plasma_profile
 
 
-def init_plasma(config):
+def init_plasma(config, current_time=0):
     window_width = config.getfloat('window-width')
     r_step = config.getfloat('window-width-step-size')
     part_per_cell = config.getint('plasma-particles-per-cell')
@@ -23,4 +23,7 @@ def init_plasma(config):
         age = np.full_like(r_p, path_lim)
     else:
         age = np.zeros_like(r_p)
-    return fields, Particles(r_p, p_r_p, p_f_p, p_z_p, q_p, m_p, age)
+    
+    zeros = np.zeros(grid_length, dtype=np.float64)
+    return (fields, Particles(r_p, p_r_p, p_f_p, p_z_p, q_p, m_p, age),
+            Currents(rho=zeros, j_r=zeros, j_f=zeros, j_z=zeros))

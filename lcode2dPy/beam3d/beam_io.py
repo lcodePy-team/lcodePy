@@ -69,3 +69,6 @@ class BeamDrain:
         """
         if lost_layer.id.size > 0:
             self.lost_buffer.append(lost_layer)
+    
+    def beam_slice(self):
+        return self.beam_buffer

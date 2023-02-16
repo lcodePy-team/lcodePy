@@ -3,15 +3,15 @@ import numpy as np
 from ..config.config import Config
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles
+from ..beam3d import BeamCalculator, BeamSource3D, BeamDrain3D, BeamParticles3D
 
 
-class PushAndSolver3d:
+class PusherAndSolver3D:
     def __init__(self, config: Config):
         self.config = config
 
         self.pl_solver = Plane2d3vPlasmaSolver(config)
-        self.beam_particles_class = BeamParticles
+        self.beam_particles_class = BeamParticles3D
         self.beam_calc = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
@@ -28,8 +28,8 @@ class PushAndSolver3d:
 
     def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
                 pl_currents: Arrays, pl_const_arrays: Arrays,
-                beam_source: BeamSource, beam_drain: BeamDrain, current_time,
-                diagnostics_list=[]):
+                beam_source: BeamSource3D, beam_drain: BeamDrain3D,
+                current_time, diagnostics_list=[]):
         """
         Perform one time step of beam-plasma calculations.
         """
@@ -87,7 +87,7 @@ class PushAndSolver3d:
             Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
 
             print(
-                f't={current_time:+.4f}, ' + 
+                f't={current_time:+.4f}, ' +
                 f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
             )
 
