@@ -14,7 +14,7 @@ from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D
 
 # Imports plasma module, 2d:
 from .push_solvers.push_solver_2d import PusherAndSolver2D
-from .plasma import init_plasma_2d
+from .plasma import init_plasma_2d, load_plasma_2d
 
 # Imports beam module, 3d:
 from .beam import BeamParticles2D, BeamSource2D, BeamDrain2D
@@ -76,7 +76,7 @@ class Simulation:
         elif geometry == '2d':
             self.__push_solver = PusherAndSolver2D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
-                init_plasma_2d, None #TODO: Add load_plasma functionality for 2d.
+                init_plasma_2d, load_plasma_2d
             self.BeamParticles, self.BeamSource, self.BeamDrain = \
                 BeamParticles2D, BeamSource2D, BeamDrain2D
         else:

@@ -1,5 +1,6 @@
 import numpy as np
-from numba import njit
+
+from ..config.config import Config
 
 from ..beam import BeamSource2D, BeamDrain2D, BeamParticles2D, beam_slice_mover
 from ..beam.beam_calculate import layout_beam_slice
@@ -49,7 +50,7 @@ def split_beam_slice(beam_slice, xi_end):
 
 
 class PusherAndSolver2D:
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
         
         #self.layout_beam_slice = configure_layout_beam_slice(config)
