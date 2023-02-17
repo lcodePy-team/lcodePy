@@ -1,4 +1,6 @@
 """Top-level three-dimensional simulation class."""
+import copy
+
 # Imports config, diagnostics, alternative beam generator for 3d
 # (can be used for 2d too)
 from .config.default_config_values import default_config_values
@@ -22,15 +24,35 @@ from .beam import BeamParticles2D, BeamSource2D, BeamDrain2D
 
 class Simulation:
     """
-    Top-level lcodePy simulation class for cartesian 3d geometry.
+    Top-level lcodePy simulation class that controls computational.
 
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config=default_config_values, beam_parameters={},
                  diagnostics=[]):
-        self.config = config
-        self.beam_parameters = beam_parameters
-        self.diagnostics_list = diagnostics
+        """
+            Initializes a simulation.
+
+            Parametrs
+            ---------
+            config : Dict, optional
+                    The set of base parameters to perform the simulation.
+                    Default : default_config_values from lcodePy2d/config/
+                    (TODO: Should we use Config class insted Dict by default?)
+
+            beam_parametrs : Dict, otianal
+                    Configuration of the charge beam.
+                    The beam desibled by default.      
+                    (TODO: set default beam)
+
+            diagnostics : List, optianal
+                    Collection of diagnostics that should be run.
+                    By default, diagnostics are desibled.      
+        """
+
+        self.config = copy.copy(config)
+        self.beam_parameters = copy.copy(beam_parameters)
+        self.diagnostics_list = copy.copy(diagnostics)
 
         # Here we set parameters for beam generation, where we will store beam
         # particles and where they will go after calculations
@@ -49,9 +71,12 @@ class Simulation:
         self.external_plasmastate = False
         self.path_to_plasmastate = 'plasmastate.npz'
 
+        #set geometry is None before reading config
+        self.__geometry = None
+
         # Pull the config before the start of calculations:
         self.__pull_config()
-
+    
     def __pull_config(self):
         # 0. We set __config__ as a Config class instance:
         self.__config = Config(self.config)
@@ -65,15 +90,18 @@ class Simulation:
         self.__cont_mode = self.__config.get('continuation')
 
         # Firstly, we check that the geomtry was set right:
-        geometry = self.__config.get('geometry').lower()
-
-        if geometry == '3d':
+        if self.__geometry is None:
+            self.__geometry = self.__config.get('geometry').lower()
+        elif self.__geometry != self.__config.get('geometry').lower():
+            raise Exception("Sorry, update geometry does not support now.")
+            
+        if self.__geometry == '3d':
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
             self.BeamParticles, self.BeamSource, self.BeamDrain = \
                 BeamParticles3D, BeamSource3D, BeamDrain3D
-        elif geometry == '2d':
+        elif self.__geometry == '2d':
             self.__push_solver = PusherAndSolver2D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_2d, load_plasma_2d
@@ -82,10 +110,18 @@ class Simulation:
         else:
             raise Exception("Sorry, you set a wrong type of geometry. " +
                             "For now, we support only 2d and 3d geometry.")
+            
 
         # Finally, we set the diagnostics.
         for diagnostic in self.diagnostics_list:
             diagnostic.pull_config(config=self.__config)
+
+    
+    ## TODO add update beam and diagnostics
+    ## def update(self, config):
+    ##    """
+    ##    Update the simulation according modification. 
+
 
     # TODO: Should we make load_beamfile just
     #       another method of beam genetration?
@@ -121,8 +157,18 @@ class Simulation:
             #       modifications after copy-pasting.
 
     def step(self, N_steps=None):
-        """Compute N time steps."""
+        """
+        Compute N time steps.
+
+        Parametrs
+        ---------
+
+        N_steps : int, optional
+                Number of time steps that will be done. 
+                Default : N_steps = time_limit / time_step.
+        """
         # 0. It analyzes config values:
+        #TODO: explicit config update. If we change xi-step we must change beam.
         self.__pull_config()
 
         # 1. If we use an external plasma state, we load it:
