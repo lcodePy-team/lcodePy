@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from .beam_slice import BeamSlice
+from ..config.config import Config
 
 
 class BeamSource(ABC):
@@ -62,7 +63,10 @@ lost_particle_dtype = np.dtype([('time', 'f8'), ('xi', 'f8'), ('r', 'f8'), ('p_z
 
 
 class MemoryBeamSource(BeamSource):
-    def __init__(self, beam_slice: BeamSlice):
+    def __init__(self, config: Config, beam_slice):
+        if type(beam_slice) == np.ndarray:
+            beam_slice = BeamSlice(beam_slice.size, beam_slice)
+
         self._beam_slice = beam_slice
         self._used_count = 0
         if beam_slice.particles.size == 0:
@@ -97,7 +101,7 @@ class MemoryBeamDrain(BeamDrain):
     def finish_layer(self, xi):
         pass
 
-    def __init__(self):
+    def __init__(self, config: Config):
         self._beam_buffer = []
         self._beam_buffer_lost = []
 

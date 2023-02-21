@@ -1,7 +1,8 @@
 import numba as nb
 import numpy as np
 
-particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
+particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'),
+                           ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
                            ('q_norm', 'f8'), ('id', 'i8')])
 
 _beamParticlesSliceSpec = [

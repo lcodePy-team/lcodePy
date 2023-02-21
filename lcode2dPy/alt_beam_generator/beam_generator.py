@@ -7,8 +7,6 @@ from ..config.config import Config
 from .beam_shape import BeamShape
 from .beam_segment_shape import BeamSegmentShape
 
-from .. import beam3d as beam3d_cpu_module
-
 
 particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
                              ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'),
@@ -27,8 +25,7 @@ def rigid_beam_current(beam_shape: BeamShape, xi_step_p):
     return current
 
 
-def generate_beam(config=default_config, beam_parameters: dict=None,
-                  beam_module=beam3d_cpu_module):
+def generate_beam(config=default_config, beam_parameters: dict=None):
     # We check if 'config' is just a Python dictionary:
     if type(config) == dict:
         config = Config(config)
@@ -93,19 +90,14 @@ def generate_beam(config=default_config, beam_parameters: dict=None,
         beam_segment = BeamSegmentShape(**def_beam_segment_params)
         beam_shape.add_segment(beam_segment)
 
-    # Now we generate beam particles. beam_module is either
-    # beam3d or beam3d_gpu
-    beam_particles = beam_module.BeamParticles()
-    beam_particles.init_generated(generate_beam_array(config, beam_shape))
-    return beam_particles
+    return generate_beam_array(config, beam_shape)
 
 
 def generate_beam_array(config: Config, beam_shape: BeamShape):
     xi_step_p = config.getfloat('xi-step')
-    xy_step_p = config.getfloat('window-width-step-size')
     three_dimensions = (config.get('geometry').lower() == '3d')
-    max_radius = xy_step_p * config.getint('window-width-steps') / 2
-    # Should a user define max_radius by themselves?
+    max_radius = config.getint('window-width') / 2
+    # TODO: Should a user define max_radius by themselves?
 
     rng = np.random.RandomState(beam_shape.rng_seed)
     current = rigid_beam_current(beam_shape, xi_step_p)
