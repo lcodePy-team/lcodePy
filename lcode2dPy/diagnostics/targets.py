@@ -44,7 +44,7 @@ class FieldDiagnostics:
         self.out = out
         self.data = {}
 
-    def config(self, config):
+    def pull_config(self, config):
         self.dt = config.getfloat('time-step')
         self.tlim = config.getfloat('time-limit')
         if self.t_start is None:
@@ -53,7 +53,7 @@ class FieldDiagnostics:
             self.t_end = self.tlim
         r_step = config.getfloat('window-width-step-size')
         xi_step = config.getfloat('xi-step')
-        self.w = int(config.getfloat('window-length')/xi_step)
+        self.w = int(config.getfloat('window-length')/xi_step)+1
         self.h = int(config.getfloat('window-width')/r_step)+1
         
         self.last_idx = self.w - 1  
@@ -143,7 +143,7 @@ class BeamDiagnostics:
         self.data = {}
         self.lost = {}
 
-    def config(self, config):
+    def pull_config(self, config):
         self.tlim = config.getfloat('time-limit')
         if self.t_end is None:
             self.t_end = self.tlim
@@ -184,7 +184,7 @@ class PlasmaDiagnostics:
         self.data = {}
         self.lost = {}
 
-    def config(self, config):
+    def pull_config(self, config):
         self.tlim = config.getfloat('time-limit')
         if self.t_end is None:
             self.t_end = self.tlim
