@@ -130,7 +130,7 @@ def generate_beam_array(config: Config, beam_shape: BeamShape):
         start_idx = part_idx
         end_idx = part_idx + particles_in_layer
 
-        beam['xi'][start_idx:end_idx] = np.random.uniform(layer_xi - xi_step_p,
+        beam['xi'][start_idx:end_idx] = rng.uniform(layer_xi - xi_step_p,
                                                           layer_xi,
                                                           particles_in_layer)
         if three_dimensions:
