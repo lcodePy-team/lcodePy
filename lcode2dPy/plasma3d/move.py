@@ -58,7 +58,7 @@ def noise_reductor(ro, i, j, Ex, Ey, x_half, y_half, grid,
     return Ex_new, Ey_new
 
 
-@nb.njit(parallel=True)
+@nb.njit #(parallel=True)
 def move_smart_kernel(xi_step_size, reflect_boundary,
                       grid_step_size, grid_steps,
                       ms, qs,

@@ -41,7 +41,7 @@ def weights(x, y, xi_loc, grid_steps, grid_step_size):
 
 # Deposition and field interpolation #
 
-@nb.njit(parallel=True)
+@nb.njit #(parallel=True)
 def deposit_beam_cpu(grid_steps, grid_step_size, x, y, xi_loc, q_norm,
                      rho_layout_0, rho_layout_1):
     """

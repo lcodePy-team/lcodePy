@@ -92,7 +92,7 @@ def sign(x):
 
 # Moves one particle as far as possible on current xi layer
 
-@nb.njit(parallel=True)
+@nb.njit #(parallel=True)
 def move_particles_kernel(grid_steps, grid_step_size, xi_step_size,
                           beam_xi_layer, lost_radius,
                           q_m_, dt_, remaining_steps,
