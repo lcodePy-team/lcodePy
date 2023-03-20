@@ -79,4 +79,8 @@ default_config_values = {
     'corrector-steps': 2, # Can we even change this???
 
     'noise-reductor-amplitude': 0, # Amplitude of noise reduction
+
+    'filter-window-length': 5,
+    'filter-polyorder': 3,
+    'filter-coefficient': 0.1,
 }

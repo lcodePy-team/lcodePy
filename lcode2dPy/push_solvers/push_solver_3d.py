@@ -94,11 +94,11 @@ class PushAndSolver3d:
             # Some diagnostics:
             view_pl_fields = ArraysView(pl_fields)
             Ez_00 = view_pl_fields.Ez[self.grid_steps//2, self.grid_steps//2]
-
-            print(
-                # f't={current_time:+.4f}, ' + 
-                f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}'
-            )
+            
+            if xi_i % 10. == 0:
+                print(
+                    # f't={current_time:+.4f}, ' + 
+                    f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}')
 
         # Perform diagnostics
         if diagnostics:
