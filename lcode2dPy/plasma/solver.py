@@ -7,11 +7,11 @@ from .rhoj import RhoJComputer
 
 
 @njit
-def noise_amplitude(currents, enabled):
+def noise_amplitude(rho, enabled):
     if not enabled:
-        return np.zeros_like(currents.rho)
-    noise_ampl = np.zeros_like(currents.rho)
-    noise_ampl[1:-1] = 2 * currents.rho[1:-1] - currents.rho[2:] - currents.rho[:-2]
+        return np.zeros_like(rho)
+    noise_ampl = np.zeros_like(rho)
+    noise_ampl[1:-1] = 2 * rho[1:-1] - rho[2:] - rho[:-2]
     noise_ampl[-1] = -noise_ampl[-2]
     noise_ampl /= 4
     return noise_ampl
@@ -51,7 +51,7 @@ class CylindricalPlasmaSolver(object):
             # Predictor step
             particles_new = self.particles_mover.move_particles(
                 fields, particles,
-                noise_amplitude(currents, self.noisereductor_enabled),
+                noise_amplitude(currents.rho, self.noisereductor_enabled),
                 xi_step_p
             )
             currents_new = self.currents_computer.compute_rhoj(particles_new)
@@ -66,14 +66,14 @@ class CylindricalPlasmaSolver(object):
                 continue
 
             for _ in np.arange(self.corrector_steps):
-                fields_new = self.fields.compute_fields(
-                    fields_new.average(fields), rho_beam,
+                fields_new, fields_average = self.fields.compute_fields(
+                    fields_new, fields, rho_beam,
                     currents, currents_new,
                     xi_step_p,
                 )
                 particles_new = self.particles_mover.move_particles(
-                    fields_new.average(fields), particles,
-                    noise_amplitude(currents_new, self.noisereductor_enabled),
+                    fields_average, particles,
+                    noise_amplitude(currents_new.rho, self.noisereductor_enabled),
                     xi_step_p
                 )
                 currents_new = self.currents_computer.compute_rhoj(particles_new)
