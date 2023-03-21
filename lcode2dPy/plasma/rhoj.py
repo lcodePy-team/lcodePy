@@ -2,6 +2,7 @@
 import numpy as np
 from numba import njit
 
+from ..config.config import Config
 from .data import Arrays
 from .gamma import gamma_mass_nb
 from .weights import (
@@ -51,28 +52,27 @@ def _cell_volume(r_step, particles_per_cell, n_cells):
     return cell_volume
 
 
-class RhoJComputer(object):
-    def __init__(self, config):
-        self.r_step = config.getfloat('window-width-step-size')
-        max_radius = config.getfloat('window-width')
-        self.n_cells = int(max_radius / self.r_step) + 1
-        particles_per_cell = config.getint('plasma-particles-per-cell')
-        self.cell_volume = _cell_volume(
-            self.r_step, particles_per_cell, self.n_cells,
-        )
+def get_rhoj_computer(config: Config):
+    grid_step_size = config.getfloat('window-width-step-size')
+    max_radius = config.getfloat('window-width')
+    n_cells = int(max_radius / grid_step_size) + 1
+    particles_per_cell = config.getint('plasma-particles-per-cell')
+    cell_volume = _cell_volume(grid_step_size, particles_per_cell, n_cells)
 
-    def compute_rhoj(self, particles):
+    def compute_rhoj(particles):
         rho, j_r, j_f, j_z = _deposit_currents(
-            self.r_step, self.n_cells, particles.r,
+            grid_step_size, n_cells, particles.r,
             particles.p_r, particles.p_f, particles.p_z,
             particles.q, particles.m)
         
-        rho = rho / self.cell_volume
-        j_r = j_r / self.cell_volume
-        j_f = j_f / self.cell_volume
-        j_z = j_z / self.cell_volume
+        rho = rho / cell_volume
+        j_r = j_r / cell_volume
+        j_f = j_f / cell_volume
+        j_z = j_z / cell_volume
         
         # Add charge density of background ions
         rho += 1
 
         return Arrays(xp=np, rho=rho, j_r=j_r, j_f=j_f, j_z=j_z)
+    
+    return compute_rhoj

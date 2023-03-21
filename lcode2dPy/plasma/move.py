@@ -1,6 +1,8 @@
 import numpy as np
 from numba import njit
 
+from ..config.config import Config
+
 
 @njit
 def _interpolate_fields(cell_idx, local_coord, E_r, E_f, E_z, B_f, B_z):
@@ -205,20 +207,21 @@ def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
         q_array[j] = q
 
 
-class ParticleMover:
-    def __init__(self, config):
-        self.config = config
-        self.r_step = config.getfloat('window-width-step-size')
-        self.max_radius = config.getfloat('window-width')
+def get_plasma_particles_mover(config: Config):
+    xi_step_size   = config.getfloat('xi-step')
+    grid_step_size = config.getfloat('window-width-step-size')
+    max_radius     = config.getfloat('window-width')
 
     # Move particles one D_XIP step forward
-    def move_particles(self, fields, particles_prev, noise_amplitude, xi_step_p):
+    def move_particles(fields, particles_prev, noise_amplitude):
         particles = particles_prev.copy()
 
         _move_particles_with_substepping(
             fields.E_r, fields.E_f, fields.E_z, fields.B_f, fields.B_z,
             particles.r, particles.p_r, particles.p_f, particles.p_z,
             particles.q, particles.m, particles.age,
-            noise_amplitude, self.r_step, xi_step_p, self.max_radius)
+            noise_amplitude, grid_step_size, xi_step_size, max_radius)
         
         return particles
+    
+    return move_particles

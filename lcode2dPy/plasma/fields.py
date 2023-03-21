@@ -2,6 +2,7 @@
 import numpy as np
 from numba import njit
 
+from ..config.config import Config
 from .data import Arrays
 from .ode import (
     cumtrapz_numba,
@@ -194,25 +195,10 @@ def _compute_e_r_previous_factor(rho, j_r, j_phi, j_z):
     return 1 + prev_factor
 
 
-class FieldComputer(object):
-    """
-    Class to store some parameters for fields computing.
+def get_field_computer(config: Config):
+    grid_step_size = config.getfloat('window-width-step-size')
 
-    Parameters
-    ----------
-    config : ..config.Config
-
-    Attributes
-    ----------
-    r_step : float
-        Radial grid step size.
-
-    """
-
-    def __init__(self, config):
-        self.r_step = float(config.get('window-width-step-size'))
-
-    def compute_fields(self, fields, fields_prev, rho_beam,
+    def compute_fields(fields, fields_prev, rho_beam,
                        currents_previous, currents, xi_step_p):
         """
         Compute fields on the next xi step.
@@ -249,16 +235,16 @@ class FieldComputer(object):
         )
         total_rho = currents.rho + rho_beam
         E_r = compute_e_r(total_rho, currents.j_r,
-                                     currents_previous.j_r, fields.E_r,
-                                     previous_factor, self.r_step, xi_step_p)
+                          currents_previous.j_r, fields.E_r,
+                          previous_factor, grid_step_size, xi_step_p)
         previous_factor = np.ones_like(fields.E_f)
         E_f = compute_e_phi(currents.j_f, currents_previous.j_f,
-                                       fields.E_f, previous_factor,
-                                       self.r_step, xi_step_p)
-        E_z = compute_e_z(currents.j_r, self.r_step)
+                            fields.E_f, previous_factor,
+                            grid_step_size, xi_step_p)
+        E_z = compute_e_z(currents.j_r, grid_step_size)
         B_f = compute_b_phi(currents.rho, currents.j_z, E_r,
-                                       self.r_step)
-        B_z = compute_b_z(currents.j_f, self.r_step)
+                            grid_step_size)
+        B_z = compute_b_z(currents.j_f, grid_step_size)
 
         new_fields = Arrays(xp=np, E_r=E_r, E_f=E_f, E_z=E_z, B_f=B_f, B_z=B_z)
     
@@ -274,3 +260,5 @@ class FieldComputer(object):
             B_f=B_f_average, B_z=B_z_average)
 
         return new_fields, fields_average
+    
+    return compute_fields
