@@ -12,9 +12,12 @@ def init_plasma(config: Config, current_time=0):
     part_per_cell = config.getint('plasma-particles-per-cell')
     path_lim = config.getfloat('trapped-path-limit')
     grid_length = int(window_width / r_step) + 1
+
     plasma_profile = get_plasma_profile(config)
+
     r_p = plasma_profile.place_particles(part_per_cell)
     m_p = plasma_profile.weigh_particles(r_p)
+    
     q_p = -np.copy(m_p)
     p_r_p = np.zeros_like(r_p)
     p_f_p = np.zeros_like(r_p)
@@ -40,15 +43,17 @@ def init_plasma(config: Config, current_time=0):
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
+    fields, particles, currents = init_plasma(config)
+
     with np.load(file=path_to_plasmastate) as state:
-        fields = Fields(E_r=state['Er'], E_f=state['Ef'], E_z=state['Ez'],
-                        B_f=state['Bf'], B_z=state['Bz'])
+        fields = Arrays(xp=np, E_r=state['Er'], E_f=state['Ef'],
+                        E_z=state['Ez'], B_f=state['Bf'], B_z=state['Bz'])
 
-        particles = Particles(r=state['r'], p_r=state['pr'], p_f=state['pf'],
-                              p_z=state['pz'], q=state['q'], m=state['m'],
-                              age=state['age'])
+        particles = Arrays(xp=np, r=state['r'],
+                           p_r=state['pr'], p_f=state['pf'], p_z=state['pz'],
+                           q=state['q'], m=state['m'], age=state['age'])
 
-        currents = Currents(rho=state['ro'], j_x=state['jx'],
-                            j_y=state['jy'], j_z=state['jz'])
+        currents = Arrays(xp=np, rho=state['ro'],
+                          j_x=state['jx'], j_y=state['jy'], j_z=state['jz'])
 
     return fields, particles, currents
