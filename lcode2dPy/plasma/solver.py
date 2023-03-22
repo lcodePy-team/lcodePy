@@ -54,7 +54,8 @@ class CylindricalPlasmaSolver(object):
             # Predictor step
             particles_new = self.move_particles(
                 fields, particles,
-                noise_amplitude(currents.rho, self.noisereductor_enabled))
+                noise_amplitude(currents.rho, self.noisereductor_enabled),
+                xi_step_p)
 
             currents_new = self.compute_rhoj(particles_new)
             charge_move = np.abs(xi_step_p * currents_new.j_z).max()
@@ -75,7 +76,8 @@ class CylindricalPlasmaSolver(object):
                 )
                 particles_new = self.move_particles(
                     fields_average, particles,
-                    noise_amplitude(currents_new.rho, self.noisereductor_enabled))
+                    noise_amplitude(currents_new.rho, self.noisereductor_enabled),
+                    xi_step_p)
 
                 currents_new = self.compute_rhoj(particles_new)
             substeps += 1

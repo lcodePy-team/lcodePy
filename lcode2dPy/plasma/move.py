@@ -208,12 +208,11 @@ def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
 
 
 def get_plasma_particles_mover(config: Config):
-    xi_step_size   = config.getfloat('xi-step')
     grid_step_size = config.getfloat('window-width-step-size')
     max_radius     = config.getfloat('window-width')
 
     # Move particles one D_XIP step forward
-    def move_particles(fields, particles_prev, noise_amplitude):
+    def move_particles(fields, particles_prev, noise_amplitude, xi_step_size):
         particles = particles_prev.copy()
 
         _move_particles_with_substepping(
