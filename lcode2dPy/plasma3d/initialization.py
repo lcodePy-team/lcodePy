@@ -92,6 +92,9 @@ def make_plasma_grid(xp: np, steps, step_size, fineness):
     if fineness % 2:  # some on zero axes, none on cell corners
         right_half = xp.arange(steps // 2 * fineness) * plasma_step
         left_half = -right_half[:0:-1]  # invert, reverse, drop zero
+    elif 0. < fineness and fineness < 1.:
+        right_half = xp.arange(steps // (2 / fineness)) * plasma_step
+        left_half = -right_half[:0:-1]  # invert, reverse, drop zero
     else:  # none on zero axes, none on cell corners
         right_half = (.5 + xp.arange(steps // 2 * fineness)) * plasma_step
         left_half = -right_half[::-1]  # invert, reverse
@@ -312,9 +315,12 @@ def init_plasma(config: Config, current_time=0):
     grid_step_size        = config.getfloat('window-width-step-size')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
-    plasma_fineness       = config.getint('plasma-fineness')
+    plasma_fineness       = config.getfloat('plasma-fineness')
     solver_trick          = config.getint('field-solver-subtraction-trick')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
+
+    if plasma_fineness > 1:
+        plasma_fineness = int(plasma_fineness)
 
     # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
