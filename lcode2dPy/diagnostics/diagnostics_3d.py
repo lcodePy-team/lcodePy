@@ -188,14 +188,14 @@ class DiagnosticsFXi:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time)
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+            self.dump(current_time, None, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return current_time % self.__output_period == 0
 
     def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+             plasma_currents, beam_drain, clean_data=True):
         if self.conditions_check(current_time, inf):
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
@@ -211,8 +211,9 @@ class DiagnosticsFXi:
                     plt.close()
 
         # We now clean old data:
-        for name in self.__data:
-            self.__data[name] = []
+        if clean_data:
+            for name in self.__data:
+                self.__data[name] = []
 
 
 class DiagnosticsColormaps:
@@ -305,6 +306,9 @@ class DiagnosticsColormaps:
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
 
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
+
         if self.__output_period % self.__time_step_size != 0:
             raise Exception(
                 "The diagnostics will not work because " +
@@ -337,18 +341,14 @@ class DiagnosticsColormaps:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time, None, None, None, None)
+        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+            self.dump(current_time, None, None, None, None, False)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
         if (xi_plasma_layer <= self.__xi_to and
             (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to):
-            self.dump(current_time, None, None, None, None)
-
-            for name in self.__data:
-                self.__data[name] = []
-
+            self.dump(current_time, None, None, None, None, True)
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (current_time % self.__output_period == 0 and
@@ -356,7 +356,7 @@ class DiagnosticsColormaps:
                 xi_plasma_layer >= self.__xi_to)
 
     def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+             plasma_currents, beam_drain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
         if self.conditions_check(current_time, inf):
             data_for_saving = (self.__data).copy()
@@ -386,8 +386,9 @@ class DiagnosticsColormaps:
             data_for_saving = 0
 
         # We now clean old data:
-        for name in self.__data:
-            self.__data[name] = []
+        if clean_data:
+            for name in self.__data:
+                self.__data[name] = []
 
 
 class DiagnosticsTransverse:
@@ -520,7 +521,7 @@ class DiagnosticsTransverse:
             xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
 
     def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+             plasma_currents, beam_drain, clean_data=True):
         pass
 
 
@@ -544,7 +545,7 @@ class SaveRunState:
         pass
 
     def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+             plasma_currents, beam_drain, clean_data=True):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__saving_period <= self.__time_step_size / 2:
