@@ -394,7 +394,9 @@ class DiagnosticsColormaps:
 class DiagnosticsTransverse:
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho',
                            'rho_beam', 'Phi', # 'ni',
-                           'px', 'py', 'pz', 'x_offt', 'y_offt']
+                           'px', 'py', 'pz', 'x_offt', 'y_offt',
+                           'dx_chaotic', 'dy_chaotic',
+                           'dx_chaotic_perp', 'dy_chaotic_perp']
     # NOTE: If you want to save x_init, y_init, q, or m, use the SaveRunState
     #       diagnostics, as these values are constant throughout the window.
 
@@ -493,7 +495,9 @@ class DiagnosticsTransverse:
             if name == 'rho_beam':
                 data_for_saving[name] = ro_beam
 
-            if name in ['px', 'py', 'pz', 'x_offt', 'y_offt']:
+            if name in ['px', 'py', 'pz', 'x_offt', 'y_offt',
+                        'dx_chaotic', 'dy_chaotic',
+                        'dx_chaotic_perp', 'dy_chaotic_perp']:
                 data_for_saving[name] = getattr(plasma_particles, name)
 
         file_name = \

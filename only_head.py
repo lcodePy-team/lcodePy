@@ -63,8 +63,15 @@ def calculate_head(window_length: float, config_dictionary: dict,
         x_offt=particles.x_offt, y_offt=particles.y_offt,
         px=particles.px, py=particles.py, pz=particles.pz,
         q=particles.q, m=particles.m,
+        
+        dx_chaotic=particles.dx_chaotic,
+        dy_chaotic=particles.dy_chaotic,
+        dx_chaotic_perp=particles.dx_chaotic_perp,
+        dy_chaotic_perp=particles.dy_chaotic_perp,
+
         Ex=fields.Ex, Ey=fields.Ey, Ez=fields.Ez,
         Bx=fields.Bx, By=fields.By, Bz=fields.Bz,
+
         Phi=fields.Phi, ro=currents.ro,
         jx=currents.jx, jy=currents.jy, jz=currents.jz
     )

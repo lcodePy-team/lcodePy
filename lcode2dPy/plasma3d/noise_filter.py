@@ -18,24 +18,31 @@ def get_noise_filter(config: Config):
 
     # A new noise mitigation method.
     def noise_filter(particles: Arrays):
-        # First, we make views for all required arrays (similar to numpy.ndarray.view):
-        x_init, y_init = particles.x_init, particles.y_init
+        # First, we take out all the required arrays:
         x_offt, y_offt = particles.x_offt, particles.y_offt
         px, py, pz = particles.px, particles.py, particles.pz
 
-        # Particle displacement is (x_offt, y_offt). Displacement inhomogeneity:
+        dx_chaotic = particles.dx_chaotic
+        dy_chaotic = particles.dy_chaotic
+        dx_chaotic_perp = particles.dx_chaotic_perp
+        dy_chaotic_perp = particles.dy_chaotic_perp
+
+        # Particle displacement is (x_offt, y_offt).
+        # Longitudinal displacement inhomogeneity:
         dx_inhom = x_offt[1:-1, :] - (x_offt[2:, :] + x_offt[:-2, :]) / 2
         dy_inhom = y_offt[:, 1:-1] - (y_offt[:, 2:] + y_offt[:, :-2]) / 2
+        # and transverse (perpendicular):
         dx_inhom_perp = y_offt[1:-1, :] - (y_offt[2:, :] + y_offt[:-2, :]) / 2
         dy_inhom_perp = x_offt[:, 1:-1] - (x_offt[:, 2:] + x_offt[:, :-2]) / 2
 
-        # Sagol filter-averaged displacement inhomogeneity:
+        # Sagol filter-averaged longitudinal displacement inhomogeneity:
         dx_inhom_averaged = savgol_filter(
             x=dx_inhom, window_length=filter_window_length,
             polyorder=filter_polyorder, axis=0)
         dy_inhom_averaged = savgol_filter(
             x=dy_inhom, window_length=filter_window_length,
             polyorder=filter_polyorder, axis=1)
+        # and transverse (perpendicular):
         dx_inhom_averaged_perp = savgol_filter(
             x=dx_inhom_perp, window_length=filter_window_length,
             polyorder=filter_polyorder, axis=0)
@@ -43,9 +50,10 @@ def get_noise_filter(config: Config):
             x=dy_inhom_perp, window_length=filter_window_length,
             polyorder=filter_polyorder, axis=1)
 
-        # Chaotic displacement:
+        # Chaotic longitudinal displacement:
         dx_chaotic = dx_inhom - dx_inhom_averaged
         dy_chaotic = dy_inhom - dy_inhom_averaged
+        # and transverse (perpendicular):
         dx_chaotic_perp = dx_inhom_perp - dx_inhom_averaged_perp
         dy_chaotic_perp = dy_inhom_perp - dy_inhom_averaged_perp
 
@@ -82,8 +90,13 @@ def get_noise_filter(config: Config):
         px[:, 2:]   -= xi_step_size * force_y_perp / 2
         px[:, :-2]  -= xi_step_size * force_y_perp / 2
 
-        return Arrays(particles.xp, x_init=x_init, y_init=y_init,
+        return Arrays(particles.xp,q=particles.q, m=particles.m,
+                      x_init=particles.x_init, y_init=particles.y_init,
+
+                      # And arrays that change after filtering:
                       x_offt=x_offt, y_offt=y_offt,
-                      px=px, py=py, pz=pz, q=particles.q, m=particles.m)
+                      px=px, py=py, pz=pz,
+                      dx_chaotic=dx_chaotic, dx_chaotic_perp=dx_chaotic_perp,
+                      dy_chaotic=dy_chaotic, dy_chaotic_perp=dy_chaotic_perp)
 
     return noise_filter

@@ -236,7 +236,11 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
 
     return Arrays(fields.xp, x_init=x_init, y_init=y_init,
                   x_offt=x_offt_new, y_offt=y_offt_new,
-                  px=px_new, py=py_new, pz=pz_new, q=q, m=m)
+                  px=px_new, py=py_new, pz=pz_new, q=q, m=m,
+                  dx_chaotic=particles.dx_chaotic,
+                  dy_chaotic=particles.dy_chaotic,
+                  dx_chaotic_perp=particles.dx_chaotic_perp,
+                  dy_chaotic_perp=particles.dy_chaotic_perp)
     # I don't like how it looks. TODO: write a new method for Particles class
     # or somehow use Particles.copy().
 
@@ -267,7 +271,11 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Arrays):
 
     return Arrays(particles.xp, x_init=x_init, y_init=y_init,
                   x_offt=x_offt, y_offt=y_offt,
-                  px=px, py=py, pz=pz, q=q, m=m)
+                  px=px, py=py, pz=pz, q=q, m=m,
+                  dx_chaotic=particles.dx_chaotic,
+                  dy_chaotic=particles.dy_chaotic,
+                  dx_chaotic_perp=particles.dx_chaotic_perp,
+                  dy_chaotic_perp=particles.dy_chaotic_perp)
 
 
 # Field interpolation and particle movement (fused), for GPU #
@@ -480,7 +488,11 @@ def get_plasma_particles_mover(config: Config):
                           x_init=particles.x_init, y_init=particles.y_init,
                           x_offt=x_offt_new, y_offt=y_offt_new,
                           px=px_new, py=py_new, pz=pz_new,
-                          q=particles.q, m=particles.m)
+                          q=particles.q, m=particles.m,
+                          dx_chaotic=particles.dx_chaotic,
+                          dy_chaotic=particles.dy_chaotic,
+                          dx_chaotic_perp=particles.dx_chaotic_perp,
+                          dy_chaotic_perp=particles.dy_chaotic_perp)
 
         move_wo_fields_kernel_cupy = get_move_wo_fields_kernel_cupy()
 
@@ -510,6 +522,10 @@ def get_plasma_particles_mover(config: Config):
                           x_init=particles.x_init, y_init=particles.y_init,
                           x_offt=x_offt_new, y_offt=y_offt_new,
                           px=px_new, py=py_new, pz=pz_new,
-                          q=particles.q, m=particles.m)
+                          q=particles.q, m=particles.m,
+                          dx_chaotic=particles.dx_chaotic,
+                          dy_chaotic=particles.dy_chaotic,
+                          dx_chaotic_perp=particles.dx_chaotic_perp,
+                          dy_chaotic_perp=particles.dy_chaotic_perp)
 
     return move_particles_smart, move_particles_wo_fields
