@@ -2,7 +2,6 @@
 import numba as nb
 import numpy as np
 
-from scipy.signal import savgol_filter
 from math import floor, sin, sqrt, pi
 
 from ..config.config import Config
@@ -242,9 +241,7 @@ def move_smart(xi_step, reflect_boundary, grid_step_size, grid_steps,
     # or somehow use Particles.copy().
 
 
-def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Arrays,
-                            filter_window_length, filter_polyorder,
-                            filter_coefficient):
+def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Arrays):
     """
     Move coarse plasma particles as if there were no fields.
     Also reflect the particles from `+-reflect_boundary`.
@@ -267,48 +264,6 @@ def move_estimate_wo_fields(xi_step, reflect_boundary, particles: Arrays,
     y[y <= -reflect] = -2 * reflect - y[y <= -reflect]
 
     x_offt, y_offt = x - x_init, y - y_init
-
-    # A new noise mitigation method:
-    # Particle displacement is (x_offt, y_offt). Displacement inhomogeneity:
-    dx_inhom = x_offt[1:-1, :] - (x_offt[2:, :] + x_offt[:-2, :]) / 2
-    dy_inhom = y_offt[:, 1:-1] - (y_offt[:, 2:] + y_offt[:, :-2]) / 2
-
-    # Sagol filter-averaged displacement inhomogeneity:
-    dx_inhom_averaged = savgol_filter(
-        x=dx_inhom, window_length=filter_window_length,
-        polyorder=filter_polyorder, axis=0)
-    dy_inhom_averaged = savgol_filter(
-        x=dy_inhom, window_length=filter_window_length,
-        polyorder=filter_polyorder, axis=1)
-
-    # Chaotic displacement:
-    dx_chaotic = dx_inhom - dx_inhom_averaged
-    dy_chaotic = dy_inhom - dy_inhom_averaged
-
-    # Restoring force:
-    force_x = - filter_coefficient * dx_chaotic
-    force_y = - filter_coefficient * dy_chaotic
-
-    # Uncomment this to test a relativism corrected filter:
-    # gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)
-    # factor_1 = xi_step / (1 - pz / gamma_m)
-
-    # px[1:-1, :] += factor_1[1:-1, :] * force_x
-    # px[2:, :]   -= factor_1[2:, :]   * force_x / 2
-    # px[:-2, :]  -= factor_1[:-2, :]  * force_x / 2
-
-    # py[:, 1:-1] += factor_1[1:-1, :] * force_y
-    # py[:, 2:]   -= factor_1[2:, :]   * force_y / 2
-    # py[:, :-2]  -= factor_1[:-2, :]  * force_y / 2
-
-    # A filter with relativism corrections:
-    px[1:-1, :] += xi_step * force_x
-    px[2:, :]   -= xi_step * force_x / 2
-    px[:-2, :]  -= xi_step * force_x / 2
-
-    py[:, 1:-1] += xi_step * force_y
-    py[:, 2:]   -= xi_step * force_y / 2
-    py[:, :-2]  -= xi_step * force_y / 2
 
     return Arrays(particles.xp, x_init=x_init, y_init=y_init,
                   x_offt=x_offt, y_offt=y_offt,
@@ -476,11 +431,6 @@ def get_plasma_particles_mover(config: Config):
     pu_type = config.get('processing-unit-type').lower()
 
     noise_reductor_ampl = config.getfloat('noise-reductor-amplitude')
-
-    filter_window_length = config.getint('filter-window-length')
-    filter_polyorder = config.getint('filter-polyorder')
-    filter_coefficient = config.getfloat('filter-coefficient')
-
     if pu_type == 'cpu':
         def move_particles_smart(fields, particles, estimated_particles,
                                  const_arrays, ro_noisy):
@@ -491,8 +441,7 @@ def get_plasma_particles_mover(config: Config):
 
         def move_particles_wo_fields(particles):
             return move_estimate_wo_fields(
-                xi_step_size, reflect_boundary, particles,
-                filter_window_length, filter_polyorder, filter_coefficient)
+                xi_step_size, reflect_boundary, particles)
 
     elif pu_type == 'gpu':
         move_smart_kernel = get_move_smart_kernel_cupy()

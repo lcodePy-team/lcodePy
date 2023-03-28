@@ -3,6 +3,7 @@ from ..config.config import Config
 from ..plasma3d.rhoj import get_rhoj_computer
 from ..plasma3d.fields import get_field_computer
 from ..plasma3d.move import get_plasma_particles_mover
+from ..plasma3d.noise_filter import get_noise_filter
 
 
 class Plane2d3vPlasmaSolver(object):
@@ -11,6 +12,8 @@ class Plane2d3vPlasmaSolver(object):
         self.compute_fields = get_field_computer(config)
         self.move_particles, self.move_particles_wo_fields = \
             get_plasma_particles_mover(config)
+
+        self.noise_filter = get_noise_filter(config)
 
     # Perfoms one full step along xi.
     # To understand the numerical scheme, read values as following:
@@ -60,5 +63,8 @@ class Plane2d3vPlasmaSolver(object):
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
         )
+
+        # Here we perform noise filtering after the end of the movement:
+        particles_full = self.noise_filter(particles_full)
 
         return particles_full, fields_full, currents_full
