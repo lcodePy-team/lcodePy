@@ -22,10 +22,10 @@ def get_noise_filter(config: Config):
         x_offt, y_offt = particles.x_offt, particles.y_offt
         px, py, pz = particles.px, particles.py, particles.pz
 
-        dx_chaotic = particles.dx_chaotic
-        dy_chaotic = particles.dy_chaotic
-        dx_chaotic_perp = particles.dx_chaotic_perp
-        dy_chaotic_perp = particles.dy_chaotic_perp
+        dx_chaotic_previous = particles.dx_chaotic
+        dy_chaotic_previous = particles.dy_chaotic
+        dx_chaotic_perp_previous = particles.dx_chaotic_perp
+        dy_chaotic_perp_previous = particles.dy_chaotic_perp
 
         # Particle displacement is (x_offt, y_offt).
         # Longitudinal displacement inhomogeneity:
