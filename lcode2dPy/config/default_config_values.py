@@ -83,4 +83,5 @@ default_config_values = {
     'filter-window-length': 5,
     'filter-polyorder': 3,
     'filter-coefficient': 0.1,
+    'damping-coefficient': 0.1
 }

@@ -15,6 +15,7 @@ def get_noise_filter(config: Config):
     filter_window_length = config.getint('filter-window-length')
     filter_polyorder = config.getint('filter-polyorder')
     filter_coefficient = config.getfloat('filter-coefficient')
+    damping_coefficient = config.getfloat('damping-coefficient')
 
     # A new noise mitigation method.
     def noise_filter(particles: Arrays, particles_prev: Arrays):
@@ -76,17 +77,21 @@ def get_noise_filter(config: Config):
         # py[:, :-2]  -= factor_1[:-2, :]  * force_y / 2
 
         # A filter without relativism corrections:
-        px[1:-1, :] += xi_step_size * force_x
+        px[1:-1, :] += xi_step_size * (force_x  - damping_coefficient *
+                                       (dx_chaotic - dx_chaotic_previous))
         px[2:, :]   -= xi_step_size * force_x / 2
         px[:-2, :]  -= xi_step_size * force_x / 2
-        py[1:-1, :] += xi_step_size * force_x_perp
+        py[1:-1, :] += xi_step_size * (force_x_perp - damping_coefficient *
+                                       (dx_chaotic_perp - dx_chaotic_perp_previous))
         py[2:, :]   -= xi_step_size * force_x_perp / 2
         py[:-2, :]  -= xi_step_size * force_x_perp / 2
 
-        py[:, 1:-1] += xi_step_size * force_y
+        py[:, 1:-1] += xi_step_size * (force_y - damping_coefficient *
+                                       (dy_chaotic - dy_chaotic_previous))
         py[:, 2:]   -= xi_step_size * force_y / 2
         py[:, :-2]  -= xi_step_size * force_y / 2
-        px[:, 1:-1] += xi_step_size * force_y_perp
+        px[:, 1:-1] += xi_step_size * (force_y_perp - damping_coefficient *
+                                       (dy_chaotic_perp - dy_chaotic_perp_previous))
         px[:, 2:]   -= xi_step_size * force_y_perp / 2
         px[:, :-2]  -= xi_step_size * force_y_perp / 2
 
