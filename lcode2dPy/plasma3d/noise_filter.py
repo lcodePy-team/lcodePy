@@ -17,15 +17,15 @@ def get_noise_filter(config: Config):
     filter_coefficient = config.getfloat('filter-coefficient')
 
     # A new noise mitigation method.
-    def noise_filter(particles: Arrays):
+    def noise_filter(particles: Arrays, particles_prev: Arrays):
         # First, we take out all the required arrays:
         x_offt, y_offt = particles.x_offt, particles.y_offt
         px, py, pz = particles.px, particles.py, particles.pz
 
-        dx_chaotic_previous = particles.dx_chaotic
-        dy_chaotic_previous = particles.dy_chaotic
-        dx_chaotic_perp_previous = particles.dx_chaotic_perp
-        dy_chaotic_perp_previous = particles.dy_chaotic_perp
+        dx_chaotic_previous = particles_prev.dx_chaotic
+        dy_chaotic_previous = particles_prev.dy_chaotic
+        dx_chaotic_perp_previous = particles_prev.dx_chaotic_perp
+        dy_chaotic_perp_previous = particles_prev.dy_chaotic_perp
 
         # Particle displacement is (x_offt, y_offt).
         # Longitudinal displacement inhomogeneity:

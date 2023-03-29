@@ -27,10 +27,15 @@ class Plane2d3vPlasmaSolver(object):
     ):
         particles_full = self.move_particles_wo_fields(particles_prev)
 
+        # particles_full = self.noise_filter(particles_full, particles_prev)
+
         rho_noisy = currents_prev.ro + rho_beam_prev
         particles_full = self.move_particles(
             fields_prev, particles_prev, particles_full, const_arrays, rho_noisy
         )
+
+        # particles_full = self.noise_filter(particles_full, particles_prev)
+
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
         )
@@ -46,6 +51,9 @@ class Plane2d3vPlasmaSolver(object):
         particles_full = self.move_particles(
             fields_half, particles_prev, particles_full, const_arrays, rho_noisy
         )
+
+        # particles_full = self.noise_filter(particles_full, particles_prev)
+
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
         )
@@ -60,11 +68,12 @@ class Plane2d3vPlasmaSolver(object):
         particles_full = self.move_particles(
             fields_half, particles_prev, particles_full, const_arrays, rho_noisy
         )
+
+        # Here we perform noise filtering after the end of the movement:
+        particles_full = self.noise_filter(particles_full, particles_prev)
+
         currents_full = self.compute_rhoj(
             particles_full, const_arrays
         )
-
-        # Here we perform noise filtering after the end of the movement:
-        particles_full = self.noise_filter(particles_full)
 
         return particles_full, fields_full, currents_full
