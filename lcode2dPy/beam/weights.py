@@ -57,15 +57,16 @@ def interpolate_particle(value0, value1, j, a00, a01, a10, a11):
 
 
 @nb.njit
-def particle_fields(r_vec, fields_k_1, fields_k, xi_k_1, r_step, xi_step_p):
+def particle_fields(r_vec, E_r_k_1, E_f_k_1, E_z_k_1, B_f_k_1, B_z_k_1, E_r_k,
+                    E_f_k, E_z_k, B_f_k, B_z_k, xi_k_1, r_step, xi_step_p):
     r = np.sqrt(r_vec[0] ** 2 + r_vec[1] ** 2)
     j, a00, a01, a10, a11 = single_particle_weights(r, r_vec[2], xi_k_1, r_step, xi_step_p)
-    e_x = interpolate_particle(fields_k.E_r, fields_k_1.E_r, j, a00, a01, a10, a11)
-    e_y = interpolate_particle(fields_k.E_f, fields_k_1.E_f, j, a00, a01, a10, a11)
-    e_z = interpolate_particle(fields_k.E_z, fields_k_1.E_z, j, a00, a01, a10, a11)
+    e_x = interpolate_particle(E_r_k, E_r_k_1, j, a00, a01, a10, a11)
+    e_y = interpolate_particle(E_f_k, E_f_k_1, j, a00, a01, a10, a11)
+    e_z = interpolate_particle(E_z_k, E_z_k_1, j, a00, a01, a10, a11)
     b_x = -e_y  # Due to symmetry
-    b_y = interpolate_particle(fields_k.B_f, fields_k_1.B_f, j, a00, a01, a10, a11)
-    b_z = interpolate_particle(fields_k.B_z, fields_k_1.B_z, j, a00, a01, a10, a11)
+    b_y = interpolate_particle(B_f_k, B_f_k_1, j, a00, a01, a10, a11)
+    b_z = interpolate_particle(B_z_k, B_z_k_1, j, a00, a01, a10, a11)
     e_vec = np.array((e_x, e_y, e_z))
     b_vec = np.array((b_x, b_y, b_z))
     return e_vec, b_vec

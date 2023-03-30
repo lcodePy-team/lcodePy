@@ -74,7 +74,8 @@ def configure_move_beam_slice(config):
 
     # Moves particles as far as possible on its xi layer
     @nb.njit(locals=locals_spec)
-    def move_beam_slice(beam_slice, xi_layer, fields_after_slice, fields_before_slice):
+    def move_beam_slice(beam_slice, xi_layer, E_r_k_1, E_f_k_1, E_z_k_1,
+                        B_f_k_1, B_z_k_1, E_r_k, E_f_k, E_z_k, B_f_k, B_z_k):
         xi_end = xi_layer * -xi_step_p
         if beam_slice.size == 0:
             return
@@ -102,8 +103,8 @@ def configure_move_beam_slice(config):
                 # Interpolate fields and compute new impulse
                 (e_vec, b_vec) = particle_fields(
                     r_vec_half_step,
-                    fields_after_slice,
-                    fields_before_slice,
+                    E_r_k_1, E_f_k_1, E_z_k_1, B_f_k_1, B_z_k_1,
+                    E_r_k,   E_f_k,   E_z_k,   B_f_k,   B_z_k,
                     xi_end,
                     r_step,
                     xi_step_p,
@@ -162,7 +163,7 @@ def beam_slice_mover(config):
     substepping_energy = config.getfloat('beam-substepping-energy')
     move_particles = configure_move_beam_slice(config)
 
-    @nb.njit
+    # @nb.njit
     def move_beam_slice(
         beam_slice, xi_layer_idx, fields_after_slice, fields_before_slice,
     ):
@@ -174,8 +175,15 @@ def beam_slice_mover(config):
             beam_slice.dt[beam_slice.dt == 0] = time_step
         else:
             init_substepping(beam_slice, time_step, substepping_energy)
+
         move_particles(
-            beam_slice, xi_layer_idx, fields_after_slice, fields_before_slice,
+            beam_slice, xi_layer_idx, 
+            fields_after_slice.E_r, fields_after_slice.E_f,
+            fields_after_slice.E_z, fields_after_slice.B_f,
+            fields_after_slice.B_z,
+            fields_before_slice.E_r, fields_before_slice.E_f,
+            fields_before_slice.E_z, fields_before_slice.B_f,
+            fields_before_slice.B_z
         )
 
     return move_beam_slice

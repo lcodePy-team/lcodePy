@@ -6,7 +6,7 @@ from ..beam import BeamSource2D, BeamDrain2D, BeamParticles2D, beam_slice_mover
 from ..beam.beam_calculate import layout_beam_slice
 
 from ..plasma.solver import CylindricalPlasmaSolver
-from ..plasma.data import Fields, Particles, Currents
+from ..plasma.data import Arrays
 
 particle_dtype = np.dtype(
     [
@@ -65,8 +65,8 @@ class PusherAndSolver2D:
         self.xi_layers_num = int(self.window_length / self.xi_step_p)
 
 
-    def step_dt(self, plasma_fields: Fields, plasma_particles: Particles,
-                plasma_currents: Currents,
+    def step_dt(self, plasma_fields: Arrays, plasma_particles: Arrays,
+                plasma_currents: Arrays,
                 beam_source: BeamSource2D, beam_drain: BeamDrain2D,
                 current_time, diagnostics_list=[]):
         beam_slice_to_move = BeamParticles2D(0)

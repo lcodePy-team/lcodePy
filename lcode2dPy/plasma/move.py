@@ -1,10 +1,11 @@
 import numpy as np
 from numba import njit
-from numpy.core.numeric import zeros_like
+
+from ..config.config import Config
 
 
 @njit
-def _interpolate_fields(cell_idx, local_coord, fields):
+def _interpolate_fields(cell_idx, local_coord, E_r, E_f, E_z, B_f, B_z):
     """Interpolates fields from grid to particles positions."""
     a_1 = local_coord - 0.5
     a_1 *= 0.5 * a_1
@@ -15,22 +16,22 @@ def _interpolate_fields(cell_idx, local_coord, fields):
     jc = cell_idx
     jm = jc - 1
     jp = jc + 1
-    if jc == fields.E_r.size - 1:
+    if jc == E_r.size - 1:
         jp = jm
     elif jc == 0:
         jm = jp
-    elif jc >= fields.E_r.size:
+    elif jc >= E_r.size:
         return 0, 0, 0, 0, 0
     if jc == 0:
-        e_x = (a_3 - a_1) * fields.E_r[jm] + a_2 * fields.E_r[jc]
-        e_y = (a_3 - a_1) * fields.E_f[jm] + a_2 * fields.E_f[jc]
-        b_y = (a_3 - a_1) * fields.B_f[jm] + a_2 * fields.B_f[jc]
+        e_x = (a_3 - a_1) * E_r[jm] + a_2 * E_r[jc]
+        e_y = (a_3 - a_1) * E_f[jm] + a_2 * E_f[jc]
+        b_y = (a_3 - a_1) * B_f[jm] + a_2 * B_f[jc]
     else:
-        e_x = a_1 * fields.E_r[jm] + a_2 * fields.E_r[jc] + a_3 * fields.E_r[jp]
-        e_y = a_1 * fields.E_f[jm] + a_2 * fields.E_f[jc] + a_3 * fields.E_f[jp]
-        b_y = a_1 * fields.B_f[jm] + a_2 * fields.B_f[jc] + a_3 * fields.B_f[jp]
-    e_z = a_1 * fields.E_z[jm] + a_2 * fields.E_z[jc] + a_3 * fields.E_z[jp]
-    b_z = a_1 * fields.B_z[jm] + a_2 * fields.B_z[jc] + a_3 * fields.B_z[jp]
+        e_x = a_1 * E_r[jm] + a_2 * E_r[jc] + a_3 * E_r[jp]
+        e_y = a_1 * E_f[jm] + a_2 * E_f[jc] + a_3 * E_f[jp]
+        b_y = a_1 * B_f[jm] + a_2 * B_f[jc] + a_3 * B_f[jp]
+    e_z = a_1 * E_z[jm] + a_2 * E_z[jc] + a_3 * E_z[jp]
+    b_z = a_1 * B_z[jm] + a_2 * B_z[jc] + a_3 * B_z[jp]
     return e_x, e_y, e_z, b_y, b_z
 
 
@@ -55,10 +56,9 @@ def _interpolate_noisereductor(
 
 
 @njit
-def _move_one_particle(
-        fields,
-        r, p_r, p_f, p_z, q, m,
-        noise_amplitude, r_step, xi_step_p, max_radius):
+def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
+                       r, p_r, p_f, p_z, q, m,
+                       noise_amplitude, r_step, xi_step_p, max_radius):
     """Move one particle in fields.
 
     Returns
@@ -101,7 +101,8 @@ def _move_one_particle(
     cell_idx = int(np.floor(r_k_1_2 / r_step + 0.5))
     local_coord = r_k_1_2 / r_step - cell_idx
 
-    e_x, e_y, e_z, b_y, b_z = _interpolate_fields(cell_idx, local_coord, fields)
+    e_x, e_y, e_z, b_y, b_z = _interpolate_fields(
+        cell_idx, local_coord, E_r, E_f, E_z, B_f, B_z)
     e_x += _interpolate_noisereductor(noise_amplitude, cell_idx, local_coord, r_step)
 
     # Apply Lorentz force
@@ -159,58 +160,67 @@ def _move_one_particle(
 
 
 @njit
-def _move_particles_with_substepping(fields, particles, noise_amplitude, r_step, xi_step_p, max_radius):
+def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
+                                     r_array, p_r_array, p_f_array, p_z_array,
+                                     q_array, m_array, age_array,
+                                     noise_amplitude, r_step, xi_step_p,
+                                     max_radius):
     """Move particles in fields, correct steps if necessary."""
-    particles_new = particles.copy()
-    for j in np.arange(particles.r.size):
+    for j in np.arange(r_array.size):
         xi_particle = 0
         xi_step_cur = xi_step_p
 
-        r = particles.r[j]
-        p_r = particles.p_r[j]
-        p_f = particles.p_f[j]
-        p_z = particles.p_z[j]
-        q = particles.q[j]
-        m = particles.m[j]
+        r = r_array[j]
+        q = q_array[j]; m = m_array[j]
+        p_r = p_r_array[j]; p_f = p_f_array[j]; p_z = p_z_array[j]
+
         while xi_particle <= 0.99999 * xi_step_p:
             if q == 0:
                 break
             r, p_r, p_f, p_z, q, path, age = _move_one_particle(
-                fields, r, p_r, p_f, p_z, q, m, noise_amplitude,
+                E_r, E_f, E_z, B_f, B_z, r, p_r, p_f, p_z, q, m, noise_amplitude,
                 r_step, xi_step_cur, max_radius,
             )
             if path >= r_step and xi_step_cur / xi_step_p > 1.e-4:
                 # xi_step_cur is too big, substepping
                 xi_step_cur /= 2
                 # get particle from last good state
-                r = particles_new.r[j]
-                p_r = particles_new.p_r[j]
-                p_f = particles_new.p_f[j]
-                p_z = particles_new.p_z[j]
-                q = particles_new.q[j]
+                r = r_array[j]
+                p_r = p_r_array[j]
+                p_f = p_f_array[j]
+                p_z = p_z_array[j]
+                q = q_array[j]
             else:
                 xi_particle += xi_step_cur
                 # save as good state
-                particles_new.r[j] = r
-                particles_new.p_r[j] = p_r
-                particles_new.p_f[j] = p_f
-                particles_new.p_z[j] = p_z
-                particles_new.q[j] = q
-                particles_new.age[j] -= age
-        particles_new.r[j] = r
-        particles_new.p_r[j] = p_r
-        particles_new.p_f[j] = p_f
-        particles_new.p_z[j] = p_z
-        particles_new.q[j] = q
-    return particles_new
+                r_array[j] = r
+                p_r_array[j] = p_r
+                p_f_array[j] = p_f
+                p_z_array[j] = p_z
+                q_array[j] = q
+                age_array[j] -= age
+
+        r_array[j] = r
+        p_r_array[j] = p_r
+        p_f_array[j] = p_f
+        p_z_array[j] = p_z
+        q_array[j] = q
 
 
-class ParticleMover:
-    def __init__(self, config):
-        self.config = config
-        self.r_step = config.getfloat('window-width-step-size')
-        self.max_radius = config.getfloat('window-width')
+def get_plasma_particles_mover(config: Config):
+    grid_step_size = config.getfloat('window-width-step-size')
+    max_radius     = config.getfloat('window-width')
 
     # Move particles one D_XIP step forward
-    def move_particles(self, fields, particles, noise_amplitude, xi_step_p):
-        return _move_particles_with_substepping(fields, particles, noise_amplitude, self.r_step, xi_step_p, self.max_radius)
+    def move_particles(fields, particles_prev, noise_amplitude, xi_step_size):
+        particles = particles_prev.copy()
+
+        _move_particles_with_substepping(
+            fields.E_r, fields.E_f, fields.E_z, fields.B_f, fields.B_z,
+            particles.r, particles.p_r, particles.p_f, particles.p_z,
+            particles.q, particles.m, particles.age,
+            noise_amplitude, grid_step_size, xi_step_size, max_radius)
+        
+        return particles
+    
+    return move_particles
