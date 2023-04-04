@@ -59,7 +59,7 @@ class FieldDiagnostics:
         self.last_idx = self.w - 1  
 
         
-    def process(self, config, t, layer_idx, steps, \
+    def process(self, config, t, layer_idx, \
                 plasma_particles, plasma_fields, rho_beam, \
                 beam_slice):
         if t<self.t_start or t>self.t_end:
@@ -150,7 +150,7 @@ class BeamDiagnostics:
         xi_step = config.getfloat('xi-step')
         self.last_idx = int(config.getfloat('window-length')/xi_step) - 1
 
-    def process(self, config, t, layer_idx, steps, \
+    def process(self, config, t, layer_idx, \
                 plasma_particles, plasma_fields, rho_beam, \
                 beam_slice):
         if t<self.t_start or t>self.t_end:
@@ -191,7 +191,7 @@ class PlasmaDiagnostics:
         xi_step = config.getfloat('xi-step')
         self.last_idx = int(config.getfloat('window-length')/xi_step) - 1
 
-    def process(self, config, t, layer_idx, steps, \
+    def process(self, config, t, layer_idx, \
                 plasma_particles, plasma_fields, rho_beam, \
                 beam_slice):
         if t<self.t_start or t>self.t_end:
