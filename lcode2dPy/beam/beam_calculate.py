@@ -193,10 +193,8 @@ def beam_slice_mover(config):
 class BeamCalculator2D():
     def __init__(self, config):
         # Get main calculation parameters.
-        self.substep_energy = config.getfloat('beam-substepping-energy')
         self.r_step = config.getfloat('window-width-step-size')
         self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1
-        self.time_step = config.getfloat('time-step')
         self.dxi = config.getfloat('xi-step')
         self.layout_beam_slice = layout_beam_slice
         self.move_beam_slice = beam_slice_mover(config)

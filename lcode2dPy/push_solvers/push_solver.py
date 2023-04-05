@@ -14,7 +14,7 @@ from ..beam3d import BeamCalculator as BeamCalculator3D
 
 class PusherAndSolver():
     """
-    Parent Class for calculation xi-cycle. 
+    Parent class for calculation xi-cycle. 
     """
     def __init__(self, config: Config):
         """
@@ -28,15 +28,14 @@ class PusherAndSolver():
         self.config = config
         
         #remeber some config value
-        self.r_step = float(config.get('window-width-step-size'))
         self.dxi = config.getfloat('xi-step')
-        self.is_rigid = 1 if config.get('rigid-beam')=='y' else 0
-        max_radius = float(config.get('window-width'))
         self.grid_steps = config.getint('window-width-steps') 
         if not self.grid_steps:
-            self.grid_steps = int(max_radius / self.r_step) + 1
-        self.window_length = config.getfloat('window-length')
-        self.xi_steps = int(self.window_length / self.dxi)
+            max_radius = config.getfloat('window-width')
+            r_step = config.getfloat('window-width-step-size')
+            self.grid_steps = int(max_radius / r_step) + 1
+        window_length = config.getfloat('window-length')
+        self.xi_steps = int(window_length / self.dxi)
     
     def _set_beam_particles(self, xp):
         pass
@@ -60,13 +59,13 @@ class PusherAndSolver():
         Parameters
         ----------
         pl_fileds : Array
-                The collection of Er, Ef, Ez, Bf, Bz. 
+                The collection of Er, Ef, Ez, Bf, Bz (and Br for 3D). 
         
         pl_particles : Array
                 All plasma partcles.  
         
         pl_currents : Array
-                The collection of plasma macroparameters (j and rho). 
+                The collection of plasma macroparameters j and rho. 
         
         pl_cons_arrays : Array
                 Pre-calculated coefficients and initial state for plasma solver.
@@ -87,6 +86,7 @@ class PusherAndSolver():
 
         # TODO: Not sure this is right if we start from a saved plasma state and
         #       with a saved beamfile.
+        #       Do we need array here?
         rho_beam_prev = self._set_rho_beam_array(xp, self.grid_steps)
 
         for xi_i in np.arange(self.xi_steps + 1):
@@ -136,7 +136,7 @@ class PusherAndSolver():
 
 class PusherAndSolver2D(PusherAndSolver):
     """
-    Class for calculation xi-cycle in 2D geometry. 
+    Class for calculation xi-cycle in 2D axisymmetric geometry. 
     """
     def __init__(self, config: Config):
         """
@@ -148,7 +148,6 @@ class PusherAndSolver2D(PusherAndSolver):
             The set of base parameters to perform the simulation.
         """
         super().__init__(config)
-        self.foo = "foo"
         
         self.solver = CylindricalPlasmaSolver(config)
         self.beam_calc = BeamCalculator2D(config)
@@ -172,16 +171,6 @@ class PusherAndSolver2D(PusherAndSolver):
                 f't={current_time:+.4f}, ' + 
                 f'xi={-xi_i * self.dxi:+.4f} Ez={Ez_00:+.16e}'
             )
-    
-#    def step_dt(self, pl_fields, pl_particles,
-#                pl_currents, pl_const_arrays,
-#                beam_source, beam_drain,
-#                current_time, diagnostics_list=[]):
-#                super().step_dt(pl_fields, pl_particles,
-#                                pl_currents, pl_const_arrays,
-#                                beam_source, beam_drain,
-#                                current_time, diagnostics_list)
-
 
 class PusherAndSolver3D(PusherAndSolver):
     """
