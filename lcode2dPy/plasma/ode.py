@@ -3,23 +3,6 @@
 import numpy as np
 from numba import njit
 
-
-@njit(cache=True)
-def _cumtrapz_nb_forward(right_part, step, length, out):
-    out[0] = 0.0
-    for idx in np.arange(0, length - 1):
-        right_part_average = (right_part[idx + 1] + right_part[idx]) / 2
-        out[idx + 1] = out[idx] + step * right_part_average
-
-
-@njit(cache=True)
-def _cumtrapz_nb_backward(right_part, step, length, out):
-    out[length - 1] = 0.0
-    for idx in np.arange(length - 2, -1, -1):
-        right_part_average = (right_part[idx + 1] + right_part[idx]) / 2
-        out[idx] = out[idx + 1] - step * right_part_average
-
-
 @njit(cache=True)
 def cumtrapz_numba(y, dx, out, mode):  # noqa: WPS111
     """
@@ -41,9 +24,15 @@ def cumtrapz_numba(y, dx, out, mode):  # noqa: WPS111
     """
     length = out.size
     if mode == 'forward':
-        _cumtrapz_nb_forward(y, dx, length, out)
+        out[0] = 0.0
+        for idx in np.arange(0, length - 1):
+            y_average = (y[idx + 1] + y[idx]) / 2
+            out[idx + 1] = out[idx] + dx * y_average
     elif mode == 'backward':
-        _cumtrapz_nb_backward(y, dx, length, out)
+        out[length - 1] = 0.0
+        for idx in np.arange(length - 2, -1, -1):
+            y_average = (y[idx + 1] + y[idx]) / 2
+            out[idx] = out[idx + 1] - dx * y_average
 
 
 # Solve ode using tridiagonal matrix method
