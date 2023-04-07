@@ -38,8 +38,11 @@ def init_plasma(config: Config, current_time=0):
         xp=np, r=r_p, p_r=p_r_p, p_f=p_f_p, p_z=p_z_p, q=q_p, m=m_p, age=age)
     currents = Arrays(
         xp=np, rho=zeros(), j_r=zeros(), j_f=zeros(), j_z=zeros())
+
+    #TODO add possible constants Arrays for calculation and test speed 
+    pl_const_arrays = Arrays(np)
     
-    return fields, particles, currents
+    return fields, particles, currents, pl_const_arrays
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):

@@ -8,14 +8,14 @@ from .config.config import Config
 from .alt_beam_generator.beam_generator import generate_beam
 
 # Imports plasma nodule, 3d:
-from .push_solvers.push_solver_3d import PusherAndSolver3D
+from .push_solvers.push_solver import PusherAndSolver3D
 from .plasma3d import init_plasma_3d, load_plasma_3d
 
 # Imports beam module, 3d:
 from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D
 
 # Imports plasma module, 2d:
-from .push_solvers.push_solver_2d import PusherAndSolver2D
+from .push_solvers.push_solver import PusherAndSolver2D
 from .plasma import init_plasma_2d, load_plasma_2d
 
 # Imports beam module, 3d:

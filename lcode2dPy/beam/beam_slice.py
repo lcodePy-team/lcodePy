@@ -87,7 +87,7 @@ class BeamSlice:
         new_slice.lost = np.concatenate((self.lost, other_slice.lost))
         return new_slice
     
-    def concatenate(self, other_slice):
+    def append(self, other_slice):
         self.particles = np.concatenate((
             self.particles, other_slice.particles,
         ))

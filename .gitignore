@@ -6,4 +6,5 @@ venv
 *png
 *jpg
 *.prof
+diagnostics/
 # *.ipynb

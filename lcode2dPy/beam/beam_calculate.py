@@ -7,6 +7,8 @@ from .weights import (
     particles_weights,
 )
 
+from .beam_slice import BeamSlice as BeamParticles2D
+
 
 @nb.vectorize([nb.float64(nb.float64, nb.float64, nb.float64)], cache=True)
 def beam_substepping_step(q_m, p_z, substepping_energy):
@@ -187,3 +189,62 @@ def beam_slice_mover(config):
         )
 
     return move_beam_slice
+
+class BeamCalculator2D():
+    def __init__(self, config):
+        # Get main calculation parameters.
+        self.r_step = config.getfloat('window-width-step-size')
+        self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1
+        self.dxi = config.getfloat('xi-step')
+        self.layout_beam_slice = layout_beam_slice
+        self.move_beam_slice = beam_slice_mover(config)
+
+    def start_time_step(self):
+        self.rho_layout = np.zeros(self.grid_steps)
+
+    def layout_beam_layer(self, beam_layer_to_layout, xi_i):
+        rho_beam, self.rho_layout = self.layout_beam_slice(
+            beam_layer_to_layout,
+            xi_i + 1,
+            self.rho_layout,
+            self.r_step,
+            self.dxi,
+        )
+        return rho_beam
+
+    def move_beam_layer(self, beam_partickles_to_move, fell_size, 
+                        xi_i, prev_pl_fields, pl_fields):
+        self.move_beam_slice(
+            beam_partickles_to_move,
+            xi_i,
+            pl_fields,
+            prev_pl_fields,
+        )
+        return self.split_beam_slice(beam_partickles_to_move, xi_i * -self.dxi)
+
+    # split beam slice into lost, stable and moving beam slices
+    # @nb.njit
+    def split_beam_slice(self, beam_slice, xi_end):
+        lost_slice = BeamParticles2D(0)
+        # lost_sorted_idxes = np.argsort(beam_slice.lost)
+        # beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
+        # beam_slice.dt = beam_slice.dt[lost_sorted_idxes]
+        # beam_slice.remaining_steps = beam_slice.remaining_steps[lost_sorted_idxes]
+        # beam_slice.lost = beam_slice.lost[lost_sorted_idxes]
+        # lost_slice = beam_slice.get_subslice(0, beam_slice.nlost)
+        # beam_slice = beam_slice.get_subslice(beam_slice.nlost, beam_slice.size)
+        
+
+        moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
+        stable_count = moving_mask.size - np.sum(moving_mask)
+
+        sorted_idxes = np.argsort(moving_mask)
+        beam_slice.particles = beam_slice.particles[sorted_idxes]
+        beam_slice.dt = beam_slice.dt[sorted_idxes]
+        beam_slice.remaining_steps = beam_slice.remaining_steps[sorted_idxes]
+        beam_slice.lost = beam_slice.lost[sorted_idxes]
+        stable_slice = beam_slice.get_subslice(0, stable_count)
+        moving_slice = beam_slice.get_subslice(stable_count, beam_slice.size)
+
+        return lost_slice, stable_slice, moving_slice
+
