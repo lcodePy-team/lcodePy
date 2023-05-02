@@ -31,6 +31,7 @@ class PushAndSolver3d:
 
     def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
                 pl_currents: Arrays, pl_const_arrays: Arrays,
+                xi_plasma_layer_start,
                 beam_source: BeamSource, beam_drain: BeamDrain, current_time,
                 diagnostics: Diagnostics3d=None):
         """
@@ -49,7 +50,9 @@ class PushAndSolver3d:
         ro_beam_prev = xp.zeros(
             (self.grid_steps, self.grid_steps), dtype=xp.float64)
 
-        for xi_i in range(self.xi_steps + 1):
+        xi_i_plasma_layer_start =\
+            int(-xi_plasma_layer_start / self.xi_step_size) + 1
+        for xi_i in range(xi_i_plasma_layer_start, self.xi_steps + 1, 1):
             beam_layer_to_layout = \
                 beam_source.get_beam_layer_to_layout(xi_i)
             ro_beam_full = \
@@ -101,6 +104,7 @@ class PushAndSolver3d:
                     f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}')
 
         # Perform diagnostics
+        xi_plasma_layer = - self.xi_step_size * xi_i
         if diagnostics:
-            diagnostics.dump(current_time, pl_particles, pl_fields,
-                             pl_currents, beam_drain)
+            diagnostics.dump(current_time, xi_plasma_layer, pl_particles,
+                             pl_fields, pl_currents, beam_drain)

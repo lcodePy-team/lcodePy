@@ -414,12 +414,15 @@ def init_plasma(config: Config, current_time=0):
                        dy_chaotic_perp=dy_chaotic_perp)
 
     currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
+    
+    xi_plasma_layer = 0
 
-    return fields, particles, currents, const_arrays
+    return fields, particles, currents, const_arrays, xi_plasma_layer
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents, const_arrays = init_plasma(config)
+    fields, particles, currents, const_arrays, xi_plasma_layer =\
+        init_plasma(config)
 
     with fields.xp.load(file=path_to_plasmastate) as state:
         fields = Arrays(fields.xp,
@@ -441,5 +444,8 @@ def load_plasma(config: Config, path_to_plasmastate: str):
         currents = Arrays(fields.xp,
                           ro=state['ro'], jx=state['jx'],
                           jy=state['jy'], jz=state['jz'])
+        
+        if 'xi_plasma_layer' in state.keys():
+            xi_plasma_layer = state['xi_plasma_layer'][0]
 
-    return fields, particles, currents, const_arrays
+    return fields, particles, currents, const_arrays, xi_plasma_layer

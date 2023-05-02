@@ -151,11 +151,6 @@ class DiagnosticsFXi:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
-
     def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
                        plasma_fields, plasma_currents, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
@@ -189,13 +184,13 @@ class DiagnosticsFXi:
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
         if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-            self.dump(current_time, None, None, None, None, False)
+            self.dump(current_time, None, None, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
-        return current_time % self.__output_period == 0
+        return current_time % self.__output_period <= self.__time_step_size / 2
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles,
+             plasma_fields, plasma_currents, beam_drain, clean_data=True):
         if self.conditions_check(current_time, inf):
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
@@ -309,11 +304,6 @@ class DiagnosticsColormaps:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
-
     def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
                        plasma_fields, plasma_currents, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
@@ -342,23 +332,24 @@ class DiagnosticsColormaps:
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
         if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-            self.dump(current_time, None, None, None, None, False)
+            self.dump(current_time, None, None, None, None, None, False)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
         if (xi_plasma_layer <= self.__xi_to and
             (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to):
-            self.dump(current_time, None, None, None, None, True)
+            self.dump(current_time, None, None, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
-        return (current_time % self.__output_period == 0 and
-                xi_plasma_layer <= self.__xi_from and
-                xi_plasma_layer >= self.__xi_to)
+        return (
+            current_time % self.__output_period <= self.__time_step_size / 2 and
+            xi_plasma_layer <= self.__xi_from and
+            xi_plasma_layer >= self.__xi_to)
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles,
+             plasma_fields, plasma_currents, beam_drain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
-        if self.conditions_check(current_time, inf):
+        if current_time % self.__output_period <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
 
             size = len(self.__data['xi'])
@@ -449,11 +440,6 @@ class DiagnosticsTransverse:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
-
     def draw_figures(self, xi_plasma_layer, plasma_fields,
                      plasma_currents, ro_beam):
         Path('./diagnostics').mkdir(parents=True, exist_ok=True)
@@ -521,17 +507,19 @@ class DiagnosticsTransverse:
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
-            current_time % self.__output_period == 0 and
+            current_time % self.__output_period <= self.__time_step_size / 2 and
             xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles,
+             plasma_fields, plasma_currents, beam_drain, clean_data=True):
         pass
 
 
 class SaveRunState:
-    def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
-        self.__saving_period = saving_period
+    def __init__(self, output_period=1000, saving_xi_period=inf,
+                 save_beam=False, save_plasma=False):
+        self.__output_period = output_period
+        self.__saving_xi_period = saving_xi_period
         self.__save_beam = bool(save_beam)
         self.__save_plasma = bool(save_plasma)
 
@@ -541,18 +529,62 @@ class SaveRunState:
 
     def pull_config(self, config: Config):
         self.__time_step_size = config.getfloat('time-step')
+        self.__xi_step_size   = config.getfloat('xi-step')
 
-        if self.__saving_period < self.__time_step_size:
-            self.__saving_period = self.__time_step_size
+        if self.__output_period < self.__time_step_size:
+            self.__output_period = self.__time_step_size
 
-    def after_step_dxi(self, *parameters):
-        pass
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain, clean_data=True):
+    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
+                       plasma_fields, plasma_currents, ro_beam):
+        if (self.conditions_check(current_time, xi_plasma_layer) and
+            self.__save_plasma):
+            Path('./snapshots').mkdir(parents=True, exist_ok=True)
+
+            # Important for saving arrays from GPU (is it really?)
+            plasma_particles = ArraysView(plasma_particles)
+            plasma_fields    = ArraysView(plasma_fields)
+            plasma_currents  = ArraysView(plasma_currents)
+
+            file_name = \
+                f'plasmastate_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
+            np.savez_compressed(
+                file='./snapshots/' + file_name,
+                xi_plasma_layer=np.array([xi_plasma_layer]),
+                x_init=plasma_particles.x_init,
+                y_init=plasma_particles.y_init,
+                x_offt=plasma_particles.x_offt,
+                y_offt=plasma_particles.y_offt,
+    
+                dx_chaotic=plasma_particles.dx_chaotic,
+                dy_chaotic=plasma_particles.dy_chaotic,
+                dx_chaotic_perp=plasma_particles.dx_chaotic_perp,
+                dy_chaotic_perp=plasma_particles.dy_chaotic_perp,
+
+                px=plasma_particles.px, py=plasma_particles.py,
+                pz=plasma_particles.pz,
+                q=plasma_particles.q, m=plasma_particles.m,
+
+                Ex=plasma_fields.Ex, Bx=plasma_fields.Bx,
+                Ey=plasma_fields.Ey, By=plasma_fields.By,
+                Ez=plasma_fields.Ez, Bz=plasma_fields.Bz,
+                
+                Phi=plasma_fields.Phi, ro=plasma_currents.ro,
+                jx=plasma_currents.jx, jy=plasma_currents.jy,
+                jz=plasma_currents.jz)
+
+    def conditions_check(self, current_time, xi_plasma_layer):
+        return (
+            current_time % self.__output_period <= self.__time_step_size / 2 and
+            xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
+
+    def dump(self, current_time, xi_plasma_layer, plasma_particles,
+             plasma_fields, plasma_currents, beam_drain, clean_data=True):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
-        if current_time % self.__saving_period <= self.__time_step_size / 2:
+        if current_time % self.__output_period <= self.__time_step_size / 2:
             Path('./run_states').mkdir(parents=True, exist_ok=True)
 
             if self.__save_beam:
@@ -567,16 +599,25 @@ class SaveRunState:
 
                 np.savez_compressed(
                     file=f'./run_states/plasmastate_{current_time:08.2f}',
+                    xi_plasma_layer=np.array([xi_plasma_layer]),
                     x_init=plasma_particles.x_init,
                     y_init=plasma_particles.y_init,
                     x_offt=plasma_particles.x_offt,
                     y_offt=plasma_particles.y_offt,
+        
+                    dx_chaotic=plasma_particles.dx_chaotic,
+                    dy_chaotic=plasma_particles.dy_chaotic,
+                    dx_chaotic_perp=plasma_particles.dx_chaotic_perp,
+                    dy_chaotic_perp=plasma_particles.dy_chaotic_perp,
+
                     px=plasma_particles.px, py=plasma_particles.py,
                     pz=plasma_particles.pz,
                     q=plasma_particles.q, m=plasma_particles.m,
+
                     Ex=plasma_fields.Ex, Bx=plasma_fields.Bx,
                     Ey=plasma_fields.Ey, By=plasma_fields.By,
                     Ez=plasma_fields.Ez, Bz=plasma_fields.Bz,
+                    
                     Phi=plasma_fields.Phi, ro=plasma_currents.ro,
                     jx=plasma_currents.jx, jy=plasma_currents.jy,
                     jz=plasma_currents.jz)

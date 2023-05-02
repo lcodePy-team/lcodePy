@@ -36,7 +36,7 @@ def calculate_head(window_length: float, config_dictionary: dict,
     x_grid, y_grid = grid[:, None], grid[None, :]
 
     # Creates the first plasma slice
-    fields, particles, currents, const_arrays = init_plasma(config)
+    fields, particles, currents, const_arrays, xi = init_plasma(config)
 
     # Simulation loop:
     start_time = time.time()
@@ -59,6 +59,7 @@ def calculate_head(window_length: float, config_dictionary: dict,
 
     np.savez_compressed(
         file='plasmastate_after_the_head',
+        xi_plasma_layer=np.array([xi]),
         x_init=particles.x_init, y_init=particles.y_init,
         x_offt=particles.x_offt, y_offt=particles.y_offt,
         px=particles.px, py=particles.py, pz=particles.pz,
