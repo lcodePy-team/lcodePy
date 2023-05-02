@@ -1,6 +1,4 @@
 """The module for experimental noise filters that we are trying to use to successfully pass the so-called test 1."""
-from scipy.signal import savgol_filter
-
 from ..config.config import Config
 from .data import Arrays
 
@@ -16,6 +14,12 @@ def get_noise_filter(config: Config):
     filter_polyorder = config.getint('filter-polyorder')
     filter_coefficient = config.getfloat('filter-coefficient')
     damping_coefficient = config.getfloat('damping-coefficient')
+
+    pu_type = config.get('processing-unit-type').lower()
+    if pu_type == 'cpu':
+        from scipy.signal import savgol_filter
+    elif pu_type == 'gpu':
+        from .savgol_filter_cp import savgol_filter
 
     # A new noise mitigation method.
     def noise_filter(particles: Arrays, particles_prev: Arrays):
