@@ -445,7 +445,6 @@ def load_plasma(config: Config, path_to_plasmastate: str):
                           ro=state['ro'], jx=state['jx'],
                           jy=state['jy'], jz=state['jz'])
         
-        if 'xi_plasma_layer' in state.keys():
-            xi_plasma_layer = state['xi_plasma_layer'][0]
+        xi_plasma_layer = state['xi_plasma_layer'][0]
 
     return fields, particles, currents, const_arrays, xi_plasma_layer

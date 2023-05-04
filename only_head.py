@@ -1,12 +1,12 @@
 # Import required modules
-import numpy as np
+import cupy as np
 import matplotlib.pyplot as plt
 import time
 
-from lcode2dPy.plasma3d.initialization import init_plasma
-from lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
+from .lcode2dPy.plasma3d.initialization import init_plasma
+from .lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
 
-from lcode2dPy.config.config import Config
+from .lcode2dPy.config.config import Config
 
 
 def rho_b_test1(xi, x_grid, y_grid):
