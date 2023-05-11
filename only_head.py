@@ -1,5 +1,4 @@
 # Import required modules
-import cupy as np
 import matplotlib.pyplot as plt
 import time
 
@@ -9,20 +8,25 @@ from .lcode2dPy.plasma3d.solver import Plane2d3vPlasmaSolver
 from .lcode2dPy.config.config import Config
 
 
-def rho_b_test1(xi, x_grid, y_grid):
-    COMPRESS, BOOST, SIGMA, SHIFT = 1, 1, 1, 0
-    if xi < -2 * np.sqrt(2 * np.pi) / COMPRESS or xi > 0:
-        return 0.
-        # return np.zeros_like(xs)
-    r = np.sqrt(x_grid**2 + (y_grid - SHIFT)**2)
-    return (.05 * BOOST * np.exp(-.5 * (r / SIGMA)**2) *
-            (1 - np.cos(xi * COMPRESS * np.sqrt(np.pi / 2))))
+# def rho_b_test1(xi, x_grid, y_grid):
+#     COMPRESS, BOOST, SIGMA, SHIFT = 1, 1, 1, 0
+#     if xi < -2 * xp .sqrt(2 * xp .pi) / COMPRESS or xi > 0:
+#         return 0.
+#         # return xp .zeros_like(xs)
+#     r = xp .sqrt(x_grid**2 + (y_grid - SHIFT)**2)
+#     return (.05 * BOOST * xp .exp(-.5 * (r / SIGMA)**2) *
+#             (1 - xp .cos(xi * COMPRESS * xp .sqrt(xp .pi / 2))))
 
 
-def calculate_head(window_length: float, config_dictionary: dict,
-                   rho_b: rho_b_test1):
+def calculate_head(window_length: float, config_dictionary: dict, rho_b):
     # Creates a config
     config = Config(config_dictionary)
+
+    pu_type = config.get('processing-unit-type').lower()
+    if pu_type == 'cpu':
+        import numpy as xp
+    elif pu_type == 'gpu':
+        import cupy as xp
 
     # Makes ready a plasma solver
     solver = Plane2d3vPlasmaSolver(config)
@@ -31,7 +35,7 @@ def calculate_head(window_length: float, config_dictionary: dict,
     grid_steps     = config.getint('window-width-steps')
     grid_step_size = config.getfloat('window-width-step-size')
 
-    grid = ((np.arange(grid_steps) - grid_steps // 2)
+    grid = ((xp.arange(grid_steps) - grid_steps // 2)
             * grid_step_size)
     x_grid, y_grid = grid[:, None], grid[None, :]
 
@@ -57,9 +61,9 @@ def calculate_head(window_length: float, config_dictionary: dict,
         if xi_i % 1. == 0:
             print(f'xi={xi:+.4f} Ez={ez:+.4e}')
 
-    np.savez_compressed(
+    xp.savez_compressed(
         file='plasmastate_after_the_head',
-        xi_plasma_layer=np.array([xi]),
+        xi_plasma_layer=xp.array([xi]),
         x_init=particles.x_init, y_init=particles.y_init,
         x_offt=particles.x_offt, y_offt=particles.y_offt,
         px=particles.px, py=particles.py, pz=particles.pz,
