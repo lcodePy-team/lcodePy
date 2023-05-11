@@ -1,4 +1,5 @@
 """The module for experimental noise filters that we are trying to use to successfully pass the so-called test 1."""
+import numpy as np
 from ..config.config import Config
 from .data import Arrays
 
@@ -14,6 +15,7 @@ def get_noise_filter(config: Config):
     filter_polyorder = config.getint('filter-polyorder')
     filter_coefficient = config.getfloat('filter-coefficient')
     damping_coefficient = config.getfloat('damping-coefficient')
+    dx_max = config.getfloat('dx-max')
 
     pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
@@ -21,8 +23,19 @@ def get_noise_filter(config: Config):
     elif pu_type == 'gpu':
         from .savgol_filter_cp import savgol_filter
 
+    def calculate_inhomogeneity(d_offt, xp: np, axis):
+        if axis: d_offt = d_offt.T
+        d_inhom = xp.vstack( (d_offt[0, :] - 2 * d_offt[1, :] + d_offt[2, :],
+                    d_offt[1:-1, :] - (d_offt[2:, :] + d_offt[:-2, :]) / 2,
+                    d_offt[-1, :] - 2 * d_offt[-2, :] + d_offt[-3, :] ))
+        if axis: d_inhom = d_inhom.T
+        return d_inhom
+
     # A new noise mitigation method.
     def noise_filter(particles: Arrays, particles_prev: Arrays):
+        # Zero step. We determine if we will use numpy or cupy as xp:
+        xp = particles.xp
+
         # First, we take out all the required arrays:
         x_offt, y_offt = particles.x_offt, particles.y_offt
         px, py, pz = particles.px, particles.py, particles.pz
@@ -32,13 +45,18 @@ def get_noise_filter(config: Config):
         dx_chaotic_perp_previous = particles_prev.dx_chaotic_perp
         dy_chaotic_perp_previous = particles_prev.dy_chaotic_perp
 
-        # Particle displacement is (x_offt, y_offt).
-        # Longitudinal displacement inhomogeneity:
-        dx_inhom = x_offt[1:-1, :] - (x_offt[2:, :] + x_offt[:-2, :]) / 2
-        dy_inhom = y_offt[:, 1:-1] - (y_offt[:, 2:] + y_offt[:, :-2]) / 2
-        # and transverse (perpendicular):
-        dx_inhom_perp = y_offt[1:-1, :] - (y_offt[2:, :] + y_offt[:-2, :]) / 2
-        dy_inhom_perp = x_offt[:, 1:-1] - (x_offt[:, 2:] + x_offt[:, :-2]) / 2
+#         # Particle displacement is (x_offt, y_offt).
+#         # Longitudinal displacement inhomogeneity:
+#         dx_inhom = x_offt[1:-1, :] - (x_offt[2:, :] + x_offt[:-2, :]) / 2
+#         dy_inhom = y_offt[:, 1:-1] - (y_offt[:, 2:] + y_offt[:, :-2]) / 2
+#         # and transverse (perpendicular):
+#         dx_inhom_perp = y_offt[1:-1, :] - (y_offt[2:, :] + y_offt[:-2, :]) / 2
+#         dy_inhom_perp = x_offt[:, 1:-1] - (x_offt[:, 2:] + x_offt[:, :-2]) / 2
+        
+        dx_inhom = calculate_inhomogeneity(x_offt, xp, 0)
+        dy_inhom = calculate_inhomogeneity(y_offt, xp, 1)
+        dx_inhom_perp = calculate_inhomogeneity(y_offt, xp, 0)
+        dy_inhom_perp = calculate_inhomogeneity(x_offt, xp, 1)
 
         # Sagol filter-averaged longitudinal displacement inhomogeneity:
         dx_inhom_averaged = savgol_filter(
@@ -62,11 +80,17 @@ def get_noise_filter(config: Config):
         dx_chaotic_perp = dx_inhom_perp - dx_inhom_averaged_perp
         dy_chaotic_perp = dy_inhom_perp - dy_inhom_averaged_perp
 
+        d_limit = (dx_chaotic * dx_chaotic +
+                   dy_chaotic * dy_chaotic +
+                   dx_chaotic_perp * dx_chaotic_perp +
+                   dy_chaotic_perp * dy_chaotic_perp)
+        d_limit = xp.where(d_limit < dx_max, 1 - d_limit/dx_max, 0)
+        
         # Restoring force:
-        force_x = - filter_coefficient * dx_chaotic
-        force_y = - filter_coefficient * dy_chaotic
-        force_x_perp = - filter_coefficient * dx_chaotic_perp
-        force_y_perp = - filter_coefficient * dy_chaotic_perp
+        force_x = - filter_coefficient * dx_chaotic * d_limit
+        force_y = - filter_coefficient * dy_chaotic * d_limit
+        force_x_perp = - filter_coefficient * dx_chaotic_perp * d_limit
+        force_y_perp = - filter_coefficient * dy_chaotic_perp * d_limit
 
         # Uncomment this to test a relativism corrected filter:
         # gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)
@@ -81,25 +105,25 @@ def get_noise_filter(config: Config):
         # py[:, :-2]  -= factor_1[:-2, :]  * force_y / 2
 
         # A filter without relativism corrections:
-        px[1:-1, :] += xi_step_size * (force_x  - damping_coefficient *
-                                       (dx_chaotic - dx_chaotic_previous))
-        px[2:, :]   -= xi_step_size * force_x / 2
-        px[:-2, :]  -= xi_step_size * force_x / 2
-        py[1:-1, :] += xi_step_size * (force_x_perp - damping_coefficient *
-                                       (dx_chaotic_perp - dx_chaotic_perp_previous))
-        py[2:, :]   -= xi_step_size * force_x_perp / 2
-        py[:-2, :]  -= xi_step_size * force_x_perp / 2
+        px[1:-1, :] += xi_step_size * (force_x  - damping_coefficient * d_limit *
+                                       (dx_chaotic - dx_chaotic_previous))[1:-1, :]
+        px[2:, :]   -= xi_step_size * force_x[1:-1, :] / 2
+        px[:-2, :]  -= xi_step_size * force_x[1:-1, :] / 2
+        py[1:-1, :] += xi_step_size * (force_x_perp - damping_coefficient * d_limit *
+                                       (dx_chaotic_perp - dx_chaotic_perp_previous))[1:-1, :]
+        py[2:, :]   -= xi_step_size * force_x_perp[1:-1, :] / 2
+        py[:-2, :]  -= xi_step_size * force_x_perp[1:-1, :] / 2
 
-        py[:, 1:-1] += xi_step_size * (force_y - damping_coefficient *
-                                       (dy_chaotic - dy_chaotic_previous))
-        py[:, 2:]   -= xi_step_size * force_y / 2
-        py[:, :-2]  -= xi_step_size * force_y / 2
-        px[:, 1:-1] += xi_step_size * (force_y_perp - damping_coefficient *
-                                       (dy_chaotic_perp - dy_chaotic_perp_previous))
-        px[:, 2:]   -= xi_step_size * force_y_perp / 2
-        px[:, :-2]  -= xi_step_size * force_y_perp / 2
+        py[:, 1:-1] += xi_step_size * (force_y - damping_coefficient * d_limit *
+                                       (dy_chaotic - dy_chaotic_previous))[:, 1:-1]
+        py[:, 2:]   -= xi_step_size * force_y[:, 1:-1] / 2
+        py[:, :-2]  -= xi_step_size * force_y[:, 1:-1] / 2
+        px[:, 1:-1] += xi_step_size * (force_y_perp - damping_coefficient * d_limit *
+                                       (dy_chaotic_perp - dy_chaotic_perp_previous))[:, 1:-1]
+        px[:, 2:]   -= xi_step_size * force_y_perp[:, 1:-1] / 2
+        px[:, :-2]  -= xi_step_size * force_y_perp[:, 1:-1] / 2
 
-        return Arrays(particles.xp,q=particles.q, m=particles.m,
+        return Arrays(particles.xp, q=particles.q, m=particles.m,
                       x_init=particles.x_init, y_init=particles.y_init,
 
                       # And arrays that change after filtering:
