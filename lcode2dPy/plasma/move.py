@@ -78,6 +78,8 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
     p_yo = p_f
     p_zo = p_z
     gammam = np.sqrt(m ** 2 + p_xo ** 2 + p_yo ** 2 + p_zo ** 2)
+    if gammam == p_z or not np.isfinite(gammam):
+        return max_radius / 2, 0, 0, 0, 0, 0, 0
     dl_t = xi_step_p / (gammam - p_zo)
 
     # Predict middle point of particle trajectory
@@ -117,6 +119,8 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
 
     # Correct gamma and step length
     gammam = np.sqrt(m ** 2 + p_x ** 2 + p_y ** 2 + p_z ** 2)
+    if gammam == p_z or not np.isfinite(gammam):
+        return max_radius / 2, 0, 0, 0, 0, 0, 0
     dl_t = xi_step_p / (gammam - p_z)
 
     # Apply Lorentz force
@@ -151,6 +155,10 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
     elif r_new > max_radius:
         r_new = 2 * max_radius - r_new
         p_r = p_f = p_z = 0
+
+    if not np.isfinite(p_z) or not np.isfinite(p_r) or not np.isfinite(p_f) \
+            or r_new > max_radius or r_new < 0:
+        return max_radius / 2, 0, 0, 0, 0, 0, 0
 
     # xi_step_p was too big, particle is out of window after correction
     if r_k_1_2 < 0 or r_k_1_2 > max_radius:
