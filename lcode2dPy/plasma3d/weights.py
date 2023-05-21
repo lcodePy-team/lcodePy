@@ -1,4 +1,5 @@
 """Module for weights calculation, interpolation and deposition routines."""
+import numpy as np
 import numba as nb
 
 from math import sqrt, floor
@@ -32,7 +33,8 @@ def weight4(x, place):
 
 # Deposition #
 
-@nb.njit(parallel=True)
+#TODO do deposition in parallel
+@nb.njit
 def deposit_plasma_numba(grid_steps, x_h, y_h, px, py, pz, q, m,
                          out_ro, out_jx, out_jy, out_jz, size):
     """
@@ -41,7 +43,7 @@ def deposit_plasma_numba(grid_steps, x_h, y_h, px, py, pz, q, m,
     x_h, y_h, m, q = x_h.ravel(), y_h.ravel(), m.ravel(), q.ravel()
     px, py, pz = px.ravel(), py.ravel(), pz.ravel()
 
-    for k in nb.prange(size):
+    for k in np.arange(size):
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)
