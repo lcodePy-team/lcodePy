@@ -22,8 +22,8 @@ def weight_quadratic(local_coordinate, place):
     if place == 1:
         return (local_coordinate + 1 / 2) ** 2 / 2
 
-
-@nb.njit(parallel=True)
+#TODO do deposition in parallel
+@nb.njit
 def deposit_plasma(grid_step_size, grid_steps, r, p_r, p_f, p_z, q, m):
     """
     Deposit plasma particles onto the charge density and current grids.
@@ -33,7 +33,7 @@ def deposit_plasma(grid_step_size, grid_steps, r, p_r, p_f, p_z, q, m):
     out_j_f = np.zeros(grid_steps, dtype=np.float64)
     out_j_z = np.zeros(grid_steps, dtype=np.float64)
 
-    for k in nb.prange(m.size):
+    for k in np.arange(m.size):
         gamma_mass = sqrt(m[k] ** 2 + p_r[k] ** 2 + p_f[k] ** 2 + p_z[k] ** 2)
 
         # Particle charge depends on velocity to save continuity equation in QSA
@@ -110,10 +110,10 @@ def get_rhoj_computer(config: Config):
             particles.p_r, particles.p_f, particles.p_z,
             particles.q, particles.m)
         
-        rho = rho / cell_volume
-        j_r = j_r / cell_volume
-        j_f = j_f / cell_volume
-        j_z = j_z / cell_volume
+        rho /= cell_volume
+        j_r /= cell_volume
+        j_f /= cell_volume
+        j_z /= cell_volume
         
         # Add charge density of background ions
         rho += 1

@@ -1,4 +1,5 @@
 """Module for weights calculation and deposition routines."""
+import numpy as np
 import numba as nb
 from math import floor
 
@@ -37,7 +38,8 @@ def weight4(x, place):
 
 # Deposition and field interpolation #
 
-@nb.njit(parallel=True)
+#TODO do deposition in parallel
+@nb.njit
 def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
                        out_ro0, out_ro1, size):
     """
@@ -46,7 +48,7 @@ def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
     x_h, y_h = x_h.ravel(), y_h.ravel()
     xi_loc, q_norm = xi_loc.ravel(), q_norm.ravel()
 
-    for k in nb.prange(size):
+    for k in np.arange(size):
         x_loc = x_h[k] - floor(x_h[k]) - .5
         y_loc = y_h[k] - floor(y_h[k]) - .5
         ix = int(floor(x_h[k]) + grid_steps // 2)

@@ -1,10 +1,10 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 
 from ..config.config import Config
 
 
-@njit
+@njit(cache=True, inline='always')
 def _interpolate_fields(cell_idx, local_coord, E_r, E_f, E_z, B_f, B_z):
     """Interpolates fields from grid to particles positions."""
     a_1 = local_coord - 0.5
@@ -35,7 +35,7 @@ def _interpolate_fields(cell_idx, local_coord, E_r, E_f, E_z, B_f, B_z):
     return e_x, e_y, e_z, b_y, b_z
 
 
-@njit
+@njit(cache=True, inline='always')
 def _interpolate_noisereductor(
     noise_amplitude, cell_idx, local_coord, r_step,
 ):
@@ -55,7 +55,7 @@ def _interpolate_noisereductor(
     return result
 
 
-@njit
+@njit(cache=True, inline='always')
 def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
                        r, p_r, p_f, p_z, q, m,
                        noise_amplitude, r_step, xi_step_p, max_radius):
@@ -167,14 +167,14 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
     return r_new, p_r, p_f, p_z, q, path, gammam * dl_t
 
 
-@njit
+@njit(parallel=True, cache=True, nogil=True)
 def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
                                      r_array, p_r_array, p_f_array, p_z_array,
                                      q_array, m_array, age_array,
                                      noise_amplitude, r_step, xi_step_p,
                                      max_radius):
     """Move particles in fields, correct steps if necessary."""
-    for j in np.arange(r_array.size):
+    for j in prange(r_array.size):
         xi_particle = 0
         xi_step_cur = xi_step_p
 

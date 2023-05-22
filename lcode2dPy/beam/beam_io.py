@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 
 import numpy as np
+import numba
 
 from .beam_slice import BeamSlice
 from ..config.config import Config
@@ -61,6 +62,22 @@ particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8
 lost_particle_dtype = np.dtype([('time', 'f8'), ('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'),
                                 ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
+@numba.njit
+def find_sub_slice(beam_slice, used_count, xi_max, xi_min):
+    start = used_count
+    end = beam_slice.size
+    flag = 0
+    for i in np.arange(used_count, beam_slice.size):
+        if beam_slice.xi[i] - xi_min < 0:
+            end = i
+            break
+        if beam_slice.xi[i] - xi_max > 0:
+            end = start
+            flag = 1
+            break
+    used_count += end - start
+    return start, end, used_count, flag
+
 
 class MemoryBeamSource(BeamSource):
     def __init__(self, config: Config, beam_slice):
@@ -82,17 +99,11 @@ class MemoryBeamSource(BeamSource):
 
     def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
         assert xi_min < xi_max
-        start = self._used_count
-        end = self._beam_slice.size
-        for i in np.arange(self._used_count, self._beam_slice.size):
-            if self._beam_slice.xi[i] - xi_min < 0:
-                end = i
-                break
-            if self._beam_slice.xi[i] - xi_max > 0:
-                end = start
-                logging.debug(f'Wrong order of the particles')
-                break
-        self._used_count += end - start
+        start, end, self._used_count, flag = find_sub_slice(self._beam_slice,
+                                                            self._used_count,
+                                                            xi_max, xi_min)
+        if flag:
+            logging.debug(f'Wrong order of the particles')
         logging.debug(f'MemoryBeamSource: sourced {end - start} particles')
         return BeamSlice(end - start, particles=self._beam_slice.particles[start:end])
 

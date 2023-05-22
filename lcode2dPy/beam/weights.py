@@ -8,7 +8,7 @@ def add_at(out, idx, value):
         out[idx[i]] += value[i]
 
 
-@nb.njit(parallel=True)
+@nb.njit()
 def particles_weights(r, xi, xi_end, r_step, xi_step_p):
     j = np.floor(r / r_step).astype(np.int_)
     dxi = (xi_end - xi) / xi_step_p + 1

@@ -143,7 +143,9 @@ def compute_b_phi(rho, j_z, e_r, r_step):
         mode='forward',
     )
     temporary_b_phi[1:] /= np.arange(1, rho.size)
-    return e_r - temporary_b_phi
+    for i in range(e_r.shape[0]):
+        temporary_b_phi[i] = e_r [i]- temporary_b_phi[i]
+    return temporary_b_phi
 
 
 @njit
@@ -192,7 +194,8 @@ def _compute_e_r_previous_factor(rho, j_r, j_phi, j_z):
             continue
         prev_factor[j] = _prev_factor_multiplier * (1 / np.sqrt(invgamma_sq) - 1) - _prev_factor_threshold
     prev_factor[prev_factor < 0] = 0
-    return 1 + prev_factor
+    prev_factor += 1
+    return prev_factor
 
 
 def get_field_computer(config: Config):
