@@ -194,15 +194,8 @@ class DiagnosticsFXi:
                             **self.__data)
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
-                for name in self.__f_xi_names:
-                    try:
-                        data_for_plot = self.__data[name][:, 0]
-                    except:
-                        # If x_probe_lines and y_probe_lines are only a number,
-                        # as is the default.
-                        data_for_plot = self.__data[name]
-                        
-                    plt.plot(self.__data['xi'], data_for_plot)
+                for name in self.__f_xi_names:                        
+                    plt.plot(self.__data['xi'], self.__data[name])
                     plt.savefig(
                         f'./diagnostics/{name}_f_xi_{current_time:08.2f}.jpg')
                                 # vmin=-1, vmax=1)
