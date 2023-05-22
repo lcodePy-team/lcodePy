@@ -80,15 +80,14 @@ class Diagnostics3d:
 
 class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                      'Ez2', 'Bz2', 'rho_beam2', 'Phi']
+                      'Phi']
                     # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(self, output_period=100, saving_xi_period=100, f_xi='Ez',
-                 f_xi_type='numbers', axis_x=0, axis_y=0,
-                 auxiliary_x=0, auxiliary_y=1):
+                 f_xi_type='numbers', x_probe_lines=0, y_probe_lines=0):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__f_xi_names = from_str_into_list(f_xi)
         for name in self.__f_xi_names:
@@ -102,10 +101,19 @@ class DiagnosticsFXi:
             raise Exception(f"{f_xi_type} type of f(xi) diagnostics is " +
                              "not supported.")
 
-        # The position of a `probe' line 1 from the center:
-        self.__axis_x, self.__axis_y = axis_x, axis_y
-        # THe position of a `probe' line 2 from the center:
-        self.__auxiliary_x, self.__auxiliary_y = auxiliary_x, auxiliary_y
+        # The position of `probe' lines from the center:
+        if ((type(x_probe_lines) == list or type(x_probe_lines) == np.ndarray) and
+            (type(y_probe_lines) == list or type(y_probe_lines) == np.ndarray)):
+            self.__x_probe = np.array(x_probe_lines)
+            self.__y_probe = np.array(y_probe_lines)
+            if len(self.__x_probe) != len(self.__y_probe):
+                raise Exception(f"Different number of x and y coordinates " +
+                                 "for probe lines!")
+        else:
+            # If x_probe_lines and y_probe_lines are only a number,
+            # as is the default.
+            self.__x_probe = x_probe_lines
+            self.__y_probe = y_probe_lines
 
         # Set time periodicity of detailed output and safving into a file:
         self.__output_period = output_period
@@ -118,14 +126,11 @@ class DiagnosticsFXi:
 
     def __repr__(self):
         return (f"DiagnosticsFXi(output_period={self.__output_period}, " +
-                f"saving_xi_period={self.__saving_xi_period}, " + 
-            f"saving_xi_period={self.__saving_xi_period}, " + 
-                f"saving_xi_period={self.__saving_xi_period}, " + 
+                f"saving_xi_period={self.__saving_xi_period}, " +
                 f"f_xi='{','.join(self.__f_xi_names)}', " +
                 f"f_xi_type='{self.__f_xi_type}', " +
-                f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
-                f"auxiliary_x={self.__auxiliary_x}, " +
-                f"auxiliary_y={self.__auxiliary_y})")
+                f"x_probe_lines={self.__x_probe}, " +
+                f"y_probe_lines={self.__y_probe}")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -133,10 +138,10 @@ class DiagnosticsFXi:
         grid_step_size = config.getfloat('window-width-step-size')
 
         # We change how we store the positions of the 'probe' lines:
-        self.__ax_x  = steps // 2 + round(self.__axis_x / grid_step_size)
-        self.__ax_y  = steps // 2 + round(self.__axis_y / grid_step_size)
-        self.__aux_x = steps // 2 + round(self.__auxiliary_x / grid_step_size)
-        self.__aux_y = steps // 2 + round(self.__auxiliary_y / grid_step_size)
+        self.__ax_x = (steps // 2 +
+                       np.round(self.__x_probe / grid_step_size)).astype(int)
+        self.__ax_y = (steps // 2 +
+                       np.round(self.__y_probe / grid_step_size)).astype(int)
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
@@ -171,15 +176,6 @@ class DiagnosticsFXi:
                     val = ro_beam[self.__ax_x, self.__ax_y]
                     self.__data[name].append(val)
 
-                if name in ['Ez2', 'Bz2']:
-                    val = getattr(
-                        plasma_fields, name[:2])[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(val)
-
-                if name == 'rho_beam2':
-                    val = ro_beam[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(val)
-
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
@@ -199,7 +195,14 @@ class DiagnosticsFXi:
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 for name in self.__f_xi_names:
-                    plt.plot(self.__data['xi'], self.__data[name])
+                    try:
+                        data_for_plot = self.__data[name][:, 0]
+                    except:
+                        # If x_probe_lines and y_probe_lines are only a number,
+                        # as is the default.
+                        data_for_plot = self.__data[name]
+                        
+                    plt.plot(self.__data['xi'], data_for_plot)
                     plt.savefig(
                         f'./diagnostics/{name}_f_xi_{current_time:08.2f}.jpg')
                                 # vmin=-1, vmax=1)
