@@ -66,7 +66,6 @@ default_config_values = {
     # of lcode3d.
     'plasma-zshape': '',
     
-    'field-solver-subtraction-trick': 1,
     'field-solver-variant-A': True,
 
     'reflect-padding-steps': 10,
@@ -84,5 +83,6 @@ default_config_values = {
     'filter-polyorder': 3,
     'filter-coefficient': 0.1,
     'damping-coefficient': 0.1,
-    'dx-max': 1
+    'dx-max': 1,
+    'field-solver-subtraction-coefficient': 1
 }

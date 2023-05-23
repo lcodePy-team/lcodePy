@@ -28,7 +28,7 @@ def dirichlet_matrix(xp: np, grid_steps, grid_step_size):
 
 # Solving Laplace or Helmholtz equation with mixed boundary conditions #
 
-def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_trick):
+def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_coeff):
     """
     Calculate a magical matrix that solves the Helmholtz or Laplace equation
     (subtraction_trick=True and subtraction_trick=False correspondingly)
@@ -42,7 +42,7 @@ def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_trick):
     li = 4 / grid_step_size**2 * xp.sin(ki * xp.pi / (2 * (grid_steps - 1)))**2
     lj = 4 / grid_step_size**2 * xp.sin(kj * xp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = li[:, None], lj[None, :]
-    mul = 1 / (lambda_i + lambda_j + (1 if subtraction_trick else 0))
+    mul = 1 / (lambda_i + lambda_j + subtraction_coeff)
     return mul / (2 * (grid_steps - 1))**2  
     # return additional 2xDST normalization
 
@@ -316,8 +316,8 @@ def init_plasma(config: Config, current_time=0):
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getfloat('plasma-fineness')
-    solver_trick          = config.getint('field-solver-subtraction-trick')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
+    subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
 
     if plasma_fineness > 1:
         plasma_fineness = int(plasma_fineness)
@@ -369,7 +369,7 @@ def init_plasma(config: Config, current_time=0):
     ro_initial = -ro_electrons_initial
 
     dir_matrix = dirichlet_matrix(xp, grid_steps, grid_step_size)
-    mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, solver_trick)
+    mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, subtraction_coeff)
     neu_matrix = neumann_matrix(xp, grid_steps, grid_step_size)
 
     grid = ((np.arange(grid_steps) - grid_steps // 2) * grid_step_size)
