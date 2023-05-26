@@ -98,5 +98,5 @@ class PusherAndSolver3D:
         # Perform diagnostics
         xi_plasma_layer = - self.xi_step_size * xi_i
         for diagnostic in diagnostics_list:
-            diagnostic.dump(current_time, pl_particles, pl_fields,
-                            pl_currents, beam_drain)
+            diagnostic.dump(current_time, xi_plasma_layer, pl_particles,
+                            pl_fields, pl_currents, beam_drain)

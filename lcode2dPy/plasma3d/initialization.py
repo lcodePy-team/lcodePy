@@ -361,6 +361,22 @@ def init_plasma(config: Config, current_time=0):
     # set plasma_zhape:
     q, m = change_by_plasma_zshape(config, current_time, q, m)
 
+    # We create arrays dx_chaotic, dy_chaotic, dx_chaotic_perp, dy_chaotic_perp
+    # that are used in noise filter, with right sizes:
+    size = x_offt.shape[0]
+    dx_chaotic = xp.zeros((size, size), dtype=xp.float64)
+    dy_chaotic = xp.zeros((size, size), dtype=xp.float64)
+    dx_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
+    dy_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
+
+    particles = Arrays(xp, x_init=x_init, y_init=y_init,
+                       x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
+                       q=q, m=m,
+                       dx_chaotic=dx_chaotic,
+                       dy_chaotic=dy_chaotic,
+                       dx_chaotic_perp=dx_chaotic_perp, 
+                       dy_chaotic_perp=dy_chaotic_perp)
+
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
     initial_deposition = get_deposit_plasma(config)
@@ -397,23 +413,6 @@ def init_plasma(config: Config, current_time=0):
 
     fields = Arrays(xp, Ex=zeros(), Ey=zeros(), Ez=zeros(),
                     Bx=zeros(), By=zeros(), Bz=zeros(), Phi=zeros())
-
-    # We create arrays dx_chaotic, dy_chaotic, dx_chaotic_perp, dy_chaotic_perp
-    # that are used in noise filter, with right sizes:
-    size = x_offt.shape[0]
-    dx_chaotic = xp.zeros((size, size), dtype=xp.float64)
-    dy_chaotic = xp.zeros((size, size), dtype=xp.float64)
-    dx_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
-    dy_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
-
-    particles = Arrays(xp, x_init=x_init, y_init=y_init,
-                       x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
-                       q=q, m=m,
-                       dx_chaotic=dx_chaotic,
-                       dy_chaotic=dy_chaotic,
-                       dx_chaotic_perp=dx_chaotic_perp, 
-                       dy_chaotic_perp=dy_chaotic_perp)
-
     currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
     
     xi_plasma_layer = 0
