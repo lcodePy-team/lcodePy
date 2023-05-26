@@ -135,4 +135,8 @@ _cylindrical_profiles = {
 
 def get_plasma_profile(config):
     profile = config.get('plasma-profile')
+    try:
+        profile = str(int(float(profile))) # process cases like '1.0'
+    except:
+        pass
     return _cylindrical_profiles[profile](config)

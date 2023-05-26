@@ -1,6 +1,6 @@
 """Module for weights calculation, interpolation and deposition routines."""
 import numba as nb
-import numpy as np
+
 from math import sqrt, floor
 
 from ..config.config import Config
@@ -9,98 +9,39 @@ from .data import Arrays
 # Deposition and interpolation functions, for CPU #
 
 @nb.njit
-def weights(x, y, grid_steps, grid_step_size):
+def weight4(x, place):
     """
     Calculate the indices of a cell corresponding to the coordinates,
     and the coefficients of interpolation and deposition for this cell
     and 24 surrounding cells.
     The weights correspond to ...
     """
-    x_h, y_h = x / grid_step_size + .5, y / grid_step_size + .5
-    i, j = int(floor(x_h) + grid_steps // 2), int(floor(y_h) + grid_steps // 2)
-    x_loc, y_loc = x_h - floor(x_h) - .5, y_h - floor(y_h) - .5
-    # centered to -.5 to 5, not 0 to 1, as formulas use offset from cell center
-    # TODO: get rid of this deoffsetting/reoffsetting festival
-
-    wx0 = 115/192 - x_loc**2 * 5/8 + x_loc**4 / 4
-    wy0 = 115/192 - y_loc**2 * 5/8 + y_loc**4 / 4
-    wx1P = 19/96 + 11/24 * x_loc + x_loc**2 / 4 - x_loc**3 / 6 - x_loc**4 / 6
-    wy1P = 19/96 + 11/24 * y_loc + y_loc**2 / 4 - y_loc**3 / 6 - y_loc**4 / 6
-    wx1M = 19/96 - 11/24 * x_loc + x_loc**2 / 4 + x_loc**3 / 6 - x_loc**4 / 6
-    wy1M = 19/96 - 11/24 * y_loc + y_loc**2 / 4 + y_loc**3 / 6 - y_loc**4 / 6
-    wx2P = (1 / 2 + x_loc)**4 / 24
-    wy2P = (1 / 2 + y_loc)**4 / 24
-    wx2M = (1 / 2 - x_loc)**4 / 24
-    wy2M = (1 / 2 - y_loc)**4 / 24
-
-    w2M2P, w1M2P, w02P, w1P2P, w2P2P = (wx2M * wy2P, wx1M * wy2P, wx0 * wy2P,
-                                        wx1P * wy2P, wx2P * wy2P)
-    w2M1P, w1M1P, w01P, w1P1P, w2P1P = (wx2M * wy1P, wx1M * wy1P, wx0 * wy1P,
-                                        wx1P * wy1P, wx2P * wy1P)
-    w2M0,  w1M0,  w00,  w1P0,  w2P0  = (wx2M * wy0 , wx1M * wy0 , wx0 * wy0 ,
-                                        wx1P * wy0 , wx2P * wy0 ) 
-    w2M1M, w1M1M, w01M, w1P1M, w2P1M = (wx2M * wy1M, wx1M * wy1M, wx0 * wy1M,
-                                        wx1P * wy1M, wx2P * wy1M)
-    w2M2M, w1M2M, w02M, w1P2M, w2P2M = (wx2M * wy2M, wx1M * wy2M, wx0 * wy2M,
-                                        wx1P * wy2M, wx2P * wy2M)
-
-    return (
-        i, j,
-        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-        w2M0,  w1M0,  w00,  w1P0,  w2P0,
-        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-        w2M2M, w1M2M, w02M, w1P2M, w2P2M
-    )
-
-
-@nb.njit
-def deposit25(a, i, j, val, 
-        w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-        w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-        w2M0,  w1M0,  w00,  w1P0,  w2P0,
-        w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-        w2M2M, w1M2M, w02M, w1P2M, w2P2M):
-    """
-    Deposit value into a cell and 24 surrounding cells (using `weights` output).
-    """
-    a[i - 2, j + 2] += val * w2M2P
-    a[i - 1, j + 2] += val * w1M2P
-    a[i + 0, j + 2] += val * w02P
-    a[i + 1, j + 2] += val * w1P2P
-    a[i + 2, j + 2] += val * w2P2P
-    a[i - 2, j + 1] += val * w2M1P
-    a[i - 1, j + 1] += val * w1M1P
-    a[i + 0, j + 1] += val * w01P
-    a[i + 1, j + 1] += val * w1P1P
-    a[i + 2, j + 1] += val * w2P1P
-    a[i - 2, j + 0] += val * w2M0
-    a[i - 1, j + 0] += val * w1M0
-    a[i + 0, j + 0] += val * w00
-    a[i + 1, j + 0] += val * w1P0
-    a[i + 2, j + 0] += val * w2P0
-    a[i - 2, j - 1] += val * w2M1M
-    a[i - 1, j - 1] += val * w1M1M
-    a[i + 0, j - 1] += val * w01M
-    a[i + 1, j - 1] += val * w1P1M
-    a[i + 2, j - 1] += val * w2P1M
-    a[i - 2, j - 2] += val * w2M2M
-    a[i - 1, j - 2] += val * w1M2M
-    a[i + 0, j - 2] += val * w02M
-    a[i + 1, j - 2] += val * w1P2M
-    a[i + 2, j - 2] += val * w2P2M
+    # TODO: Change to switch statement (match and case) when Python 3.10 is
+    #       supported by Anaconda.
+    if place == -2:
+        return (1 / 2 - x) ** 4 / 24
+    elif place == -1:
+        return 19/96 - 11/24 * x + x ** 2 / 4 + x ** 3 / 6 - x ** 4 / 6
+    elif place == 0:
+        return 115/192 - x ** 2 * 5/8 + x ** 4 / 4
+    elif place == 1:
+        return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
+    elif place == 2:
+        return (1 / 2 + x) ** 4 / 24
 
 
 # Deposition #
 
-@nb.njit #(parallel=True)
-def deposit_kernel(grid_steps, grid_step_size,
-                   x_init, y_init, x_offt, y_offt, m, q, px, py, pz,
-                   out_ro, out_jx, out_jy, out_jz):
+@nb.njit(parallel=True)
+def deposit_plasma_numba(grid_steps, x_h, y_h, px, py, pz, q, m,
+                         out_ro, out_jx, out_jy, out_jz, size):
     """
     Deposit plasma particles onto the charge density and current grids.
     """
-    for k in nb.prange(m.size):    
+    x_h, y_h, m, q = x_h.ravel(), y_h.ravel(), m.ravel(), q.ravel()
+    px, py, pz = px.ravel(), py.ravel(), pz.ravel()
+
+    for k in nb.prange(size):
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)
@@ -108,63 +49,21 @@ def deposit_kernel(grid_steps, grid_step_size,
         djy = py[k] * (dro / gamma_m)
         djz = pz[k] * (dro / gamma_m)
 
-        x, y = x_init[k] + x_offt[k], y_init[k] + y_offt[k]
-        (i, j, 
-         w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-         w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-         w2M0,  w1M0,  w00,  w1P0,  w2P0,
-         w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-         w2M2M, w1M2M, w02M, w1P2M, w2P2M
-        ) = weights(
-            x, y, grid_steps, grid_step_size
-        )
-        
-        deposit25(out_ro, i, j, dro,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jx, i, j, djx,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jy, i, j, djy,
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
-        deposit25(out_jz, i, j, djz, 
-                  w2M2P, w1M2P, w02P, w1P2P, w2P2P,
-                  w2M1P, w1M1P, w01P, w1P1P, w2P1P,
-                  w2M0,  w1M0,  w00,  w1P0,  w2P0,
-                  w2M1M, w1M1M, w01M, w1P1M, w2P1M,
-                  w2M2M, w1M2M, w02M, w1P2M, w2P2M)
+        x_loc = x_h[k] - floor(x_h[k]) - .5
+        y_loc = y_h[k] - floor(y_h[k]) - .5
+        ix = int(floor(x_h[k]) + grid_steps // 2)
+        iy = int(floor(y_h[k]) + grid_steps // 2)
 
+        for kx in range(-2, 3):
+            wx = weight4(x_loc, kx)
+            for ky in range(-2, 3):
+                w = wx * weight4(y_loc, ky)
+                index_x, index_y = ix + kx, iy + ky
 
-@nb.njit
-def deposit(grid_steps, grid_step_size, x_init, y_init,
-            x_offt, y_offt, px, py, pz, q, m):
-    """
-    Deposit plasma particles onto the charge density and current grids.
-    This is a convenience wrapper around the `deposit_kernel` CUDA kernel.
-    """
-    ro = np.zeros((grid_steps, grid_steps))
-    jx = np.zeros((grid_steps, grid_steps))
-    jy = np.zeros((grid_steps, grid_steps))
-    jz = np.zeros((grid_steps, grid_steps))
-
-    deposit_kernel(grid_steps, grid_step_size,
-                   x_init.ravel(), y_init.ravel(),
-                   x_offt.ravel(), y_offt.ravel(),
-                   m.ravel(), q.ravel(),
-                   px.ravel(), py.ravel(), pz.ravel(),
-                   ro, jx, jy, jz)
-
-    return ro, jx, jy, jz
+                out_ro[index_x, index_y] += dro * w
+                out_jx[index_x, index_y] += djx * w
+                out_jy[index_x, index_y] += djy * w
+                out_jz[index_x, index_y] += djz * w
 
 
 # Helper function for dual plasma approach, for GPU #
@@ -177,8 +76,7 @@ def get_coarse_to_fine_cupy():
         float64 virtplasma_smallness_factor,
         float64 fine_grid_size, float64 coarse_grid_size,
         raw T c_x_offt, raw T c_y_offt, raw T c_px, raw T c_py, raw T c_pz,
-        raw T c_q, raw T c_m, raw T fine_grid,
-        raw T influence_prev, raw T influence_next,
+        raw T c_q, raw T c_m, raw T influence_prev, raw T influence_next,
         raw int64 inds_prev, raw int64 inds_next
         """,
         out_params="""
@@ -197,12 +95,10 @@ def get_coarse_to_fine_cupy():
         const int ind3 = (int) coarse_grid_size * inds_next[fi] + inds_prev[fj];
         const int ind4 = (int) coarse_grid_size * inds_next[fi] + inds_next[fj];
         
-        x[i] = fine_grid[fi] + 
-            (wpp * c_x_offt[ind1] + wpn * c_x_offt[ind2] +
-             wnp * c_x_offt[ind3] + wnn * c_x_offt[ind4]);
-        y[i] = fine_grid[fj] +
-            (wpp * c_y_offt[ind1] + wpn * c_y_offt[ind2] +
-             wnp * c_y_offt[ind3] + wnn * c_y_offt[ind4]);
+        x[i] = (wpp * c_x_offt[ind1] + wpn * c_x_offt[ind2] +
+                wnp * c_x_offt[ind3] + wnn * c_x_offt[ind4]);
+        y[i] = (wpp * c_y_offt[ind1] + wpn * c_y_offt[ind2] +
+                wnp * c_y_offt[ind3] + wnn * c_y_offt[ind4]);
         
         px[i] = virtplasma_smallness_factor *
             (wpp * c_px[ind1] + wpn * c_px[ind2] +
@@ -221,7 +117,7 @@ def get_coarse_to_fine_cupy():
             (wpp * c_m[ind1] + wpn * c_m[ind2] +
              wnp * c_m[ind3] + wnn * c_m[ind4]);
         """,
-        name='coarse_to_fine'
+        name='coarse_to_fine', no_return=True
     )
 
 
@@ -286,7 +182,7 @@ def get_deposit_plasma_cupy():
             }
         }
         """,
-        name='deposit_plasma_cupy', preamble=weight4_cupy
+        name='deposit_plasma_cupy', preamble=weight4_cupy, no_return=True
     )
 
 
@@ -302,90 +198,74 @@ def get_deposit_plasma(config: Config):
 
     pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
-        def deposit_template(x_init, y_init, x_offt, y_offt,
-                             px, py, pz, q, m, const_arrays):
-            return deposit(
-                grid_steps, grid_step_size, x_init, y_init,
-                x_offt, y_offt, px, py, pz, q, m)
-
-        return deposit_template
-
+        deposit_plasma_kernel = deposit_plasma_numba
     elif pu_type == 'gpu':
-        deposit_plasma_cupy = get_deposit_plasma_cupy()
+        deposit_plasma_kernel = get_deposit_plasma_cupy()
 
-        if dual_plasma_approach:
-            plasma_coarseness = config.getint('plasma-coarseness')
+    if dual_plasma_approach and pu_type == 'gpu':
+        plasma_coarseness = config.getint('plasma-coarseness')
+        coarse_to_fine_kernel = get_coarse_to_fine_cupy()
 
-            coarse_to_fine = get_coarse_to_fine_cupy()
+        def coarse_to_fine(particles: Arrays, const_arrays: Arrays):
+            """
+            Interpolate coarse plasma into fine plasma.
+            """
+            xp = const_arrays.xp
 
-            def deposit_dual(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
-                             const_arrays: Arrays):
-                """
-                Interpolate coarse plasma into fine plasma and deposit it on the
-                charge density and current grids. This is a convenience wrapper
-                around the `deposit_kernel` CUDA kernel.
-                """
-                xp = const_arrays.xp
+            virtplasma_smallness_factor = 1 / (
+                plasma_coarseness * plasma_fineness)**2
+            fine_grid_size = const_arrays.fine_x_init.size
+            coarse_grid_size = len(particles.m)
 
-                virtplasma_smallness_factor = 1 / (
-                    plasma_coarseness * plasma_fineness)**2
-                fine_grid_size = const_arrays.fine_grid.size
-                coarse_grid_size = len(m)
+            x_fine  = xp.zeros((fine_grid_size, fine_grid_size))
+            y_fine  = xp.zeros((fine_grid_size, fine_grid_size))
+            px_fine = xp.zeros((fine_grid_size, fine_grid_size))
+            py_fine = xp.zeros((fine_grid_size, fine_grid_size))
+            pz_fine = xp.zeros((fine_grid_size, fine_grid_size))
+            q_fine  = xp.zeros((fine_grid_size, fine_grid_size))
+            m_fine  = xp.zeros((fine_grid_size, fine_grid_size))
 
-                x_fine  = xp.zeros((fine_grid_size, fine_grid_size))
-                y_fine  = xp.zeros((fine_grid_size, fine_grid_size))
-                px_fine = xp.zeros((fine_grid_size, fine_grid_size))
-                py_fine = xp.zeros((fine_grid_size, fine_grid_size))
-                pz_fine = xp.zeros((fine_grid_size, fine_grid_size))
-                q_fine  = xp.zeros((fine_grid_size, fine_grid_size))
-                m_fine  = xp.zeros((fine_grid_size, fine_grid_size))
+            coarse_to_fine_kernel(
+                virtplasma_smallness_factor,
+                fine_grid_size, coarse_grid_size,
+                particles.x_offt, particles.y_offt,
+                particles.px, particles.py, particles.pz,
+                particles.q, particles.m,
+                const_arrays.influence_prev, const_arrays.influence_next,
+                const_arrays.indices_prev, const_arrays.indices_next,
+                x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine,
+                size=fine_grid_size**2)
 
-                x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine =\
-                    coarse_to_fine(
-                        virtplasma_smallness_factor,
-                        fine_grid_size, coarse_grid_size,
-                        x_offt, y_offt, px, py, pz, q, m,
-                        const_arrays.fine_grid,
-                        const_arrays.influence_prev, const_arrays.influence_next,
-                        const_arrays.indices_prev, const_arrays.indices_next,
-                        x_fine, y_fine, px_fine, py_fine, pz_fine, q_fine, m_fine,
-                        size=fine_grid_size**2)
+            x_h = (const_arrays.fine_x_init + x_fine) / grid_step_size + 0.5
+            y_h = (const_arrays.fine_y_init + y_fine) / grid_step_size + 0.5
 
-                ro = xp.zeros((grid_steps, grid_steps))
-                jx = xp.zeros((grid_steps, grid_steps))
-                jy = xp.zeros((grid_steps, grid_steps))
-                jz = xp.zeros((grid_steps, grid_steps))
+            return (x_h, y_h, px_fine, py_fine, pz_fine,
+                    q_fine, m_fine, fine_grid_size**2)
 
-                x_h = x_fine / grid_step_size + 0.5
-                y_h = y_fine / grid_step_size + 0.5
+    def deposit_plasma(particles: Arrays, const_arrays: Arrays):
+        """
+        Deposit plasma particles onto the charge density and current
+        grids.
+        """
+        xp = const_arrays.xp
 
-                return deposit_plasma_cupy(
-                    grid_steps, x_h, y_h, px_fine, py_fine, pz_fine,
-                    q_fine, m_fine, ro, jx, jy, jz, size=fine_grid_size**2
-                )
-
-            return deposit_dual
-
+        if dual_plasma_approach and pu_type == 'gpu':
+            (x_h, y_h, px, py, pz, q, m, arrays_size) =\
+                coarse_to_fine(particles, const_arrays)
         else:
-            def deposit_single(x_init, y_init, x_offt, y_offt, px, py, pz, q, m,
-                               const_arrays: Arrays):
-                """
-                Deposit plasma particles onto the charge density and current
-                grids.
-                """
-                xp = const_arrays.xp
+            x_h = (particles.x_init + particles.x_offt) / grid_step_size + 0.5
+            y_h = (particles.y_init + particles.y_offt) / grid_step_size + 0.5
+            px, py, pz = particles.px, particles.py, particles.pz
+            q, m, arrays_size = particles.q, particles.m, particles.m.size
 
-                ro = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-                jx = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-                jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-                jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+        ro = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+        jx = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+        jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+        jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
-                x_h = (x_init + x_offt) / grid_step_size + 0.5
-                y_h = (y_init + y_offt) / grid_step_size + 0.5
+        deposit_plasma_kernel(grid_steps, x_h, y_h, px, py, pz,
+                                q, m, ro, jx, jy, jz, size=arrays_size)
 
-                return deposit_plasma_cupy(
-                    grid_steps, x_h, y_h, px, py, pz, q, m, ro, jx, jy, jz,
-                    size=m.size
-                )
+        return ro, jx, jy, jz
 
-            return deposit_single
+    return deposit_plasma

@@ -1,21 +1,18 @@
 import numpy as np
 
 from ..config.config import Config
-from ..diagnostics.diagnostics_3d import Diagnostics3d
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import BeamCalculator, BeamSource, BeamDrain, BeamParticles, \
-                     concatenate_beam_layers
+from ..beam3d import BeamCalculator, BeamSource3D, BeamDrain3D, BeamParticles3D
 
 
-class PushAndSolver3d:
-    def __init__(self, xp: np, config: Config):
+class PusherAndSolver3D:
+    def __init__(self, config: Config):
         self.config = config
 
         self.pl_solver = Plane2d3vPlasmaSolver(config)
-        self.beam_particles_class = BeamParticles
-        self.beam_conc = concatenate_beam_layers
-        self.beam_calc = BeamCalculator(xp, config)
+        self.beam_particles_class = BeamParticles3D
+        self.beam_calc = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
 
@@ -27,19 +24,17 @@ class PushAndSolver3d:
         # TODO: Get rid of time_step_size and how we change current_time
         #       in step_dt method later, when we figure out how time
         #       in diagnostics should work.
-        self.time_step_size = config.getfloat('time-step')
+        # self.time_step_size = config.getfloat('time-step')
 
     def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
                 pl_currents: Arrays, pl_const_arrays: Arrays,
                 xi_plasma_layer_start,
-                beam_source: BeamSource, beam_drain: BeamDrain, current_time,
-                diagnostics: Diagnostics3d=None):
+                beam_source: BeamSource3D, beam_drain: BeamDrain3D,
+                current_time, diagnostics_list=[]):
         """
         Perform one time step of beam-plasma calculations.
         """
         xp = pl_const_arrays.xp
-
-        current_time = current_time + self.time_step_size
 
         self.beam_calc.start_time_step()
         beam_layer_to_move = self.beam_particles_class(xp)
@@ -66,33 +61,30 @@ class PushAndSolver3d:
             )
 
             lost, moved, fell_to_next_layer = self.beam_calc.move_beam_layer(
-                beam_layer_to_move, fell_size, xi_i, pl_fields, prev_pl_fields
+                beam_layer_to_move, fell_size, xi_i, prev_pl_fields, pl_fields
             )
 
             ro_beam_prev = ro_beam_full.copy()
 
             # Beam layers operations:
-            beam_layer_to_move = self.beam_conc(
-                beam_layer_to_layout, fell_to_next_layer
-            )
-            fell_size = fell_to_next_layer.size
+            beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
+            fell_size = fell_to_next_layer.id.size
 
             beam_drain.push_beam_layer(moved)
             # beam_drain.push_beam_lost(lost)
 
             # Diagnostics:
-            if diagnostics:
-                xi_plasma_layer = - self.xi_step_size * xi_i
-                try: # cupy
-                    diagnostics.after_step_dxi(
-                        current_time, xi_plasma_layer, ArraysView(pl_particles),
-                        ArraysView(pl_fields), ArraysView(pl_currents),
-                        ro_beam_full.get())
-                except AttributeError: # numpy
-                    diagnostics.after_step_dxi(
-                        current_time, xi_plasma_layer, ArraysView(pl_particles),
-                        ArraysView(pl_fields), ArraysView(pl_currents),
-                        ro_beam_full)
+            xi_plasma_layer = - self.xi_step_size * xi_i
+            try: # cupy
+                ro_beam_full = ro_beam_full.get()
+            except AttributeError: # numpy
+                pass
+
+            for diagnostic in diagnostics_list:
+                diagnostic.after_step_dxi(
+                    current_time, xi_plasma_layer, ArraysView(pl_particles),
+                    ArraysView(pl_fields), ArraysView(pl_currents),
+                    ro_beam_full)
 
             # Some diagnostics:
             view_pl_fields = ArraysView(pl_fields)
@@ -105,6 +97,6 @@ class PushAndSolver3d:
 
         # Perform diagnostics
         xi_plasma_layer = - self.xi_step_size * xi_i
-        if diagnostics:
-            diagnostics.dump(current_time, xi_plasma_layer, pl_particles,
-                             pl_fields, pl_currents, beam_drain)
+        for diagnostic in diagnostics_list:
+            diagnostic.dump(current_time, pl_particles, pl_fields,
+                            pl_currents, beam_drain)

@@ -192,6 +192,7 @@ def make_plasma_dual(xp: np, steps, cell_size, coarseness=2, fineness=2):
     coarse_grid_xs, coarse_grid_ys = coarse_grid[:, None], coarse_grid[None, :]
 
     fine_grid = make_fine_plasma_grid(xp, steps, cell_size, fineness)
+    fine_grid_xs, fine_grid_ys = fine_grid[:, None], fine_grid[None, :]
 
     Nc = len(coarse_grid)
 
@@ -252,7 +253,7 @@ def make_plasma_dual(xp: np, steps, cell_size, coarseness=2, fineness=2):
     virt_params = Arrays(xp,
         influence_prev=influence_prev, influence_next=influence_next,
         indices_prev=indices_prev, indices_next=indices_next,
-        fine_grid=fine_grid,
+        fine_x_init = fine_grid_xs, fine_y_init = fine_grid_ys
     )
 
     return (
@@ -364,8 +365,7 @@ def init_plasma(config: Config, current_time=0):
     # with their initial parameters and negating the result.
     initial_deposition = get_deposit_plasma(config)
 
-    ro_electrons_initial, _, _, _ = initial_deposition(
-        x_init, y_init, x_offt, y_offt, px, py, pz, q, m, virt_params)
+    ro_electrons_initial, _, _, _ = initial_deposition(particles, virt_params)
     ro_initial = -ro_electrons_initial
 
     dir_matrix = dirichlet_matrix(xp, grid_steps, grid_step_size)
@@ -383,7 +383,8 @@ def init_plasma(config: Config, current_time=0):
             influence_next=virt_params.influence_next,
             indices_prev=virt_params.indices_prev,
             indices_next=virt_params.indices_next,
-            fine_grid=virt_params.fine_grid)
+            fine_x_init=virt_params.fine_x_init,
+            fine_y_init=virt_params.fine_y_init)
     else:
         const_arrays = Arrays(xp,
             grid=grid,

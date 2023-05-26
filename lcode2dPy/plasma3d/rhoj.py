@@ -8,17 +8,13 @@ def get_rhoj_computer(config: Config):
     deposit = get_deposit_plasma(config)
 
     def compute_rhoj(particles: Arrays, const_arrays: Arrays):
-        ro, jx, jy, jz = deposit(
-            particles.x_init, particles.y_init,
-            particles.x_offt, particles.y_offt,
-            particles.px, particles.py, particles.pz,
-            particles.q, particles.m, const_arrays
-        )
+        ro, jx, jy, jz = deposit(particles, const_arrays)
 
         # Also add the background ion charge density.
         # Do it last to preserve more float precision
+        # TODO: Add background ions that can move.
         ro += const_arrays.ro_initial
 
         return Arrays(particles.xp, ro=ro, jx=jx, jy=jy, jz=jz)
-    
+
     return compute_rhoj
