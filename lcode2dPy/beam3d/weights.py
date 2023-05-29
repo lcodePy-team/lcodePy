@@ -37,9 +37,7 @@ def weight4(x, place):
 
 
 # Deposition and field interpolation #
-
-#TODO do deposition in parallel
-@nb.njit
+@nb.njit(parallel=True)
 def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
                        out_ro0, out_ro1, size):
     """
@@ -47,8 +45,12 @@ def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
     """
     x_h, y_h = x_h.ravel(), y_h.ravel()
     xi_loc, q_norm = xi_loc.ravel(), q_norm.ravel()
+    num_threads = nb.get_num_threads()
+    out_ro0_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
+    out_ro1_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
 
-    for k in np.arange(size):
+    for k in nb.prange(size):
+        thread = nb.get_thread_id()
         x_loc = x_h[k] - floor(x_h[k]) - .5
         y_loc = y_h[k] - floor(y_h[k]) - .5
         ix = int(floor(x_h[k]) + grid_steps // 2)
@@ -62,8 +64,17 @@ def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
                 w1 = w * weight1(xi_loc[k], 1)
                 index_x, index_y = ix + kx, iy + ky
 
-                out_ro0[index_x, index_y] += q_norm[k] * w0
-                out_ro1[index_x, index_y] += q_norm[k] * w1
+                out_ro0_[thread, index_x, index_y] += q_norm[k] * w0
+                out_ro1_[thread, index_x, index_y] += q_norm[k] * w1
+    
+    for index_x in nb.prange(out_ro0.shape[0]): 
+        for index_y in range(out_ro0.shape[1]): 
+            c1 = c2 = 0
+            for i in range(num_threads):
+                c1 += out_ro0_[i, index_x, index_y] 
+                c2 += out_ro1_[i, index_x, index_y] 
+            out_ro0[index_x, index_y] += c1
+            out_ro1[index_x, index_y] += c2
 
 
 # Calculates the weights for a particle, for GPU #
