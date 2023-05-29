@@ -119,8 +119,8 @@ def make_plasma_single(xp: np, steps, cell_size, fineness=2):
     px = xp.zeros((Np, Np))
     py = xp.zeros((Np, Np))
     pz = xp.zeros((Np, Np))
-    q = xp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2
-    m = xp.ones((Np, Np)) * ELECTRON_MASS / fineness**2
+    q = xp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2 * cell_size**2
+    m = xp.ones((Np, Np)) * ELECTRON_MASS / fineness**2 * cell_size**2
 
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
@@ -204,8 +204,8 @@ def make_plasma_dual(xp: np, steps, cell_size, coarseness=2, fineness=2):
     coarse_px = xp.zeros((Nc, Nc))
     coarse_py = xp.zeros((Nc, Nc))
     coarse_pz = xp.zeros((Nc, Nc))
-    coarse_m = xp.ones((Nc, Nc)) * ELECTRON_MASS * coarseness**2
-    coarse_q = xp.ones((Nc, Nc)) * ELECTRON_CHARGE * coarseness**2
+    coarse_m = xp.ones((Nc, Nc)) * ELECTRON_MASS * coarseness**2 * cell_size**2
+    coarse_q = xp.ones((Nc, Nc)) * ELECTRON_CHARGE * coarseness**2 * cell_size**2
 
     # Calculate indices for coarse -> fine bilinear interpolation
 

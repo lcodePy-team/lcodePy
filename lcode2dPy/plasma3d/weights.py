@@ -33,7 +33,7 @@ def weight4(x, place):
 # Deposition #
 
 @nb.njit(parallel=True)
-def deposit_plasma_numba(grid_steps, x_h, y_h, px, py, pz, q, m,
+def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
                          out_ro, out_jx, out_jy, out_jz, size):
     """
     Deposit plasma particles onto the charge density and current grids.
@@ -55,9 +55,9 @@ def deposit_plasma_numba(grid_steps, x_h, y_h, px, py, pz, q, m,
         iy = int(floor(y_h[k]) + grid_steps // 2)
 
         for kx in range(-2, 3):
-            wx = weight4(x_loc, kx)
+            wx = weight4(x_loc, kx) / grid_step_size 
             for ky in range(-2, 3):
-                w = wx * weight4(y_loc, ky)
+                w = wx * weight4(y_loc, ky) / grid_step_size 
                 index_x, index_y = ix + kx, iy + ky
 
                 out_ro[index_x, index_y] += dro * w
@@ -152,7 +152,7 @@ def get_deposit_plasma_cupy():
 
     return cp.ElementwiseKernel(
         in_params="""
-        float64 grid_steps, raw T x_h, raw T y_h,
+        float64 grid_steps, float64 grid_step_size, raw T x_h, raw T y_h,
         raw T px, raw T py, raw T pz, raw T q, raw T m
         """,
         out_params='raw T out_ro, raw T out_jx, raw T out_jy, raw T out_jz',
@@ -170,9 +170,9 @@ def get_deposit_plasma_cupy():
         const int iy = floor(y_h[i]) + floor(grid_steps / 2);
 
         for (int kx = -2; kx <= 2; kx++) {
-            const T wx = weight4(x_loc, kx);
+            const T wx = weight4(x_loc, kx) / grid_step_size;
             for (int ky = -2; ky <= 2; ky++) {
-                const T w = wx * weight4(y_loc, ky);
+                const T w = wx * weight4(y_loc, ky) / grid_step_size;
                 const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
                 atomicAdd(&out_ro[idx], dro * w);
@@ -263,7 +263,7 @@ def get_deposit_plasma(config: Config):
         jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
         jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
-        deposit_plasma_kernel(grid_steps, x_h, y_h, px, py, pz,
+        deposit_plasma_kernel(grid_steps, grid_step_size, x_h, y_h, px, py, pz,
                                 q, m, ro, jx, jy, jz, size=arrays_size)
 
         return ro, jx, jy, jz
