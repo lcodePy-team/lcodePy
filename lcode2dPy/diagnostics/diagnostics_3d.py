@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..config.config import Config
-from ..plasma3d.data import ArraysView
+from ..plasma3d.data import Arrays, ArraysView
 
 
 # Auxiliary functions:
@@ -34,6 +34,27 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
 
     return np.reshape(np.array(new_arr),
                       ceil(arr.shape[0] / merging_xi, -1))
+
+
+def calculate_energy_fluxes(grid_step_size,
+                            plasma_particles: Arrays, plasma_fields: Arrays):
+    # xp is either np (numpy) or cp (cupy):
+    xp = plasma_particles.xp
+
+    # The perturbation to the flux density of the electromagnetic energy:
+    Se = (plasma_fields.Ez ** 2 + plasma_fields.Bz ** 2 +
+         (plasma_fields.Ex - plasma_fields.By) ** 2 +
+         (plasma_fields.Ey + plasma_fields.Bx) ** 2) * grid_step_size ** 2 / 2
+
+    # Additional array to calculate the motion energy of plasma particles:
+    gamma_m = xp.sqrt(plasma_particles.m ** 2  + plasma_particles.px ** 2 +
+                      plasma_particles.py ** 2 + plasma_particles.pz ** 2)
+    motion_energy = gamma_m - plasma_particles.m
+
+    # Calculate integral total energy flux and return it:
+    psi_electromagnetic = xp.sum(Se)
+    psi_total = xp.sum(motion_energy) + psi_electromagnetic
+    return psi_total
 
 
 # Diagnostics classes:
@@ -110,6 +131,7 @@ class DiagnosticsFXi:
         # because otherwise it won't diagnosed anything.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
+        self.__grid_step_size = config.getfloat('window-width-step-size')
 
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
@@ -135,6 +157,12 @@ class DiagnosticsFXi:
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(val)
+
+                if name == 'Sf':
+                    val = calculate_energy_fluxes(self.__grid_step_size,
+                                                  plasma_particles,
+                                                  plasma_fields).get()
                     self.__data[name].append(val)
 
         # We use dump here to save data not only at the end of the simulation
