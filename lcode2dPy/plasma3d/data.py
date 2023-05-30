@@ -29,6 +29,17 @@ class Arrays:
         """
         return Arrays(**self.__dict__)
 
+    def get(self, attrname):
+        """
+        A method to copy data from GPU to CPU when using cupy as the main data
+        module. For now, this method is only used in diagnostics.
+        """
+        # Practically, we don't need class ArraysView if we have this method.
+        if self.xp == np: # numpy
+            return getattr(self, attrname)
+        else: # cupy
+            return getattr(self, attrname).get() # auto-copies to host RAM
+
 
 # NOTE: The implementation may be complicated, but the usage is simple.
 class ArraysView:

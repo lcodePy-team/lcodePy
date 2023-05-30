@@ -41,7 +41,7 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
 
 class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                      'Phi']
+                      'Phi', 'Sf']
                     # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
@@ -124,12 +124,12 @@ class DiagnosticsFXi:
 
             for name in self.__f_xi_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                    val = getattr(plasma_fields, name)[self.__ax_x, self.__ax_y]
+                    val = plasma_fields.get(name)[self.__ax_x, self.__ax_y]
                     self.__data[name].append(val)
 
                 if name == 'rho':
                     # TODO: It's just a crutch!!!
-                    val = getattr(plasma_currents, 'ro')[
+                    val = plasma_currents.get('ro')[
                         self.__ax_x, self.__ax_y]
                     self.__data[name].append(val)
 
@@ -152,7 +152,7 @@ class DiagnosticsFXi:
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 np.savez(f'./diagnostics/f_xi_{current_time:08.2f}.npz',
-                            **self.__data)
+                         **self.__data)
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 for name in self.__f_xi_names:                        
@@ -269,13 +269,13 @@ class DiagnosticsColormaps:
 
             for name in self.__colormaps_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                    val = getattr(plasma_fields, name)[
+                    val = plasma_fields.get(name)[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
                 if name == 'rho':
                     # val = getattr(plasma_currents, 'ro')[ # It isn't right!
-                    val = getattr(plasma_currents, 'ro')[
+                    val = plasma_currents.get('ro')[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(val)
 
@@ -407,19 +407,20 @@ class DiagnosticsTransverse:
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                 plt.imsave(
                     './diagnostics/' + fname,
-                    getattr(plasma_fields, name).T, origin='lower',
+                    plasma_fields.get(name).T, origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho':
                 plt.imsave(
                     './diagnostics/' + fname,
-                    getattr(plasma_currents, 'ro').T, origin='lower',
+                    plasma_currents.get('ro').T, origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho_beam':
                 plt.imsave(
                     './diagnostics/' + fname,
-                    getattr(ro_beam, 'ro_beam').T, origin='lower',
+                    # getattr(ro_beam, 'ro_beam').T, origin='lower',
+                    ro_beam.T, origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
     def save_to_file(self, current_time, xi_plasma_layer, plasma_particles,
@@ -430,7 +431,7 @@ class DiagnosticsTransverse:
 
         for name in self.__colormaps_names:
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                data_for_saving[name] = getattr(plasma_fields, name)
+                data_for_saving[name] = plasma_fields.get(name)
 
             if name == 'rho':
                 data_for_saving[name] = getattr(plasma_currents, 'ro')
