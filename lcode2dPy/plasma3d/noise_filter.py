@@ -25,9 +25,10 @@ def get_noise_filter(config: Config):
 
     def calculate_inhomogeneity(d_offt, xp: np, axis):
         if axis: d_offt = d_offt.T
-        d_inhom = xp.vstack( (d_offt[0, :] - 2 * d_offt[1, :] + d_offt[2, :],
-                    d_offt[1:-1, :] - (d_offt[2:, :] + d_offt[:-2, :]) / 2,
-                    d_offt[-1, :] - 2 * d_offt[-2, :] + d_offt[-3, :] ))
+        d_inhom = xp.vstack((
+            xp.zeros_like(d_offt[0, :]),
+            d_offt[1:-1, :] - (d_offt[2:, :] + d_offt[:-2, :]) / 2,
+            xp.zeros_like(d_offt[-1, :])))
         if axis: d_inhom = d_inhom.T
         return d_inhom
 
