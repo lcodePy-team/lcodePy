@@ -3,6 +3,7 @@ import numpy as np
 from ..config.config import Config
 from ..plasma3d.data import Arrays
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
+from ..diagnostics.diagnostics_3d import get
 from ..beam3d import BeamCalculator, BeamSource3D, BeamDrain3D, BeamParticles3D
 
 
@@ -75,21 +76,15 @@ class PusherAndSolver3D:
 
             # Diagnostics:
             xi_plasma_layer = - self.xi_step_size * xi_i
-            if pl_particles.xp == np: # numpy
-                ro_beam = ro_beam_full
-            else: # cupy
-                ro_beam = ro_beam_full.get()
 
             for diagnostic in diagnostics_list:
                 diagnostic.after_step_dxi(
                     current_time, xi_plasma_layer, pl_particles,
-                    pl_fields, pl_currents,
-                    ro_beam)
+                    pl_fields, pl_currents, ro_beam_full)
 
-            # Some diagnostics:
-            Ez_00 = pl_fields.get('Ez')[self.grid_steps//2, self.grid_steps//2]
-            
+            # Some diagnostics:            
             if xi_i % 10. == 0:
+                Ez_00 = get(pl_fields.Ez[self.grid_steps//2, self.grid_steps//2])
                 print(
                     # f't={current_time:+.4f}, ' + 
                     f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}')

@@ -4,10 +4,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..config.config import Config
-from ..plasma3d.data import Arrays, ArraysView
+from ..plasma3d.data import Arrays
+from ..beam3d.beam_io import BeamDrain
 
 
 # Auxiliary functions:
+
+def get(array: np.ndarray):
+    """
+    A function to copy data from GPU to CPU when using cupy as the main data
+    module. For now, this method is only used in diagnostics.
+    """
+    if 'numpy' in str(type(array)): # numpy
+        return array
+    else: # cupy
+        return array.get() # auto-copies to host RAM
+
 
 def from_str_into_list(names_str: str):
     """ Makes a list of elements that it gets from a long string."""
@@ -139,48 +151,51 @@ class DiagnosticsFXi:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                    val = plasma_fields.get(name)[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    val = getattr(plasma_fields, name)[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(get(val))
 
                 if name == 'rho':
                     # TODO: It's just a crutch!!!
-                    val = plasma_currents.get('ro')[
-                        self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    val = getattr(plasma_currents, 'ro')[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'Sf':
                     val = calculate_energy_fluxes(self.__grid_step_size,
                                                   plasma_particles,
-                                                  plasma_fields).get()
-                    self.__data[name].append(val)
+                                                  plasma_fields)
+                    self.__data[name].append(get(val))
 
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
         if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-            self.dump(current_time, None, None, None, None, None, False)
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return current_time % self.__output_period <= self.__time_step_size / 2
 
-    def dump(self, current_time, xi_plasma_layer, plasma_particles,
-             plasma_fields, plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays, 
+             eam_drain: BeamDrain, clean_data=True):
         if self.conditions_check(current_time, inf):
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
-                np.savez(f'./diagnostics/f_xi_{current_time:08.2f}.npz',
-                         **self.__data)
+                plasma_particles.xp.savez(
+                    f'./diagnostics/f_xi_{current_time:08.2f}.npz',
+                    **self.__data)
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 for name in self.__f_xi_names:                        
@@ -289,27 +304,28 @@ class DiagnosticsColormaps:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
             # Firstly, it adds the current value of xi to data dictionary:
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__colormaps_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                    val = plasma_fields.get(name)[
+                    val = getattr(plasma_fields, name)[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'rho':
                     # val = getattr(plasma_currents, 'ro')[ # It isn't right!
-                    val = plasma_currents.get('ro')[
+                    val = getattr(plasma_currents, 'ro')[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 val = None
 
@@ -317,13 +333,15 @@ class DiagnosticsColormaps:
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
         if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-            self.dump(current_time, None, None, None, None, None, False)
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
         if (xi_plasma_layer <= self.__xi_to and
             (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to):
-            self.dump(current_time, None, None, None, None, None, False)
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
@@ -331,8 +349,9 @@ class DiagnosticsColormaps:
             xi_plasma_layer <= self.__xi_from and
             xi_plasma_layer >= self.__xi_to)
 
-    def dump(self, current_time, xi_plasma_layer, plasma_particles,
-             plasma_fields, plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays, 
+             eam_drain: BeamDrain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
         if current_time % self.__output_period <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
@@ -346,8 +365,8 @@ class DiagnosticsColormaps:
             if self.__merging_r > 1 or self.__merging_xi > 1:
                 for name in self.__colormaps_names:
                     data_for_saving[name] = conv_2d(
-                        data_for_saving[name], self.__merging_xi,
-                        self.__merging_r)
+                        data_for_saving[name],
+                        self.__merging_xi, self.__merging_r)
 
             # TODO: If there is a file with the same name with important data 
             #       and we want to save data there, we should just add new data,
@@ -356,7 +375,7 @@ class DiagnosticsColormaps:
             if ('numbers' in self.__colormaps_type or
                 'both' in self.__colormaps_type):
                 np.savez(f'./diagnostics/colormaps_{current_time:08.2f}.npz',
-                    **data_for_saving)
+                         **data_for_saving)
 
             # Clean some memory. TODO: Better ways to do that?
             data_for_saving = 0
@@ -435,31 +454,32 @@ class DiagnosticsTransverse:
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                 plt.imsave(
                     './diagnostics/' + fname,
-                    plasma_fields.get(name).T, origin='lower',
+                    get(getattr(plasma_fields, name).T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho':
                 plt.imsave(
                     './diagnostics/' + fname,
-                    plasma_currents.get('ro').T, origin='lower',
+                    get(getattr(plasma_currents, 'ro').T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho_beam':
                 plt.imsave(
                     './diagnostics/' + fname,
                     # getattr(ro_beam, 'ro_beam').T, origin='lower',
-                    ro_beam.T, origin='lower',
+                    get(ro_beam.T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
-    def save_to_file(self, current_time, xi_plasma_layer, plasma_particles,
-                     plasma_fields, plasma_currents, ro_beam):
+    def save_to_file(self, current_time, xi_plasma_layer,
+                     plasma_particles: Arrays, plasma_fields: Arrays,
+                     plasma_currents: Arrays, ro_beam):
         Path('./diagnostics').mkdir(parents=True, exist_ok=True)
 
         data_for_saving = {'transverse_grid': self.__grid}
 
         for name in self.__colormaps_names:
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
-                data_for_saving[name] = plasma_fields.get(name)
+                data_for_saving[name] = getattr(plasma_fields, name)
 
             if name == 'rho':
                 data_for_saving[name] = getattr(plasma_currents, 'ro')
@@ -474,10 +494,12 @@ class DiagnosticsTransverse:
 
         file_name = \
             f'transverse_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
-        np.savez('./diagnostics/' + file_name, **data_for_saving)
+        plasma_particles.xp.savez(
+            './diagnostics/' + file_name, **data_for_saving)
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
             # For xy diagnostics we save files to a file or plot a picture.
             if ('pictures' in self.__colormaps_type or
@@ -496,8 +518,9 @@ class DiagnosticsTransverse:
             current_time % self.__output_period <= self.__time_step_size / 2 and
             xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
 
-    def dump(self, current_time, xi_plasma_layer, plasma_particles,
-             plasma_fields, plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays, 
+             eam_drain: BeamDrain, clean_data=True):
         pass
 
 
@@ -523,22 +546,18 @@ class SaveRunState:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if (self.conditions_check(current_time, xi_plasma_layer) and
             self.__save_plasma):
             Path('./snapshots').mkdir(parents=True, exist_ok=True)
 
-            # Important for saving arrays from GPU (is it really?)
-            plasma_particles = ArraysView(plasma_particles)
-            plasma_fields    = ArraysView(plasma_fields)
-            plasma_currents  = ArraysView(plasma_currents)
-
             file_name = \
                 f'plasmastate_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
-            np.savez_compressed(
+            plasma_particles.xp.savez_compressed(
                 file='./snapshots/' + file_name,
-                xi_plasma_layer=np.array([xi_plasma_layer]),
+                xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
                 x_init=plasma_particles.x_init,
                 y_init=plasma_particles.y_init,
                 x_offt=plasma_particles.x_offt,
@@ -566,8 +585,9 @@ class SaveRunState:
             current_time % self.__output_period <= self.__time_step_size / 2 and
             xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
 
-    def dump(self, current_time, xi_plasma_layer, plasma_particles,
-             plasma_fields, plasma_currents, beam_drain, clean_data=True):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays, 
+             beam_drain: BeamDrain, clean_data=True):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__output_period <= self.__time_step_size / 2:
@@ -578,14 +598,9 @@ class SaveRunState:
                     f'./run_states/beamfile_{current_time:08.2f}')
 
             if self.__save_plasma:
-                # Important for saving arrays from GPU (is it really?)
-                plasma_particles = ArraysView(plasma_particles)
-                plasma_fields    = ArraysView(plasma_fields)
-                plasma_currents  = ArraysView(plasma_currents)
-
-                np.savez_compressed(
+                plasma_particles.xp.savez_compressed(
                     file=f'./run_states/plasmastate_{current_time:08.2f}',
-                    xi_plasma_layer=np.array([xi_plasma_layer]),
+                    xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
                     x_init=plasma_particles.x_init,
                     y_init=plasma_particles.y_init,
                     x_offt=plasma_particles.x_offt,
