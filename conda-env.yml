@@ -1,0 +1,10 @@
+name: lcode-env
+channels:
+    - conda-forge
+    - defaults
+dependencies:
+    - numba=0.56
+    - numpy
+    - scipy
+    - matplotlib
+    - mpi4py

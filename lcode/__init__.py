@@ -1,7 +1,5 @@
-"""Quasi-static 2d3v Particle-In-Cell plasma simulation code."""
-# Imports typical modules for 3d simulations.
-from .alt_beam_generator.beam_generator import generate_beam
-# from .simulation import test
-from .diagnostics.diagnostics_3d import (
-    DiagnosticsFXi, DiagnosticsColormaps, DiagnosticsTransverse, SaveRunState
-)
+"""Quasistatic code for plasma wakefield simulation."""
+
+from .simulation import Simulation
+
+__version__ = "0.1.0"
