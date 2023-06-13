@@ -15,14 +15,14 @@ http://lcode.info/.
 
 ## Instalation 
 
-We use [Anaconda](https://www.continuum.io/why-anaconda)we and recommend 
+We use [Anaconda](https://www.continuum.io/why-anaconda) and we recommend 
 installing lcode in a separate environment. 
 Any other python installation should work fine, but has not been tested. 
 
 
-- Create a new env and install the dependency:
+- Create a new environment and install the dependencies:
 ```
-conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib mpi4py
+conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib
 ```
 or 
 ```
@@ -30,14 +30,14 @@ conda env create -f conda-env.yml
 ```
 where `conda-env.yml` is avalible in sources.
 
-- Acivate new env:
+- Acivate the new environment:
 ```
 conda activate lcode-env
 ```
 
-- **Optional**: install cupy in order to run simulation on GPU. 
+- **Optional**: in order to run simulations on GPU, add cupy and other necessary packages to the line of dependencies when creating a new eviroment. Check in advance if you have the drivers for your GPU installed. It is not necessary to install CUDA Toolkit in advance. For any other questions about cupy, please check https://docs.cupy.dev/en/stable/install.html
 ```
-conda install -c conda-forge cupy
+conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib cupy
 ```
 
 - Install lcode:
