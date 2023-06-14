@@ -271,9 +271,8 @@ class DiagnosticsColormaps:
         self.__grid_steps = config.getint('window-width-steps')
         grid_step_size = config.getfloat('window-width-step-size')
 
-        grid = ((np.arange(self.__grid_steps) - self.__grid_steps // 2) *
-                grid_step_size)
-        self.__data['transverse_grid'] = grid
+        self.__grid = ((np.arange(self.__grid_steps) - self.__grid_steps // 2) *
+                        grid_step_size)
 
         # Here we define subwindow borders in terms of number of steps:
         self.__r_f = self.__grid_steps // 2 + self.__r_from / grid_step_size
@@ -355,6 +354,7 @@ class DiagnosticsColormaps:
         # In case of colormaps, we reshape every data list except for xi list.
         if current_time % self.__output_period <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
+            data_for_saving['transverse_grid'] = self.__grid
 
             size = len(self.__data['xi'])
             for name in self.__colormaps_names:
