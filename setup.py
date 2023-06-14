@@ -32,7 +32,7 @@ if __name__ == '__main__':
           'Operating System :: OS Independent'
         ],
         license ='BSD-3-Clause-extended', 
-        license_files = ('LICENSE.txt',),
+        license_files = ('LICENSE',),
         keywords=['plasma wakefield acceleration', 
             'quasistatic approximation',
             'numerical simulation'],
