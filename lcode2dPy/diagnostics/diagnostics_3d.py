@@ -188,8 +188,8 @@ class DiagnosticsFXi:
         return current_time % self.__output_period <= self.__time_step_size / 2
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
-             plasma_fields: Arrays, plasma_currents: Arrays, 
-             eam_drain: BeamDrain, clean_data=True):
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         if self.conditions_check(current_time, inf):
             Path('./diagnostics').mkdir(parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
@@ -215,7 +215,7 @@ class DiagnosticsColormaps:
     # By default, colormaps are taken in (y, xi) plane.
     # TODO: Make (x, xi) plane an option.
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                           'Phi']
+                           'Phi', 'y_offt', 'y_plasma_particles']
                         # 'ni']
                     # TODO: add them and functionality!
     __allowed_colormaps_type = ['numbers']
@@ -317,13 +317,28 @@ class DiagnosticsColormaps:
                     self.__data[name].append(get(val))
 
                 if name == 'rho':
-                    # val = getattr(plasma_currents, 'ro')[ # It isn't right!
                     val = getattr(plasma_currents, 'ro')[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__grid_steps//2, self.__r_f:self.__r_t]
+                    self.__data[name].append(get(val))
+
+                # NOTE: These two are very-very experimental diagnostics!
+                if name == 'y_offt':
+                    val = getattr(plasma_particles, 'y_offt')
+                    val = val[val.shape[0] // 2, :]
+                    # TODO: self.__r_f:self.__r_t won't work here, think about
+                    #       other ways for trajectories diagnostics.
+                    self.__data[name].append(get(val))
+
+                if name == 'y_plasma_particles':
+                    val = (getattr(plasma_particles, 'y_init') +
+                           getattr(plasma_particles, 'y_offt'))
+                    val = val[val.shape[0] // 2, :]
+                    # TODO: self.__r_f:self.__r_t won't work here, think about
+                    #       other ways for trajectories diagnostics.
                     self.__data[name].append(get(val))
 
                 val = None
@@ -349,8 +364,8 @@ class DiagnosticsColormaps:
             xi_plasma_layer >= self.__xi_to)
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
-             plasma_fields: Arrays, plasma_currents: Arrays, 
-             eam_drain: BeamDrain, clean_data=True):
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
         if current_time % self.__output_period <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
@@ -519,8 +534,8 @@ class DiagnosticsTransverse:
             xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
-             plasma_fields: Arrays, plasma_currents: Arrays, 
-             eam_drain: BeamDrain, clean_data=True):
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         pass
 
 
@@ -562,7 +577,7 @@ class SaveRunState:
                 y_init=plasma_particles.y_init,
                 x_offt=plasma_particles.x_offt,
                 y_offt=plasma_particles.y_offt,
-    
+
                 dx_chaotic=plasma_particles.dx_chaotic,
                 dy_chaotic=plasma_particles.dy_chaotic,
                 dx_chaotic_perp=plasma_particles.dx_chaotic_perp,
@@ -575,7 +590,7 @@ class SaveRunState:
                 Ex=plasma_fields.Ex, Bx=plasma_fields.Bx,
                 Ey=plasma_fields.Ey, By=plasma_fields.By,
                 Ez=plasma_fields.Ez, Bz=plasma_fields.Bz,
-                
+
                 Phi=plasma_fields.Phi, ro=plasma_currents.ro,
                 jx=plasma_currents.jx, jy=plasma_currents.jy,
                 jz=plasma_currents.jz)
