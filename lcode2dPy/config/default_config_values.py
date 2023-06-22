@@ -81,8 +81,8 @@ default_config_values = {
 
     'filter-window-length': 5,
     'filter-polyorder': 3,
-    'filter-coefficient': 0.1,
-    'damping-coefficient': 0.1,
+    'filter-coefficient': 0,
+    'damping-coefficient': 0,
     'dx-max': 1,
     'field-solver-subtraction-coefficient': 1
 }
