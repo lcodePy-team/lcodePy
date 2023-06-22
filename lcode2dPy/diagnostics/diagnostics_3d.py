@@ -81,7 +81,8 @@ class DiagnosticsFXi:
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(self, output_period=100, saving_xi_period=100, f_xi='Ez',
-                 f_xi_type='numbers', x_probe_lines=0, y_probe_lines=0):
+                 f_xi_type='numbers', x_probe_lines=0, y_probe_lines=0,
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__f_xi_names = from_str_into_list(f_xi)
         for name in self.__f_xi_names:
@@ -113,18 +114,23 @@ class DiagnosticsFXi:
         self.__output_period = output_period
         self.__saving_xi_period = saving_xi_period
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
         # We store data as a simple Python dictionary of lists for f(xi) data.
         # But I'm not sure this is the best way to handle data storing!
         self.__data = {name: [] for name in self.__f_xi_names}
         self.__data['xi'] = []
 
     def __repr__(self):
-        return (f"DiagnosticsFXi(output_period={self.__output_period}, " +
-                f"saving_xi_period={self.__saving_xi_period}, " +
-                f"f_xi='{','.join(self.__f_xi_names)}', " +
-                f"f_xi_type='{self.__f_xi_type}', " +
-                f"x_probe_lines={self.__x_probe}, " +
-                f"y_probe_lines={self.__y_probe}")
+        return (
+            f"DiagnosticsFXi(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_xi_period}, " +
+            f"f_xi='{','.join(self.__f_xi_names)}', " +
+            f"f_xi_type='{self.__f_xi_type}', " +
+            f"x_probe_lines={self.__x_probe}, " +
+            f"y_probe_lines={self.__y_probe}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -191,17 +197,20 @@ class DiagnosticsFXi:
              plasma_fields: Arrays, plasma_currents: Arrays,
              beam_drain: BeamDrain, clean_data=True):
         if self.conditions_check(current_time, inf):
-            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 plasma_particles.xp.savez(
-                    f'./diagnostics/f_xi_{current_time:08.2f}.npz',
+                    f'./diagnostics{self.__unique_directory_name}/' + 
+                    f'f_xi_{current_time:08.2f}.npz',
                     **self.__data)
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
                 for name in self.__f_xi_names:                        
                     plt.plot(self.__data['xi'], self.__data[name])
                     plt.savefig(
-                        f'./diagnostics/{name}_f_xi_{current_time:08.2f}.jpg')
+                        f'./diagnostics{self.__unique_directory_name}/' +
+                        f'{name}_f_xi_{current_time:08.2f}.jpg')
                                 # vmin=-1, vmax=1)
                     plt.close()
 
@@ -224,7 +233,8 @@ class DiagnosticsColormaps:
     def __init__(self, output_period=100, saving_xi_period=1000, colormaps='Ez',
                  colormaps_type='numbers', xi_from=inf, xi_to=-inf,
                  r_from=-inf, r_to=inf,
-                 output_merging_r: int=1, output_merging_xi: int=1):
+                 output_merging_r: int=1, output_merging_xi: int=1,
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
         for name in self.__colormaps_names:
@@ -250,6 +260,9 @@ class DiagnosticsColormaps:
         self.__merging_r  = round(output_merging_r)
         self.__merging_xi = round(output_merging_xi)
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
         # We store data as a Python dictionary of numpy arrays for colormaps
         # data. I'm not sure this is the best way to handle data storing.
         self.__data = {name: [] for name in self.__colormaps_names}
@@ -264,7 +277,8 @@ class DiagnosticsColormaps:
             f"xi_from={self.__xi_from}, xi_to={self.__xi_to}, " + 
             f"r_from={self.__r_from}, r_to={self.__r_to}, " +
             f"output_merging_r={self.__merging_r}, " +
-            f"output_merging_xi={self.__merging_xi})")
+            f"output_merging_xi={self.__merging_xi}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -386,10 +400,12 @@ class DiagnosticsColormaps:
             # TODO: If there is a file with the same name with important data 
             #       and we want to save data there, we should just add new data,
             #       not rewrite a file.
-            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
             if ('numbers' in self.__colormaps_type or
                 'both' in self.__colormaps_type):
-                np.savez(f'./diagnostics/colormaps_{current_time:08.2f}.npz',
+                np.savez(f'./diagnostics{self.__unique_directory_name}/' +
+                         f'colormaps_{current_time:08.2f}.npz',
                          **data_for_saving)
 
             # Clean some memory. TODO: Better ways to do that?
@@ -415,7 +431,8 @@ class DiagnosticsTransverse:
     #       on the grid: fields and currents.
 
     def __init__(self, output_period=100, saving_xi_period=1000,
-                 colormaps='rho', colormaps_type='pictures'):
+                 colormaps='rho', colormaps_type='pictures',
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
         for name in self.__colormaps_names:
@@ -433,12 +450,16 @@ class DiagnosticsTransverse:
         self.__output_period = output_period
         self.__saving_xi_period = saving_xi_period
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
     def __repr__(self) -> str:
         return (
             f"DiagnosticsTransverse(output_period={self.__output_period}, " +
             f"saving_xi_period={self.__saving_xi_period}, " +
             f"colormaps='{','.join(self.__colormaps_names)}', " +
-            f"colormaps_type='{self.__colormaps_type}')")
+            f"colormaps_type='{self.__colormaps_type}', " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -461,26 +482,27 @@ class DiagnosticsTransverse:
 
     def draw_figures(self, xi_plasma_layer, plasma_fields,
                      plasma_currents, ro_beam):
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+        Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+             parents=True, exist_ok=True)
 
         for name in self.__colormaps_names:
             fname = f'{name}_{xi_plasma_layer:+09.2f}.jpg'
 
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                 plt.imsave(
-                    './diagnostics/' + fname,
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
                     get(getattr(plasma_fields, name).T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho':
                 plt.imsave(
-                    './diagnostics/' + fname,
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
                     get(getattr(plasma_currents, 'ro').T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho_beam':
                 plt.imsave(
-                    './diagnostics/' + fname,
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
                     # getattr(ro_beam, 'ro_beam').T, origin='lower',
                     get(ro_beam.T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
@@ -488,7 +510,8 @@ class DiagnosticsTransverse:
     def save_to_file(self, current_time, xi_plasma_layer,
                      plasma_particles: Arrays, plasma_fields: Arrays,
                      plasma_currents: Arrays, ro_beam):
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+        Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+             parents=True, exist_ok=True)
 
         data_for_saving = {'transverse_grid': self.__grid}
 
@@ -510,7 +533,8 @@ class DiagnosticsTransverse:
         file_name = \
             f'transverse_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
         plasma_particles.xp.savez(
-            './diagnostics/' + file_name, **data_for_saving)
+            f'./diagnostics{self.__unique_directory_name}/' + file_name,
+            **data_for_saving)
 
     def after_step_dxi(self, current_time, xi_plasma_layer,
                        plasma_particles: Arrays, plasma_fields: Arrays,
@@ -541,15 +565,21 @@ class DiagnosticsTransverse:
 
 class SaveRunState:
     def __init__(self, output_period=1000, saving_xi_period=inf,
-                 save_beam=False, save_plasma=False):
+                 save_beam=False, save_plasma=False, unique_directory_name=''):
         self.__output_period = output_period
         self.__saving_xi_period = saving_xi_period
         self.__save_beam = bool(save_beam)
         self.__save_plasma = bool(save_plasma)
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
     def __repr__(self) -> str:
-        return(f"SaveRunState(saving_period={self.__saving_period}, " +
-            f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma})")
+        return(
+            f"SaveRunState(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_xi_period}, " +
+            f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         self.__time_step_size = config.getfloat('time-step')
@@ -566,12 +596,13 @@ class SaveRunState:
                        plasma_currents: Arrays, ro_beam):
         if (self.conditions_check(current_time, xi_plasma_layer) and
             self.__save_plasma):
-            Path('./snapshots').mkdir(parents=True, exist_ok=True)
+            Path(f'./snapshots{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
 
             file_name = \
                 f'plasmastate_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
             plasma_particles.xp.savez_compressed(
-                file='./snapshots/' + file_name,
+                file=f'./snapshots{self.__unique_directory_name}/' + file_name,
                 xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
                 x_init=plasma_particles.x_init,
                 y_init=plasma_particles.y_init,
@@ -606,15 +637,18 @@ class SaveRunState:
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
         if current_time % self.__output_period <= self.__time_step_size / 2:
-            Path('./run_states').mkdir(parents=True, exist_ok=True)
+            Path(f'./run_states{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
 
             if self.__save_beam:
                 beam_drain.beam_buffer.save(
-                    f'./run_states/beamfile_{current_time:08.2f}')
+                    f'./run_states{self.__unique_directory_name}/' +
+                    f'beamfile_{current_time:08.2f}')
 
             if self.__save_plasma:
                 plasma_particles.xp.savez_compressed(
-                    file=f'./run_states/plasmastate_{current_time:08.2f}',
+                    file=f'./run_states{self.__unique_directory_name}/' +
+                    f'plasmastate_{current_time:08.2f}',
                     xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
                     x_init=plasma_particles.x_init,
                     y_init=plasma_particles.y_init,
