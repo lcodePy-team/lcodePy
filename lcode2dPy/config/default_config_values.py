@@ -84,5 +84,6 @@ default_config_values = {
     'filter-coefficient': 0,
     'damping-coefficient': 0,
     'dx-max': 1,
-    'field-solver-subtraction-coefficient': 1
+    'field-solver-subtraction-coefficient': 1,
+    'enable-noise-filter': True
 }
