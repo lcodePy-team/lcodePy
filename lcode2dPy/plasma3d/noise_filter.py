@@ -85,7 +85,7 @@ def get_noise_filter(config: Config):
                    dy_chaotic * dy_chaotic +
                    dx_chaotic_perp * dx_chaotic_perp +
                    dy_chaotic_perp * dy_chaotic_perp)
-        d_limit = xp.where(d_limit < dx_max, 1 - d_limit/dx_max, 0)
+        d_limit = xp.where(d_limit < dx_max**2, 1 - d_limit/dx_max**2, 0)
         
         # Restoring force:
         force_x = - filter_coefficient * dx_chaotic * d_limit

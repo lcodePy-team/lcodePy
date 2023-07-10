@@ -1,4 +1,4 @@
-from math import inf, ceil
+from math import inf, ceil, remainder
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,15 +22,34 @@ def get(array: np.ndarray):
 
 
 def from_str_into_list(names_str: str):
-    """ Makes a list of elements that it gets from a long string."""
+    """
+    Makes a list of elements that it gets from a long string.
+    """
     # For example: 'Ez, Ey, Ez ,Bx,,' becomes ['Ez', 'Ey', 'Ez', 'Bx']
     names = np.array(names_str.replace(' ', '').split(','))
     names = names[names != '']
     return names
 
 
+def absremainder(x, y):
+    """
+    This is a universal modulo operator that behaves predictably not only for
+    integers, but also for floating point numbers.
+    """
+    # Due to the nature of floating-number arithmetic, the regular % operator
+    # doesn't work as expected for floats. Thus, we use math.remainder that 
+    # behaves a little more predictably. Still, while 0.15 % 0.05 = 0.04999...,
+    # math.remainder(0.15, 0.05) = -1.3877787807814457e-17. Also, math.remainder
+    # isn't exactly the modulo operator like math.fmod and may produce results
+    # such as math.remainder(14, 5) = -1.0, but it solves the puzzle of
+    # floating-number arithmetic.
+    return abs(remainder(x, y))
+
+
 def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
-    """Calculates strided convolution using a mean/uniform kernel."""
+    """
+    Calculates strided convolution using a mean/uniform kernel.
+    """
     new_arr = []
     for i in range(0, arr.shape[0], merging_xi):
         start_i, end_i = i, i + merging_xi
@@ -145,8 +164,7 @@ class DiagnosticsFXi:
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if output_period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
         self.__grid_step_size = config.getfloat('window-width-step-size')
@@ -186,12 +204,14 @@ class DiagnosticsFXi:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+        if absremainder(xi_plasma_layer,
+                        self.__saving_xi_period) <= self.__xi_step_size / 2:
             self.dump(
                 current_time, None, plasma_particles, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
-        return current_time % self.__output_period <= self.__time_step_size / 2
+        return absremainder(current_time,
+                            self.__output_period) <= self.__time_step_size / 2
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
              plasma_fields: Arrays, plasma_currents: Arrays,
@@ -306,8 +326,7 @@ class DiagnosticsColormaps:
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
 
@@ -360,7 +379,8 @@ class DiagnosticsColormaps:
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
+        if absremainder(xi_plasma_layer,
+                        self.__saving_xi_period) <= self.__xi_step_size / 2:
             self.dump(
                 current_time, None, plasma_particles, None, None, None, False)
 
@@ -373,7 +393,8 @@ class DiagnosticsColormaps:
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
-            current_time % self.__output_period <= self.__time_step_size / 2 and
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
             xi_plasma_layer <= self.__xi_from and
             xi_plasma_layer >= self.__xi_to)
 
@@ -381,7 +402,8 @@ class DiagnosticsColormaps:
              plasma_fields: Arrays, plasma_currents: Arrays,
              beam_drain: BeamDrain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
-        if current_time % self.__output_period <= self.__time_step_size / 2:
+        if absremainder(current_time,
+                        self.__output_period) <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
             data_for_saving['transverse_grid'] = self.__grid
 
@@ -465,8 +487,7 @@ class DiagnosticsTransverse:
         """Pulls a config to get all required parameters."""
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
 
@@ -554,8 +575,10 @@ class DiagnosticsTransverse:
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
-            current_time % self.__output_period <= self.__time_step_size / 2 and
-            xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
+            absremainder(xi_plasma_layer,
+                         self.__saving_xi_period) <= self.__xi_step_size / 2)
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
              plasma_fields: Arrays, plasma_currents: Arrays,
@@ -628,15 +651,18 @@ class SaveRunState:
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
-            current_time % self.__output_period <= self.__time_step_size / 2 and
-            xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
+            absremainder(xi_plasma_layer,
+                         self.__saving_xi_period) <= self.__xi_step_size / 2)
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
              plasma_fields: Arrays, plasma_currents: Arrays, 
              beam_drain: BeamDrain, clean_data=True):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
-        if current_time % self.__output_period <= self.__time_step_size / 2:
+        if absremainder(current_time,
+                        self.__output_period) <= self.__time_step_size / 2:
             Path(f'./run_states{self.__unique_directory_name}').mkdir(
                  parents=True, exist_ok=True)
 

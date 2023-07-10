@@ -319,6 +319,7 @@ def init_plasma(config: Config, current_time=0):
     plasma_fineness       = config.getfloat('plasma-fineness')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
     subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
+    xi_step_size = config.getfloat('xi-step')
 
     if plasma_fineness > 1:
         plasma_fineness = int(plasma_fineness)
@@ -415,7 +416,7 @@ def init_plasma(config: Config, current_time=0):
                     Bx=zeros(), By=zeros(), Bz=zeros(), Phi=zeros())
     currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
     
-    xi_plasma_layer = 0
+    xi_plasma_layer = xi_step_size # We need it this way to start from xi_i = 0
 
     return fields, particles, currents, const_arrays, xi_plasma_layer
 
@@ -444,6 +445,11 @@ def load_plasma(config: Config, path_to_plasmastate: str):
         currents = Arrays(fields.xp,
                           ro=state['ro'], jx=state['jx'],
                           jy=state['jy'], jz=state['jz'])
+
+        try:
+            const_arrays.ro_initial = state['ro_initial']
+        except:
+            pass
         
         xi_plasma_layer = state['xi_plasma_layer'][0]
 

@@ -253,8 +253,10 @@ def get_deposit_plasma(config: Config):
             (x_h, y_h, px, py, pz, q, m, arrays_size) =\
                 coarse_to_fine(particles, const_arrays)
         else:
-            x_h = (particles.x_init + particles.x_offt) / grid_step_size + 0.5
-            y_h = (particles.y_init + particles.y_offt) / grid_step_size + 0.5
+            x_h = xp.array(
+                (particles.x_init + particles.x_offt) / grid_step_size + 0.5)
+            y_h = xp.array(
+                (particles.y_init + particles.y_offt) / grid_step_size + 0.5)
             px, py, pz = particles.px, particles.py, particles.pz
             q, m, arrays_size = particles.q, particles.m, particles.m.size
 
