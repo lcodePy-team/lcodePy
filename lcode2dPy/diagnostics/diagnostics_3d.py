@@ -265,7 +265,7 @@ class DiagnosticsColormaps:
         if colormaps_type in self.__allowed_colormaps_type:
             self.__colormaps_type = colormaps_type
         else:
-            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+            raise Exception(f"{colormaps_type} type of colormap diagnostics " +
                              "is not supported.")
 
         # Set time periodicity of detailed output:
@@ -465,7 +465,7 @@ class DiagnosticsTransverse:
         if colormaps_type in self.__allowed_colormaps_type:
             self.__colormaps_type = colormaps_type
         else:
-            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+            raise Exception(f"{colormaps_type} type of colormap diagnostics " +
                              "is not supported.")
 
         # Set time periodicity of detailed output:
@@ -613,6 +613,11 @@ class SaveRunState:
 
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
+        
+        rigid_beam = config.getbool('rigid-beam')
+        if rigid_beam and self.__save_beam:
+            raise Exception("We cannot save the beam in the case of a rigid " +
+                            "beam. Please, change save_beam to False.")
 
     def after_step_dxi(self, current_time, xi_plasma_layer,
                        plasma_particles: Arrays, plasma_fields: Arrays,

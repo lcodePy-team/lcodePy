@@ -4,16 +4,22 @@ from ..config.config import Config
 from ..plasma3d.data import Arrays
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
 from ..diagnostics.diagnostics_3d import get
-from ..beam3d import BeamCalculator, BeamSource3D, BeamDrain3D, BeamParticles3D
+from ..beam3d import BeamSource3D, BeamDrain3D, BeamParticles3D, \
+                     BeamCalculator, RigidBeamCalculator
 
 
 class PusherAndSolver3D:
     def __init__(self, config: Config):
         self.config = config
 
-        self.pl_solver = Plane2d3vPlasmaSolver(config)
+        self.plasma_solver = Plane2d3vPlasmaSolver(config)
         self.beam_particles_class = BeamParticles3D
-        self.beam_calc = BeamCalculator(config)
+
+        rigid_beam = config.getbool('rigid-beam')
+        if rigid_beam:
+            self.beam_calculator = RigidBeamCalculator(config)
+        else:
+            self.beam_calculator = BeamCalculator(config)
 
         # Import plasma solver and beam pusher, pl = plasma
 
@@ -27,17 +33,17 @@ class PusherAndSolver3D:
         #       in diagnostics should work.
         # self.time_step_size = config.getfloat('time-step')
 
-    def step_dt(self, pl_fields: Arrays, pl_particles: Arrays,
-                pl_currents: Arrays, pl_const_arrays: Arrays,
+    def step_dt(self, plasma_fields: Arrays, plasma_particles: Arrays,
+                plasma_currents: Arrays, plasma_const_arrays: Arrays,
                 xi_plasma_layer_start,
                 beam_source: BeamSource3D, beam_drain: BeamDrain3D,
                 current_time, diagnostics_list=[]):
         """
         Perform one time step of beam-plasma calculations.
         """
-        xp = pl_const_arrays.xp
+        xp = plasma_const_arrays.xp
 
-        self.beam_calc.start_time_step()
+        self.beam_calculator.start_time_step()
         beam_layer_to_move = self.beam_particles_class(xp)
         fell_size = 0
 
@@ -47,29 +53,31 @@ class PusherAndSolver3D:
             (self.grid_steps, self.grid_steps), dtype=xp.float64)
 
         xi_i_plasma_layer_start =\
-            int(-xi_plasma_layer_start / self.xi_step_size) + 1
+            round(-xi_plasma_layer_start / self.xi_step_size) + 1
         for xi_i in range(xi_i_plasma_layer_start, self.xi_steps + 1, 1):
             beam_layer_to_layout = \
                 beam_source.get_beam_layer_to_layout(xi_i)
             ro_beam_full = \
-                self.beam_calc.layout_beam_layer(beam_layer_to_layout, xi_i)
+                self.beam_calculator.layout_beam_layer(beam_layer_to_layout,
+                                                       xi_i)
 
-            prev_pl_fields = pl_fields.copy()
+            prev_plasma_fields = plasma_fields.copy()
 
-            pl_particles, pl_fields, pl_currents = self.pl_solver.step_dxi(
-                pl_particles, pl_fields, pl_currents, pl_const_arrays,
-                ro_beam_full, ro_beam_prev
-            )
+            plasma_particles, plasma_fields, plasma_currents = \
+                self.plasma_solver.step_dxi(
+                    plasma_particles, plasma_fields, plasma_currents,
+                    plasma_const_arrays, ro_beam_full, ro_beam_prev)
 
-            lost, moved, fell_to_next_layer = self.beam_calc.move_beam_layer(
-                beam_layer_to_move, fell_size, xi_i, prev_pl_fields, pl_fields
-            )
+            lost, moved, fell_to_next_layer =\
+                self.beam_calculator.move_beam_layer(
+                    beam_layer_to_move, fell_size, xi_i, prev_plasma_fields,
+                    plasma_fields)
 
-            ro_beam_prev = ro_beam_full.copy()
-
-            # Beam layers operations:
-            beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
-            fell_size = fell_to_next_layer.id.size
+            # Creats next beam layer to move and
+            # ro_beam_prev for the next iteration:
+            beam_layer_to_move, fell_size, ro_beam_prev =\
+                self.beam_calculator.create_next_layer(
+                    beam_layer_to_layout, fell_to_next_layer, ro_beam_full)
 
             beam_drain.push_beam_layer(moved)
             # beam_drain.push_beam_lost(lost)
@@ -79,12 +87,13 @@ class PusherAndSolver3D:
 
             for diagnostic in diagnostics_list:
                 diagnostic.after_step_dxi(
-                    current_time, xi_plasma_layer, pl_particles,
-                    pl_fields, pl_currents, ro_beam_full)
+                    current_time, xi_plasma_layer, plasma_particles,
+                    plasma_fields, plasma_currents, ro_beam_full)
 
             # Some diagnostics:            
             if xi_i % 10. == 0:
-                Ez_00 = get(pl_fields.Ez[self.grid_steps//2, self.grid_steps//2])
+                Ez_00 = get(
+                    plasma_fields.Ez[self.grid_steps//2, self.grid_steps//2])
                 print(
                     # f't={current_time:+.4f}, ' + 
                     f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}')
@@ -92,5 +101,5 @@ class PusherAndSolver3D:
         # Perform diagnostics
         xi_plasma_layer = - self.xi_step_size * self.xi_steps
         for diagnostic in diagnostics_list:
-            diagnostic.dump(current_time, xi_plasma_layer, pl_particles,
-                            pl_fields, pl_currents, beam_drain)
+            diagnostic.dump(current_time, xi_plasma_layer, plasma_particles,
+                            plasma_fields, plasma_currents, beam_drain)

@@ -12,7 +12,8 @@ from .push_solvers.push_solver_3d import PusherAndSolver3D
 from .plasma3d import init_plasma_3d, load_plasma_3d
 
 # Imports beam module, 3d:
-from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D
+from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D, \
+                    RigidBeamSource3D, RigidBeamDrain3D
 
 # Imports plasma module, 2d:
 from .push_solvers.push_solver_2d import PusherAndSolver2D
@@ -54,11 +55,6 @@ class Simulation:
         self.beam_parameters = copy.copy(beam_parameters)
         self.diagnostics_list = copy.copy(diagnostics)
 
-        # Here we set parameters for beam generation, where we will store beam
-        # particles and where they will go after calculations
-        # self.beam_parameters = beam_parameters
-        # self.beam_particle_dtype = particle_dtype3d
-
         # We use this time as a general time value:
         self.current_time = 0.
         # The user can change this value for diagnostic convenience.
@@ -84,7 +80,7 @@ class Simulation:
         # We set some instance variables:
         self.__time_limit = self.__config.getfloat('time-limit')
         self.__time_step_size = self.__config.getfloat('time-step')
-        self.__rigid_beam = self.__config.get('rigid-beam')
+        self.__rigid_beam = self.__config.getbool('rigid-beam')
 
         # Mode of plasma continuation:
         self.__cont_mode = self.__config.get('continuation')
@@ -99,8 +95,12 @@ class Simulation:
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
-            self.BeamParticles, self.BeamSource, self.BeamDrain = \
-                BeamParticles3D, BeamSource3D, BeamDrain3D
+            if self.__rigid_beam:
+                self.BeamParticles, self.BeamSource, self.BeamDrain = \
+                    None, RigidBeamSource3D, RigidBeamDrain3D
+            else:
+                self.BeamParticles, self.BeamSource, self.BeamDrain = \
+                    BeamParticles3D, BeamSource3D, BeamDrain3D
         elif self.__geometry == '2d':
             self.__push_solver = PusherAndSolver2D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
@@ -126,6 +126,9 @@ class Simulation:
     # TODO: Should we make load_beamfile just
     #       another method of beam genetration?
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
+        if self.__rigid_beam:
+            raise Exception("We cannot load a beam in the case of a rigid beam.")
+
         beam_particles = self.BeamParticles(self.__config.xp)
         beam_particles.load(path_to_beamfile)
 
@@ -181,6 +184,10 @@ class Simulation:
             print("Since the number of time steps hasn't been set explicitly,",
                   f"the code will simulate {N_steps} time steps with a time",
                   f"step size = {self.__time_step_size}.")
+        elif self.__rigid_beam:
+            N_steps = 1
+            print("Since the beam is rigid, the code will simulate only one " +
+                  "time step.")
         else:
             self.__time_limit = \
                 N_steps * self.__time_step_size + self.current_time
@@ -192,24 +199,28 @@ class Simulation:
         if self.__cont_mode == 'n' or self.__cont_mode == 'no':
             # 3. If a beam source is empty (None), we generate
             #    a new beam according to set parameters:
+
+            # Check for a beam being rigid:
+            if self.__rigid_beam:
+                # For now, beam_parameters is just a function representing
+                # the charge distribution of a rigid beam. In the future,
+                # we want to use the same beam_parameters as for a non-rigid
+                # beam in both cases.
+                beam_particles = self.beam_parameters
+
+                self.beam_source = self.BeamSource(self.__config,
+                                                   beam_particles)
+                self.beam_drain  = self.BeamDrain(self.__config)
+
             if self.beam_source is None:
-                # Check for a beam being not rigid.
-                if self.__rigid_beam == 'n' or self.__rigid_beam == 'no':
-                    # Generate all parameters for a beam:
-                    beam_particles = generate_beam(self.__config,
-                                                   self.beam_parameters)
+                # Generate all parameters for a beam:
+                beam_particles = generate_beam(self.__config,
+                                               self.beam_parameters)
 
-                    # Here we create a beam source and a beam drain:
-                    self.beam_source = self.BeamSource(self.__config,
-                                                       beam_particles)
-                    self.beam_drain  = self.BeamDrain(self.__config)
-
-                # A rigid beam mode has not been implemented yet. If you are
-                # writing rigid beam mode, just use rigid_beam_current(...) from
-                # ..alt_beam_generator.beam_generator
-                else:
-                    raise Exception("Sorry, for now, only 'no' mode of" +
-                                    "rigid-beam is supported.")
+                # Here we create a beam source and a beam drain:
+                self.beam_source = self.BeamSource(self.__config,
+                                                   beam_particles)
+                self.beam_drain  = self.BeamDrain(self.__config)
 
             # 4. A loop that calculates N time steps:
             for t_i in range(N_steps):
