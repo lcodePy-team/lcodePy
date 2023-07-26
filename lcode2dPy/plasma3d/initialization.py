@@ -451,6 +451,6 @@ def load_plasma(config: Config, path_to_plasmastate: str):
         except:
             pass
         
-        xi_plasma_layer = state['xi_plasma_layer'][0]
+        xi_plasma_layer = float(state['xi_plasma_layer'][0])
 
     return fields, particles, currents, const_arrays, xi_plasma_layer
