@@ -179,15 +179,15 @@ class Simulation:
             self.__load_plasmastate()
 
         # t step function, makes N_steps time steps.
-        if N_steps is None:
+        if self.__rigid_beam:
+            N_steps = 1
+            print("Since the beam is rigid, the code will simulate only one " +
+                  "time step.")
+        elif N_steps is None:
             N_steps = int(self.__time_limit / self.__time_step_size)
             print("Since the number of time steps hasn't been set explicitly,",
                   f"the code will simulate {N_steps} time steps with a time",
                   f"step size = {self.__time_step_size}.")
-        elif self.__rigid_beam:
-            N_steps = 1
-            print("Since the beam is rigid, the code will simulate only one " +
-                  "time step.")
         else:
             self.__time_limit = \
                 N_steps * self.__time_step_size + self.current_time
