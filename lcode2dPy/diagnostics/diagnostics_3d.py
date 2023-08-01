@@ -206,8 +206,7 @@ class DiagnosticsFXi:
 
                 if name in ['dx_chaotic', 'dy_chaotic',
                             'dx_chaotic_perp', 'dy_chaotic_perp']:
-                    val = getattr(plasma_particles, name)[self.__ax_x, self.__ax_y]
-                    val = xp.amax(xp.absolute(val))
+                    val = xp.amax(xp.absolute(getattr(plasma_particles, name)))
                     self.__data[name].append(get(val))
 
         # We use dump here to save data not only at the end of the simulation
