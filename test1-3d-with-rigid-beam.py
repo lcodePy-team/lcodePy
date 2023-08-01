@@ -40,7 +40,8 @@ print('The length of a beam is', 2 * np.sqrt(2 * np.pi) / COMPRESS)
 # Sets diagnostics and their parameters:
 diag = [DiagnosticsFXi(
             output_period=0, saving_xi_period=10,
-            f_xi='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,Sf',
+            f_xi='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,Sf,dx_chaotic,'+
+                 'dy_chaotic,dx_chaotic_perp,dy_chaotic_perp',
             f_xi_type='both',
             x_probe_lines=np.array([0, 1, 2]), y_probe_lines=[-5, 0, 5]),
         DiagnosticsTransverse(

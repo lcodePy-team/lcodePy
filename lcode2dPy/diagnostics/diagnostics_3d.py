@@ -93,7 +93,9 @@ def calculate_energy_fluxes(grid_step_size,
 
 class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                      'Phi', 'Sf']
+                      'Phi', 'Sf',
+                      'dx_chaotic', 'dy_chaotic',
+                      'dx_chaotic_perp', 'dy_chaotic_perp']
                     # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
@@ -179,6 +181,7 @@ class DiagnosticsFXi:
                        plasma_particles: Arrays, plasma_fields: Arrays,
                        plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
+            xp = plasma_particles.xp
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
@@ -199,6 +202,12 @@ class DiagnosticsFXi:
                     val = calculate_energy_fluxes(self.__grid_step_size,
                                                   plasma_particles,
                                                   plasma_fields)
+                    self.__data[name].append(get(val))
+
+                if name in ['dx_chaotic', 'dy_chaotic',
+                            'dx_chaotic_perp', 'dy_chaotic_perp']:
+                    val = getattr(plasma_particles, name)[self.__ax_x, self.__ax_y]
+                    val = xp.amax(xp.absolute(val))
                     self.__data[name].append(get(val))
 
         # We use dump here to save data not only at the end of the simulation
