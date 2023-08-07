@@ -7,7 +7,7 @@ from .weights import (
     particles_weights,
 )
 
-from .beam_slice import BeamSlice as BeamParticles2D
+from .data import BeamSlice as BeamParticles2D
 
 
 @nb.vectorize([nb.float64(nb.float64, nb.float64, nb.float64)], cache=True)
@@ -40,27 +40,29 @@ def is_lost(r_vec, r_max):
 
 
 @nb.njit
-def beam_to_vec(beam, idx):
-    p_x = beam.p_r[idx]
-    p_y = beam.M[idx] / beam.r[idx]
-    p_vec = np.array((p_x, p_y, beam.p_z[idx]))
-    r_vec = np.array((beam.r[idx], 0, beam.xi[idx]))
-    return p_vec, r_vec, beam.remaining_steps[idx]
+def beam_to_vec(xi, r, p_z, p_r, M):
+    p_x = p_r
+    p_y = M / r
+    p_vec = np.array((p_x, p_y, p_z))
+    r_vec = np.array((r, 0, xi))
+    return p_vec, r_vec
 
 
 @nb.njit
-def vec_to_beam(beam, idx, r_vec, p_vec, steps_left, lost, magnetic_field):
+def vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
+                layer_M, layer_remaining_steps, layer_id,
+                idx, r_vec, p_vec, steps_left, lost, magnetic_field):
     x = r_vec[0]
     y = r_vec[1]
-    beam.r[idx] = np.sqrt(x ** 2 + y ** 2)
-    beam.xi[idx] = r_vec[2]
-    beam.p_r[idx] = (x * p_vec[0] + y * p_vec[1]) / beam.r[idx]
-    beam.p_z[idx] = p_vec[2]
+    layer_r[idx] = np.sqrt(x ** 2 + y ** 2)
+    layer_xi[idx] = r_vec[2]
+    layer_p_r[idx] = (x * p_vec[0] + y * p_vec[1]) / layer_r[idx]
+    layer_p_z[idx] = p_vec[2]
     if magnetic_field == 0:
-        beam.M[idx] = x * p_vec[1] - y * p_vec[0]
-    beam.remaining_steps[idx] = steps_left
+        layer_M[idx] = x * p_vec[1] - y * p_vec[0]
+    layer_remaining_steps[idx] = steps_left
     if lost:
-        beam.id[idx] = -np.abs(beam.id[idx])
+        layer_id[idx] = -np.abs(layer_id[idx])
 
 
 def configure_move_beam_slice(config):
@@ -76,18 +78,25 @@ def configure_move_beam_slice(config):
 
     # Moves particles as far as possible on its xi layer
     @nb.njit(locals=locals_spec)
-    def move_beam_slice(beam_slice, xi_layer, E_r_k_1, E_f_k_1, E_z_k_1,
+    def move_beam_slice(layer_xi, layer_r, layer_p_z, layer_p_r, layer_M, 
+                        layer_q_m, layer_dt, layer_remaining_steps, 
+                        layer_lost, layer_size, layer_id, 
+                        xi_layer, E_r_k_1, E_f_k_1, E_z_k_1,
                         B_f_k_1, B_z_k_1, E_r_k, E_f_k, E_z_k, B_f_k, B_z_k):
         xi_end = xi_layer * -xi_step_p
-        if beam_slice.size == 0:
+        nlost = 0
+        if layer_size == 0:
             return
-        for idx in np.arange(beam_slice.size):
-            q_m = beam_slice.q_m[idx]
-            dt = beam_slice.dt[idx]
+        for idx in np.arange(layer_size):
+            q_m = layer_q_m[idx]
+            dt = layer_dt[idx]
             lost = False
+            steps = layer_remaining_steps[idx]
 
             # Initial impulse and position vectors
-            p_vec, r_vec, steps = beam_to_vec(beam_slice, idx)
+            p_vec, r_vec = beam_to_vec(layer_xi[idx], layer_r[idx], 
+                                              layer_p_z[idx], layer_p_r[idx],
+                                              layer_M[idx])
             while steps > 0:
                 # Compute approximate position of the particle in the middle of the step
                 gamma_mass = np.sqrt((1 / q_m) ** 2 + np.sum(p_vec ** 2))
@@ -99,7 +108,8 @@ def configure_move_beam_slice(config):
                     break
                 if is_lost(r_vec_half_step, lost_boundary):
                     # Particle hit the wall and is now lost
-                    beam_slice.mark_lost(idx)
+                    nlost += 1 
+                    layer_lost[idx] = True
                     break
 
                 # Interpolate fields and compute new impulse
@@ -112,7 +122,8 @@ def configure_move_beam_slice(config):
                     xi_step_p,
                 )
 
-                p_vec_half_step = p_vec + dt / 2 * np.sign(q_m) * (e_vec + cross_nb(p_vec / gamma_mass, b_vec))  # Just Lorentz
+                p_vec_half_step = p_vec + dt / 2 * np.sign(q_m) * \
+                    (e_vec + cross_nb(p_vec / gamma_mass, b_vec))  # Just Lorentz
 
                 # Compute final coordinates and impulses
                 gamma_mass = np.sqrt((1 / q_m) ** 2 + np.sum(p_vec_half_step ** 2))
@@ -124,24 +135,27 @@ def configure_move_beam_slice(config):
 
                 if is_lost(r_vec, lost_boundary):
                     # Particle hit the wall and is now lost
-                    beam_slice.mark_lost(idx)
+                    nlost += 1 
+                    layer_lost[idx] = True
                     break
-            vec_to_beam(beam_slice, idx, r_vec, p_vec, steps, lost, magnetic_field)
-
+            vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
+                        layer_M, layer_remaining_steps, layer_id,
+                        idx, r_vec, p_vec, steps, lost, 
+                        magnetic_field)
+        return nlost
     return move_beam_slice
 
 
-def layout_beam_slice(
-    beam_slice, xi_layer_idx, prev_rho_layout, r_step, xi_step_p,
-):
+def layout_beam_slice(beam_slice, xi_layer_idx, prev_rho_layout, 
+                      r_step, xi_step_p,):
     n_cells = prev_rho_layout.size
     rho_layout = np.zeros_like(prev_rho_layout)
     xi_end = xi_layer_idx * -xi_step_p
     if beam_slice.size != 0:
-        j, a00, a01, a10, a11 = particles_weights(
-            beam_slice.r, beam_slice.xi, xi_end, r_step, xi_step_p,
-        )
-        deposit_particles(beam_slice.q_norm, prev_rho_layout, rho_layout, j, a00, a01, a10, a11)
+        j, a00, a01, a10, a11 = particles_weights(beam_slice.r, beam_slice.xi, 
+                                                  xi_end, r_step, xi_step_p,)
+        deposit_particles(beam_slice.q_norm, prev_rho_layout, rho_layout, 
+                          j, a00, a01, a10, a11)
 
     prev_rho_layout, rho_layout = rho_layout, prev_rho_layout
     rho_layout /= r_step ** 2
@@ -152,23 +166,24 @@ def layout_beam_slice(
 
 
 @nb.njit
-def init_substepping(beam_slice, time_step, substepping_energy):
-    mask = beam_slice.dt == 0
-    dt = beam_substepping_step(beam_slice.q_m[mask], beam_slice.p_z[mask], substepping_energy)
+def init_substepping(layer_p_z, layer_q_m, layer_dt, layer_remaining_steps, 
+                     time_step, substepping_energy):
+    mask = layer_dt == 0
+    dt = beam_substepping_step(layer_q_m[mask], layer_p_z[mask], 
+                               substepping_energy)
     steps = (1 / dt).astype(np.int_)
-    beam_slice.dt[mask] = dt * time_step
-    beam_slice.remaining_steps[mask] = steps
+    layer_dt[mask] = dt * time_step
+    layer_remaining_steps[mask] = steps
 
 
-def beam_slice_mover(config):
+def get_beam_slice_mover(config):
     time_step = float(config.get('time-step'))
     substepping_energy = config.getfloat('beam-substepping-energy')
     move_particles = configure_move_beam_slice(config)
 
     # @nb.njit
-    def move_beam_slice(
-        beam_slice, xi_layer_idx, fields_after_slice, fields_before_slice,
-    ):
+    def move_beam_slice(beam_slice, xi_layer_idx, 
+                        fields_after_slice, fields_before_slice,):
         if beam_slice.size == 0:
             return
         if substepping_energy == 0:
@@ -176,17 +191,24 @@ def beam_slice_mover(config):
             # need no initialization
             beam_slice.dt[beam_slice.dt == 0] = time_step
         else:
-            init_substepping(beam_slice, time_step, substepping_energy)
+            init_substepping(beam_slice.p_z, beam_slice.q_m, 
+                             beam_slice.dt, beam_slice.remaining_steps, 
+                             time_step, substepping_energy)
 
-        move_particles(
-            beam_slice, xi_layer_idx, 
-            fields_after_slice.E_r, fields_after_slice.E_f,
-            fields_after_slice.E_z, fields_after_slice.B_f,
-            fields_after_slice.B_z,
-            fields_before_slice.E_r, fields_before_slice.E_f,
-            fields_before_slice.E_z, fields_before_slice.B_f,
-            fields_before_slice.B_z
-        )
+        nlost = move_particles(
+                    beam_slice.xi, beam_slice.r,
+                    beam_slice.p_z, beam_slice.p_r, beam_slice.M, 
+                    beam_slice.q_m, beam_slice.dt, beam_slice.remaining_steps, 
+                    beam_slice.lost, beam_slice.size,
+                    beam_slice.id, xi_layer_idx, 
+                    fields_after_slice.E_r, fields_after_slice.E_f,
+                    fields_after_slice.E_z, fields_after_slice.B_f,
+                    fields_after_slice.B_z,
+                    fields_before_slice.E_r, fields_before_slice.E_f,
+                    fields_before_slice.E_z, fields_before_slice.B_f,
+                    fields_before_slice.B_z
+                )
+        beam_slice.nlost += nlost
 
     return move_beam_slice
 
@@ -197,7 +219,7 @@ class BeamCalculator2D():
         self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1
         self.dxi = config.getfloat('xi-step')
         self.layout_beam_slice = layout_beam_slice
-        self.move_beam_slice = beam_slice_mover(config)
+        self.move_beam_slice = get_beam_slice_mover(config)
 
     def start_time_step(self):
         self.rho_layout = np.zeros(self.grid_steps)

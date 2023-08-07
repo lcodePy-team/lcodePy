@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import numba
 
-from .beam_slice import BeamSlice
+from .data import BeamSlice
 from ..config.config import Config
 
 
@@ -63,15 +63,15 @@ lost_particle_dtype = np.dtype([('time', 'f8'), ('xi', 'f8'), ('r', 'f8'), ('p_z
                                 ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 @numba.njit
-def find_sub_slice(beam_slice, used_count, xi_max, xi_min):
+def find_sub_slice(beam_slice_xi, used_count, xi_max, xi_min):
     start = used_count
-    end = beam_slice.size
+    end = beam_slice_xi.size
     flag = 0
-    for i in np.arange(used_count, beam_slice.size):
-        if beam_slice.xi[i] - xi_min < 0:
+    for i in np.arange(start, end):
+        if beam_slice_xi[i] - xi_min < 0:
             end = i
             break
-        if beam_slice.xi[i] - xi_max > 0:
+        if beam_slice_xi[i] - xi_max > 0:
             end = start
             flag = 1
             break
@@ -99,7 +99,7 @@ class MemoryBeamSource(BeamSource):
 
     def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
         assert xi_min < xi_max
-        start, end, self._used_count, flag = find_sub_slice(self._beam_slice,
+        start, end, self._used_count, flag = find_sub_slice(self._beam_slice.xi,
                                                             self._used_count,
                                                             xi_max, xi_min)
         if flag:
