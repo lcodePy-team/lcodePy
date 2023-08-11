@@ -46,7 +46,7 @@ def get_beam_substepping_step_cupy():
     return beam_substepping_step
 
 
-class BeamCalculator:
+class BeamCalculator3D:
     def __init__(self, config: Config):
         # Get main calculation parameters.
         self.xp = config.xp

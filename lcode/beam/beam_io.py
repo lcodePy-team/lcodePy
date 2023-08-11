@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import numba
 
-from .data import BeamSlice
+from .data import BeamParticles
 from ..config.config import Config
 
 
@@ -14,7 +14,7 @@ class BeamSource(ABC):
     """
 
     @abstractmethod
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
+    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
         """
         Returns slice from source.
 
@@ -30,7 +30,7 @@ class BeamDrain(ABC):
     """
 
     @abstractmethod
-    def push_beam_slice(self, beam_slice: BeamSlice) -> None:
+    def push_beam_slice(self, beam_slice: BeamParticles) -> None:
         """
         Write particles from beam slice to output.
 
@@ -49,7 +49,7 @@ class BeamDrain(ABC):
         pass
 
     @abstractmethod
-    def push_lost(self, time: float, beam_slice: BeamSlice) -> None:
+    def push_lost(self, time: float, beam_slice: BeamParticles) -> None:
         """
         Write lost particles.
         """
@@ -82,7 +82,7 @@ def find_sub_slice(beam_slice_xi, used_count, xi_max, xi_min):
 class MemoryBeamSource(BeamSource):
     def __init__(self, config: Config, beam_slice):
         if type(beam_slice) == np.ndarray:
-            beam_slice = BeamSlice(beam_slice.size, beam_slice)
+            beam_slice = BeamParticles(beam_slice.size, beam_slice)
 
         self._beam_slice = beam_slice
         self._used_count = 0
@@ -97,7 +97,7 @@ class MemoryBeamSource(BeamSource):
         self._beam_slice.remaining_steps.fill(1.0)
         
 
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
+    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
         assert xi_min < xi_max
         start, end, self._used_count, flag = find_sub_slice(self._beam_slice.xi,
                                                             self._used_count,
@@ -105,7 +105,7 @@ class MemoryBeamSource(BeamSource):
         if flag:
             logging.debug(f'Wrong order of the particles')
         logging.debug(f'MemoryBeamSource: sourced {end - start} particles')
-        return BeamSlice(end - start, particles=self._beam_slice.particles[start:end])
+        return BeamParticles(end - start, particles=self._beam_slice.particles[start:end])
 
 
 class MemoryBeamDrain(BeamDrain):
@@ -116,12 +116,12 @@ class MemoryBeamDrain(BeamDrain):
         self._beam_buffer = []
         self._beam_buffer_lost = []
 
-    def push_beam_slice(self, beam_slice: BeamSlice):
+    def push_beam_slice(self, beam_slice: BeamParticles):
         if beam_slice.size > 0:
             logging.debug(f'MemoryBeamDrain: drained {beam_slice.size} particles')
             self._beam_buffer.append(beam_slice)
 
-    def push_lost(self, time, beam_slice: BeamSlice):
+    def push_lost(self, time, beam_slice: BeamParticles):
         if beam_slice.size > 0:
             print(f'MemoryBeamDrain: lost {beam_slice.size} particles')
             self._beam_buffer_lost.append(beam_slice)
@@ -135,9 +135,9 @@ class DebugSource(BeamSource):
         self._source = source
         self._beam_buffer = []
 
-    def get_beam_slice(self, xi_start, xi_end) -> BeamSlice:
+    def get_beam_slice(self, xi_start, xi_end) -> BeamParticles:
         slice = self._source.get_beam_slice(xi_start, xi_end)
-        self._beam_buffer.append(BeamSlice(slice.size, particles=np.copy(slice.particles)))
+        self._beam_buffer.append(BeamParticles(slice.size, particles=np.copy(slice.particles)))
         return slice
 
     def get_debug_slice(self):
@@ -153,11 +153,11 @@ class DebugDrain(BeamDrain):
         self._beam_buffer = []
         self._beam_buffer_lost = []
 
-    def push_beam_slice(self, beam_slice: BeamSlice):
+    def push_beam_slice(self, beam_slice: BeamParticles):
         self._beam_buffer.append(beam_slice)
         self._drain.push_beam_slice(beam_slice)
 
-    def push_lost(self, time, beam_slice: BeamSlice):
+    def push_lost(self, time, beam_slice: BeamParticles):
         if beam_slice.size > 0:
             self._beam_buffer_lost.append(beam_slice)
 

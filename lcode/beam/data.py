@@ -5,28 +5,7 @@ particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'),
                            ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
                            ('q_norm', 'f8'), ('id', 'i8')])
 
-_beamParticlesSliceSpec = [
-    ('size', nb.int64),
-    ('particles', nb.types.Array(dtype=nb.from_dtype(particle_dtype), ndim=1, layout='C')),
-
-    ('xi', nb.float64[:]),
-    ('r', nb.float64[:]),
-    ('p_r', nb.float64[:]),
-    ('p_z', nb.float64[:]),
-    ('M', nb.float64[:]),
-    ('q_m', nb.float64[:]),
-    ('q_norm', nb.float64[:]),
-    ('id', nb.int64[:]),
-
-    ('dt', nb.float64[:]),
-    ('remaining_steps', nb.int64[:]),
-    ('status', nb.int64[:]),
-    ('nlost', nb.int64),
-    ('lost', nb.boolean[:])
-]
-
-
-class BeamSlice:
+class BeamParticles:
     def __init__(self, size, particles=None):
         self.size = size
         if particles is not None:
@@ -58,7 +37,7 @@ class BeamSlice:
 
     def get_subslice(self, begin, end):
         temp_particles = self.particles[begin:end]
-        sub_slice = BeamSlice(len(temp_particles), temp_particles)
+        sub_slice = BeamParticles(len(temp_particles), temp_particles)
         sub_slice.dt[:] = self.dt[begin:end]
         sub_slice.remaining_steps[:] = self.remaining_steps[begin:end]
         sub_slice.lost[:] = self.lost[begin:end]
@@ -66,7 +45,7 @@ class BeamSlice:
     
     def concat(self, other_slice):
         
-        new_slice = BeamSlice(0, None)
+        new_slice = BeamParticles(0, None)
         new_slice.size = self.size + other_slice.size
         new_slice.particles = np.concatenate((self.particles, other_slice.particles))
         new_slice.xi = new_slice.particles['xi']
