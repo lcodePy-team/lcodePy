@@ -3,13 +3,13 @@ import logging
 import numpy as np
 from mpi4py import MPI
 
-from ..beam import BeamSlice
+from ..beam import BeamParticles
 from ..beam.beam_io import BeamSource, BeamDrain
 from .util import MPIWorker, particle_dtype
 
 MPI_TAG_PARTICLES = 1
 
-finish_layer_particle = BeamSlice(1, particles=np.zeros(1, dtype=particle_dtype))
+finish_layer_particle = BeamParticles(1, particles=np.zeros(1, dtype=particle_dtype))
 
 
 class MPIBeamSource(BeamSource, MPIWorker):
@@ -29,13 +29,13 @@ class MPIBeamSource(BeamSource, MPIWorker):
         self._comm.Recv([particles_buf, MPIWorker.particles_type], source=self.prev_node, tag=MPI_TAG_PARTICLES)
         return particles_buf
 
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamSlice:
+    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
         if self.first_step:
             beam_slice = self._initial_source.get_beam_slice(xi_max, xi_min)
             return beam_slice
         assert xi_min < xi_max
         if xi_min > self.xi_finished:
-            return BeamSlice(0, particles=np.zeros(0, dtype=particle_dtype))
+            return BeamParticles(0, particles=np.zeros(0, dtype=particle_dtype))
 
         beam_buffer = []
         while xi_min <= self.xi_finished:
@@ -52,9 +52,9 @@ class MPIBeamSource(BeamSource, MPIWorker):
             beam_buffer.append(particles_buf)
         if len(beam_buffer) != 0:
             particles_buf = np.concatenate(beam_buffer)
-            return BeamSlice(len(particles_buf), particles=particles_buf)
+            return BeamParticles(len(particles_buf), particles=particles_buf)
         else:
-            return BeamSlice(0)
+            return BeamParticles(0)
 
 
 class MPIBeamDrain(BeamDrain, MPIWorker):
@@ -79,12 +79,12 @@ class MPIBeamDrain(BeamDrain, MPIWorker):
         self._comm.Send([finish_xi_particle, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
         self.xi_finished = xi
 
-    def push_beam_slice(self, beam_slice: BeamSlice):
+    def push_beam_slice(self, beam_slice: BeamParticles):
         if self.last_step:
             self._final_drain.push_beam_slice(beam_slice)
             return
         self._comm.Send([beam_slice.particles, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
         logging.debug(f'MPIBeamDrain: sent {len(beam_slice.particles)} particles')
 
-    def push_lost(self, time: float, beam_slice: BeamSlice):
+    def push_lost(self, time: float, beam_slice: BeamParticles):
         pass

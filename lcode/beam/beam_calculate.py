@@ -7,7 +7,7 @@ from .weights import (
     particles_weights,
 )
 
-from .data import BeamSlice as BeamParticles2D
+from .data import BeamParticles as BeamParticles2D
 
 
 @nb.vectorize([nb.float64(nb.float64, nb.float64, nb.float64)], cache=True)
@@ -213,7 +213,18 @@ def get_beam_slice_mover(config):
     return move_beam_slice
 
 class BeamCalculator2D():
+    """
+    The main class for performing operations with a beam.  
+    """
     def __init__(self, config):
+        """
+        Initialization.
+        
+        Paramters 
+        ---------
+        config : Config
+            The set of base parameters to perform the simulation.
+        """
         # Get main calculation parameters.
         self.r_step = config.getfloat('window-width-step-size')
         self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1

@@ -9,8 +9,7 @@ from ..plasma.solver import CylindricalPlasmaSolver
 #import for 3D simulation
 from ..plasma3d.data import Arrays, ArraysView
 from ..plasma3d.solver import Plane2d3vPlasmaSolver
-from ..beam3d import BeamParticles3D
-from ..beam3d import BeamCalculator as BeamCalculator3D
+from ..beam3d import BeamParticles3D, BeamCalculator3D
 
 class PusherAndSolver():
     """
