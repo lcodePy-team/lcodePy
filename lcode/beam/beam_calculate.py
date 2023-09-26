@@ -12,6 +12,23 @@ from .data import BeamParticles as BeamParticles2D
 
 @nb.vectorize([nb.float64(nb.float64, nb.float64, nb.float64)], cache=True)
 def beam_substepping_step(q_m, p_z, substepping_energy):
+    """
+    Calculate required time step for beam particles.
+        
+    Paramters 
+    ---------
+    q_m : array or float64
+        'q/m' of the particles.
+    p_z : array or float64
+        Particles longitudinal momentum.
+    substepping_energy : float64
+        Critical energy for beam substeping.
+    
+    Returns
+    -------
+    dt : array or float64
+        'Correct' time step for the considered particles. 
+    """
     dt = 1.0
     gamma_mass = np.sqrt(1 / q_m ** 2 + p_z ** 2)
     max_dt = np.sqrt(gamma_mass / substepping_energy)
@@ -22,6 +39,9 @@ def beam_substepping_step(q_m, p_z, substepping_energy):
 
 @nb.njit
 def cross_nb(vec1, vec2):
+    """
+    Vector product.
+    """
     result = np.zeros_like(vec1)
     result[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1]
     result[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2]
@@ -41,6 +61,12 @@ def is_lost(r_vec, r_max):
 
 @nb.njit
 def beam_to_vec(xi, r, p_z, p_r, M):
+    """
+    Translate particle parameters from cylindrical to local cartesian 
+    coordianates. In the considered position the x-axis is co-directed 
+    with the r-axis. Z-axis remains unchanged. The y-coordinate of 
+    the particle is 0.
+    """
     p_x = p_r
     p_y = M / r
     p_vec = np.array((p_x, p_y, p_z))
@@ -52,6 +78,10 @@ def beam_to_vec(xi, r, p_z, p_r, M):
 def vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
                 layer_M, layer_remaining_steps, layer_id,
                 idx, r_vec, p_vec, steps_left, lost, magnetic_field):
+    """
+    Translate particle parameters from local cartesian coordianates 
+    to global cylindrical coordinates. 
+    """
     x = r_vec[0]
     y = r_vec[1]
     layer_r[idx] = np.sqrt(x ** 2 + y ** 2)
@@ -65,7 +95,20 @@ def vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r,
         layer_id[idx] = -np.abs(layer_id[idx])
 
 
-def configure_move_beam_slice(config):
+def configure_beam_pusher(config):
+    """
+    Configurate beam-pusher for axisymmetric case. 
+
+    Parametrs
+    ---------
+    config : Config
+        The set of base parameters to perform the simulation.
+    
+    Returns
+    -------
+    push_particles : function
+        Function that calculates the motion of the beam particles.
+    """
     r_step = float(config.get('window-width-step-size'))
     xi_step_p = float(config.get('xi-step'))
     max_radius = float(config.get('window-width'))
@@ -78,12 +121,70 @@ def configure_move_beam_slice(config):
 
     # Moves particles as far as possible on its xi layer
     @nb.njit(locals=locals_spec)
-    def move_beam_slice(layer_xi, layer_r, layer_p_z, layer_p_r, layer_M, 
+    def push_particles(layer_xi, layer_r, layer_p_z, layer_p_r, layer_M, 
                         layer_q_m, layer_dt, layer_remaining_steps, 
                         layer_lost, layer_size, layer_id, 
-                        xi_layer, E_r_k_1, E_f_k_1, E_z_k_1,
+                        xi_i, E_r_k_1, E_f_k_1, E_z_k_1,
                         B_f_k_1, B_z_k_1, E_r_k, E_f_k, E_z_k, B_f_k, B_z_k):
-        xi_end = xi_layer * -xi_step_p
+        """
+        Push beam particles located from xi to xi - dxi as far as possible.  
+        
+        Parametrs
+        ---------
+        layer_xi : array
+            xi coordinates of the considered beam particles.
+        layer_r : array
+            r coordinates of the considered beam particles.
+        layer_p_z : array
+            Longitudinal momentum of the considered beam particles.
+        layer_p_r : array
+            Transverse momentum of the considered beam particles.
+        layer_M : array
+            Angular momentum of the considered beam particles.
+        layer_q_m : array
+            Charge to mass ratio of the considered beam particles.
+        layer_dt : array
+            Correct" time steps for the considered beam particles 
+            taking into account the substepping. 
+        layer_remaining_steps : array
+            Number of time steps remaining before the beam particles 
+            goes to the next time step.
+        layer_lost : array
+            Boolean array marking the beam particles 
+            going outside the simulation box.
+        layer_size : int
+            Number of beam particles in the considered layer.
+        layer_id : array
+            Array of unique identifiers of beam particles.
+        xi_i : int
+            Number of xi steps have been performed by plasma solver. 
+        E_r_k_1 : array
+            Radial electric field at xi_i step.
+        E_f_k_1 : array
+            Azimuthal electric field at xi_i step.
+        E_z_k_1 : array
+            Longitudinal electric field at xi_i step.
+        B_f_k_1 : array
+            Azimuthal electric field at xi_i step.
+        B_z_k_1 : array
+            Longitudinal electric field at xi_i step.
+        E_r_k : array
+            Radial electric field at xi_i - 1 step.
+        E_f_k : array
+            Azimuthal electric field at xi_i - 1 step.
+        E_z_k : array
+            Longitudinal electric field at xi_i - 1 step.
+        B_f_k : array
+            Azimuthal electric field at xi_i - 1 step.
+        B_z_k : array
+            Longitudinal electric field at xi_i - 1 step.
+        
+        Returns
+        -------
+        nlost : int
+            The number of particles that have left the simulation box.
+        """
+        xi_end = xi_i * -xi_step_p
         nlost = 0
         if layer_size == 0:
             return
@@ -143,7 +244,7 @@ def configure_move_beam_slice(config):
                         idx, r_vec, p_vec, steps, lost, 
                         magnetic_field)
         return nlost
-    return move_beam_slice
+    return push_particles
 
 
 def layout_beam_slice(beam_slice, xi_layer_idx, prev_rho_layout, 
@@ -168,6 +269,27 @@ def layout_beam_slice(beam_slice, xi_layer_idx, prev_rho_layout,
 @nb.njit
 def init_substepping(layer_p_z, layer_q_m, layer_dt, layer_remaining_steps, 
                      time_step, substepping_energy):
+    """
+    Initialization of substepping for newly received beam particles.
+    
+    Parametrs
+    ---------
+    layer_p_z : array
+        Longitudinal momentum of the considered beam particles.
+    layer_q_m : array
+        Charge to mass ratio of the considered beam particles.
+    layer_dt : array
+        Correct" time steps for the considered beam particles 
+        taking into account the substepping. 
+        For new particles is 0. 
+    layer_remaining_steps : array
+        Number of time steps remaining before the beam particles 
+        goes to the next time step.
+    time_step : float64
+        Base time step for current simulation.
+    substepping_energy : float64
+        Critical energy for beam substeping.
+    """
     mask = layer_dt == 0
     dt = beam_substepping_step(layer_q_m[mask], layer_p_z[mask], 
                                substepping_energy)
@@ -177,13 +299,43 @@ def init_substepping(layer_p_z, layer_q_m, layer_dt, layer_remaining_steps,
 
 
 def get_beam_slice_mover(config):
+    """
+    Configure the beam layer evolution calculator.
+
+    Paramters 
+    ---------
+    config : Config
+        The set of base parameters to perform the simulation.
+
+    Returns
+    -------
+    move_beam_slice : function
+        Function for calculating the evolution of beam particles 
+        located between xi and xi - dxi. 
+    """
     time_step = float(config.get('time-step'))
     substepping_energy = config.getfloat('beam-substepping-energy')
-    move_particles = configure_move_beam_slice(config)
+    push_particles = configure_beam_pusher(config)
 
     # @nb.njit
     def move_beam_slice(beam_slice, xi_layer_idx, 
                         fields_after_slice, fields_before_slice,):
+        """
+        Initilize substepping for newly received beam particles.
+        After, calculate the evolution of beam particles 
+        located between xi and xi - dxi. 
+
+        Paramters 
+        ---------
+        beam_slice : BeamParticles
+            Beam particles to be calculated for the given xi step.
+        xi_layer_idx : int
+            The step number that was calculated by the plasma solver.
+        fields_after_slice : Arrays
+            Electric and magnetic fields at xi_layer_idx step.
+        fields_before_slice : Arrays
+            Electric and magnetic fields at xi_layer_idx - 1 step.
+        """
         if beam_slice.size == 0:
             return
         if substepping_energy == 0:
@@ -195,7 +347,7 @@ def get_beam_slice_mover(config):
                              beam_slice.dt, beam_slice.remaining_steps, 
                              time_step, substepping_energy)
 
-        nlost = move_particles(
+        nlost = push_particles(
                     beam_slice.xi, beam_slice.r,
                     beam_slice.p_z, beam_slice.p_r, beam_slice.M, 
                     beam_slice.q_m, beam_slice.dt, beam_slice.remaining_steps, 
@@ -214,7 +366,7 @@ def get_beam_slice_mover(config):
 
 class BeamCalculator2D():
     """
-    The main class for performing operations with a beam.  
+    The main class for performing operations with a beam in 2d.  
     """
     def __init__(self, config):
         """
@@ -233,9 +385,27 @@ class BeamCalculator2D():
         self.move_beam_slice = get_beam_slice_mover(config)
 
     def start_time_step(self):
+        """
+        Initialization of array to collect the partial beam density. 
+        """
         self.rho_layout = np.zeros(self.grid_steps)
 
     def layout_beam_layer(self, beam_layer_to_layout, xi_i):
+        """
+        Calculate beam density on the grid. 
+
+        Parametrs
+        ---------
+        beam_layer_to_layout : BeamParticles2D
+            Beam particles which should be layout.
+        xi_i : int
+            The step number to be calculated by the plasma solver next time.
+
+        Returns
+        -------
+        rho_beam : array
+            Beam density on the grid at step xi_i. 
+        """
         rho_beam, self.rho_layout = self.layout_beam_slice(
             beam_layer_to_layout,
             xi_i + 1,
@@ -247,6 +417,29 @@ class BeamCalculator2D():
 
     def move_beam_layer(self, beam_partickles_to_move, fell_size, 
                         xi_i, prev_pl_fields, pl_fields):
+        """
+        Calculate the evolution of beam particles 
+        located between xi and xi - dxi.
+
+        Paramters 
+        ---------
+        beam_partickles_to_move : BeamParticles
+            Beam particles to be calculated for the given xi step.
+        fell_size : int
+            Number of particles coming from the previous step xi.
+        xi_i : int
+            The step number that was calculated by the plasma solver.
+        prev_pl_fields : array
+            Electric and magnetic fields at xi_i - 1 step.
+        pl_fields : array
+            Electric and magnetic fields at xi_i step.
+
+        Returns
+        -------
+        layers : tuple of arrays
+            [lost, move, ramain] beam particles. 
+            For more information, see BeamCalculator2D.split_beam_slice. 
+        """
         self.move_beam_slice(
             beam_partickles_to_move,
             xi_i,
@@ -258,6 +451,24 @@ class BeamCalculator2D():
     # split beam slice into lost, stable and moving beam slices
     # @nb.njit
     def split_beam_slice(self, beam_slice, xi_end):
+        """
+            Split beam particles to three groups:
+                1. Particles that have been lost from the simulation box. 
+                2. Particles that move to the next time step. 
+                3. Particles that remain at the current time step.
+
+            Parametrs 
+            ---------
+            beam_slice : BeamParticles2D
+                Beam particles which should be slited. 
+            xi_end : float
+                Left boundary of the step under consideration.
+            
+            Returns
+            -------
+            layers : tuple of arrays
+                [lost, move, ramain] beam particles. 
+        """
         lost_slice = BeamParticles2D(0)
         # lost_sorted_idxes = np.argsort(beam_slice.lost)
         # beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
