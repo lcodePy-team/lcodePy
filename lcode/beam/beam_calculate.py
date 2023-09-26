@@ -246,26 +246,6 @@ def configure_beam_pusher(config):
         return nlost
     return push_particles
 
-
-def layout_beam_slice(beam_slice, xi_layer_idx, prev_rho_layout, 
-                      r_step, xi_step_p,):
-    n_cells = prev_rho_layout.size
-    rho_layout = np.zeros_like(prev_rho_layout)
-    xi_end = xi_layer_idx * -xi_step_p
-    if beam_slice.size != 0:
-        j, a00, a01, a10, a11 = particles_weights(beam_slice.r, beam_slice.xi, 
-                                                  xi_end, r_step, xi_step_p,)
-        deposit_particles(beam_slice.q_norm, prev_rho_layout, rho_layout, 
-                          j, a00, a01, a10, a11)
-
-    prev_rho_layout, rho_layout = rho_layout, prev_rho_layout
-    rho_layout /= r_step ** 2
-    rho_layout[0] *= 6
-    rho_layout[1:] /= np.arange(1, n_cells)
-
-    return rho_layout, prev_rho_layout
-
-
 @nb.njit
 def init_substepping(layer_p_z, layer_q_m, layer_dt, layer_remaining_steps, 
                      time_step, substepping_energy):
@@ -380,8 +360,7 @@ class BeamCalculator2D():
         # Get main calculation parameters.
         self.r_step = config.getfloat('window-width-step-size')
         self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1
-        self.dxi = config.getfloat('xi-step')
-        self.layout_beam_slice = layout_beam_slice
+        self.xi_step = config.getfloat('xi-step')
         self.move_beam_slice = get_beam_slice_mover(config)
 
     def start_time_step(self):
@@ -390,7 +369,7 @@ class BeamCalculator2D():
         """
         self.rho_layout = np.zeros(self.grid_steps)
 
-    def layout_beam_layer(self, beam_layer_to_layout, xi_i):
+    def layout_beam_layer(self, beam_layer, xi_i):
         """
         Calculate beam density on the grid. 
 
@@ -403,17 +382,26 @@ class BeamCalculator2D():
 
         Returns
         -------
-        rho_beam : array
+        current_rho_layout : array
             Beam density on the grid at step xi_i. 
         """
-        rho_beam, self.rho_layout = self.layout_beam_slice(
-            beam_layer_to_layout,
-            xi_i + 1,
-            self.rho_layout,
-            self.r_step,
-            self.dxi,
-        )
-        return rho_beam
+        next_rho_layout = np.zeros_like(self.rho_layout)
+        xi_end = (xi_i+1) * (-self.xi_step)
+        if beam_layer.size != 0:
+            j, a00, a01, a10, a11 = particles_weights(beam_layer.r, 
+                                                      beam_layer.xi, 
+                                                      xi_end, self.r_step, 
+                                                      self.xi_step)
+            deposit_particles(beam_layer.q_norm, 
+                              self.rho_layout, next_rho_layout, 
+                              j, a00, a01, a10, a11)
+
+        current_rho_layout = self.rho_layout
+        self.rho_layout = next_rho_layout
+        current_rho_layout /= self.r_step ** 2
+        current_rho_layout[0] *= 6
+        current_rho_layout[1:] /= np.arange(1, self.grid_steps)
+        return current_rho_layout
 
     def move_beam_layer(self, beam_partickles_to_move, fell_size, 
                         xi_i, prev_pl_fields, pl_fields):
@@ -446,7 +434,8 @@ class BeamCalculator2D():
             pl_fields,
             prev_pl_fields,
         )
-        return self.split_beam_slice(beam_partickles_to_move, xi_i * -self.dxi)
+        return self.split_beam_slice(beam_partickles_to_move, 
+                                     xi_i * -self.xi_step)
 
     # split beam slice into lost, stable and moving beam slices
     # @nb.njit
