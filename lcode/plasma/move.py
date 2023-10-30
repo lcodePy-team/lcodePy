@@ -88,7 +88,6 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
     # Correct particle position if it reaches boundary or crosses the axis
     if r_k_1_2 < 0:
         r_k_1_2 *= -1
-        p_xo *= -1
     elif r_k_1_2 > max_radius:
         r_k_1_2 = 2 * max_radius - r_k_1_2
         p_xo = 0
