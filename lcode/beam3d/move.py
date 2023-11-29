@@ -28,7 +28,7 @@ def sign(x):
 
 # Moves one particle as far as possible on current xi layer
 
-@nb.njit(parallel=True)
+@nb.njit #(parallel=True)
 def move_beam_particles_kernel_numba(
     xi_step_size, lost_radius, beam_layer_idx, grid_step_size, grid_steps,
     q_m, dt,

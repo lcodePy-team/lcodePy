@@ -46,7 +46,9 @@ def get_beam_substepping_step_cupy():
     return beam_substepping_step
 
 
-class BeamCalculator3D:
+# ----- A class for a beam consisting of macroparticles -----
+
+class BeamCalculator:
     def __init__(self, config: Config):
         # Get main calculation parameters.
         self.xp = config.xp
@@ -130,3 +132,50 @@ class BeamCalculator3D:
         fell  = beam_layer.get_layer(fell_idxes)
 
         return lost, moved, fell
+    
+    def create_next_layer(self, beam_layer_to_layout: BeamParticles,
+                          fell_to_next_layer: BeamParticles,
+                          ro_beam_full: np.ndarray):
+        beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
+        fell_size = fell_to_next_layer.id.size
+        ro_beam_prev = ro_beam_full.copy()
+
+        return beam_layer_to_move, fell_size, ro_beam_prev
+
+
+# ----- A class for a rigid rigid beam -----
+
+class RigidBeamCalculator:
+    def __init__(self, config: Config):
+        # Get main calculation parameters.
+        self.xp = config.xp
+        self.xi_step_size = config.getfloat('xi-step')
+        
+        # Creates a transversal grid
+        grid_steps     = config.getint('window-width-steps')
+        grid_step_size = config.getfloat('window-width-step-size')
+
+        grid = ((self.xp.arange(grid_steps) - grid_steps // 2)
+                * grid_step_size)
+        self.x_grid, self.y_grid = self.xp.meshgrid(grid, grid)
+    
+    def start_time_step(self):
+        """A dummy function for the rigid-beam mode."""
+        pass
+    
+    def layout_beam_layer(self, beam_charge_distribution_function,
+                          plasma_layer_idx):
+        xi = -plasma_layer_idx * self.xi_step_size        
+        return beam_charge_distribution_function(self.xp, xi,
+                                                 self.x_grid, self.y_grid)
+
+    def move_beam_layer(self, beam_layer, fell_size,
+                        pl_layer_idx, fields_after_layer, fields_before_layer):
+        """A dummy function for the rigid-beam mode."""
+        return None, None, None
+
+    def create_next_layer(self, beam_layer_to_layout,
+                          fell_to_next_layer, ro_beam_full: np.ndarray):
+        """A half-dummy function for the rigid-beam mode."""
+        ro_beam_prev = ro_beam_full.copy()
+        return None, None, ro_beam_prev

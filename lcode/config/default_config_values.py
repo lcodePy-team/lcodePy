@@ -32,7 +32,7 @@ default_config_values = {
     'plasma-particles-per-cell': 10,
 
     # Parameters of beam model:
-    'rigid-beam': 'n', # Only this parameter from this group is used in 3d
+    'rigid-beam': False, # Only this parameter from this group is used in 3d
     'beam-substepping-energy': 2,
     'focusing': 'n',
     'foc-period': 100,
@@ -66,7 +66,6 @@ default_config_values = {
     # of lcode3d.
     'plasma-zshape': '',
     
-    'field-solver-subtraction-trick': 1,
     'field-solver-variant-A': True,
 
     'reflect-padding-steps': 10,
@@ -77,4 +76,12 @@ default_config_values = {
 
     # Conflicts:
     'corrector-steps': 2, # Can we even change this???
+
+    'filter-window-length': 5,
+    'filter-polyorder': 3,
+    'filter-coefficient': 0,
+    'damping-coefficient': 0,
+    'dx-max': 1,
+    'field-solver-subtraction-coefficient': 1,
+    'enable-noise-filter': True
 }

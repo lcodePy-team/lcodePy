@@ -174,8 +174,9 @@ def dx_dy(xp: np, arr, grid_step_size):
 
 
 def calculate_Ex_Ey_Bx_By(
-    mix2d, grid_step_size, xi_step_size, const: Arrays, fields: Arrays,
-    ro_beam_full, ro_beam_prev, currents_full: Arrays, currents_prev: Arrays
+    mix2d, grid_step_size, xi_step_size, subtraction_coeff, const: Arrays,
+    fields: Arrays, ro_beam_full, ro_beam_prev, currents_full: Arrays,
+    currents_prev: Arrays
 ):
     """
     Calculate transverse fields as iDST-DCT(mixed_matrix * DST-DCT(RHS.T)).T,
@@ -202,10 +203,10 @@ def calculate_Ex_Ey_Bx_By(
     djy_dxi = (jy_prev - jy_full) / xi_step_size  # - ?
 
     # We are solving a Helmholtz equation
-    Ex_rhs = -(dro_dx - djx_dxi - fields.Ex)  # -?
-    Ey_rhs = -(dro_dy - djy_dxi - fields.Ey)
-    Bx_rhs = +(djz_dy - djy_dxi + fields.Bx)
-    By_rhs = -(djz_dx - djx_dxi - fields.By)
+    Ex_rhs = -(dro_dx - djx_dxi - subtraction_coeff * fields.Ex)  # -?
+    Ey_rhs = -(dro_dy - djy_dxi - subtraction_coeff * fields.Ey)
+    Bx_rhs = +(djz_dy - djy_dxi + subtraction_coeff * fields.Bx)
+    By_rhs = -(djz_dx - djx_dxi - subtraction_coeff * fields.By)
 
     # Boundary conditions application (for future reference, ours are zero):
     # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
@@ -266,8 +267,9 @@ def calculate_Bz(dct2d: dctn, grid_step_size, const: Arrays, currents: Arrays):
 
 
 def get_field_computer(config: Config):
-    grid_step_size = config.getfloat('window-width-step-size')
-    xi_step_size = config.getfloat('xi-step')
+    grid_step_size    = config.getfloat('window-width-step-size')
+    xi_step_size      = config.getfloat('xi-step')
+    subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
 
     dst2d, mix2d, dct2d = get_functions(config)
 
@@ -278,8 +280,8 @@ def get_field_computer(config: Config):
         # Looks terrible! TODO: rewrite this function entirely
 
         Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By(
-            mix2d, grid_step_size, xi_step_size, const, fields,
-            rho_beam_full, rho_beam_prev, currents_full, currents_prev
+            mix2d, grid_step_size, xi_step_size, subtraction_coeff, const,
+            fields, rho_beam_full, rho_beam_prev, currents_full, currents_prev
         )
 
         Ex_full = 2 * Ex_half - fields_prev.Ex

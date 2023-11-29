@@ -4,6 +4,8 @@ from ..config.config import Config
 from .data import BeamParticles
 
 
+# ----- Classes for a beam consisting of macroparticles -----
+
 class BeamSource:
     """
     This class helps to extract a beam layer from beam particles array.
@@ -72,3 +74,32 @@ class BeamDrain:
     
     def beam_slice(self):
         return self.beam_buffer
+
+
+# ----- Classes for a rigid beam -----
+
+class RigidBeamSource:
+    def __init__(self, config: Config, beam_charge_distribution_function):
+        # From input parameters:
+        self.xp = config.xp
+        self.xi_step_size = config.getfloat('xi-step')
+
+        self.beam_charge_distribution_function =\
+             beam_charge_distribution_function
+
+    def get_beam_layer_to_layout(self, plasma_layer_idx):
+        return self.beam_charge_distribution_function
+
+class RigidBeamDrain:
+    """A dummy class for the rigid-beam mode."""
+    def __init__(self, config: Config):
+        pass
+
+    def push_beam_layer(self, beam_layer):
+        pass
+
+    def push_beam_lost(self, lost_layer):
+        pass
+
+    def beam_slice(self):
+        return None
