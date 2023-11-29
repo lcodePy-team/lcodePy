@@ -1,24 +1,55 @@
-from math import inf, ceil
+from math import inf, ceil, remainder
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
 from ..config.config import Config
-from ..plasma3d.data import ArraysView
+from ..plasma3d.data import Arrays
+from ..beam3d.beam_io import BeamDrain
 
 
 # Auxiliary functions:
 
+def get(array: np.ndarray):
+    """
+    A function to copy data from GPU to CPU when using cupy as the main data
+    module. For now, this method is only used in diagnostics.
+    """
+    if 'numpy' in str(type(array)): # numpy
+        return array
+    else: # cupy
+        return array.get() # auto-copies to host RAM
+
+
 def from_str_into_list(names_str: str):
-    """ Makes a list of elements that it gets from a long string."""
+    """
+    Makes a list of elements that it gets from a long string.
+    """
     # For example: 'Ez, Ey, Ez ,Bx,,' becomes ['Ez', 'Ey', 'Ez', 'Bx']
     names = np.array(names_str.replace(' ', '').split(','))
     names = names[names != '']
     return names
 
 
+def absremainder(x, y):
+    """
+    This is a universal modulo operator that behaves predictably not only for
+    integers, but also for floating point numbers.
+    """
+    # Due to the nature of floating-number arithmetic, the regular % operator
+    # doesn't work as expected for floats. Thus, we use math.remainder that 
+    # behaves a little more predictably. Still, while 0.15 % 0.05 = 0.04999...,
+    # math.remainder(0.15, 0.05) = -1.3877787807814457e-17. Also, math.remainder
+    # isn't exactly the modulo operator like math.fmod and may produce results
+    # such as math.remainder(14, 5) = -1.0, but it solves the puzzle of
+    # floating-number arithmetic.
+    return abs(remainder(x, y))
+
+
 def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
-    """Calculates strided convolution using a mean/uniform kernel."""
+    """
+    Calculates strided convolution using a mean/uniform kernel.
+    """
     new_arr = []
     for i in range(0, arr.shape[0], merging_xi):
         start_i, end_i = i, i + merging_xi
@@ -36,20 +67,43 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
                       ceil(arr.shape[0] / merging_xi, -1))
 
 
+def calculate_energy_fluxes(grid_step_size,
+                            plasma_particles: Arrays, plasma_fields: Arrays):
+    # xp is either np (numpy) or cp (cupy):
+    xp = plasma_particles.xp
+
+    # The perturbation to the flux density of the electromagnetic energy:
+    Se = (plasma_fields.Ez ** 2 + plasma_fields.Bz ** 2 +
+         (plasma_fields.Ex - plasma_fields.By) ** 2 +
+         (plasma_fields.Ey + plasma_fields.Bx) ** 2) * grid_step_size ** 2 / 2
+
+    # Additional array to calculate the motion energy of plasma particles:
+    gamma_m = xp.sqrt(plasma_particles.m ** 2  + plasma_particles.px ** 2 +
+                      plasma_particles.py ** 2 + plasma_particles.pz ** 2)
+    motion_energy = gamma_m - plasma_particles.m
+
+    # Calculate integral total energy flux and return it:
+    psi_electromagnetic = xp.sum(Se)
+    psi_total = xp.sum(motion_energy) + psi_electromagnetic
+    return psi_total
+
+
 # Diagnostics classes:
 # TODO: Add a template class for diagnostics.
 
 class DiagnosticsFXi:
     __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                      'Ez2', 'Bz2', 'rho_beam2', 'Phi']
+                      'Phi', 'Sf',
+                      'dx_chaotic', 'dy_chaotic',
+                      'dx_chaotic_perp', 'dy_chaotic_perp']
                     # 'ni']
                     # TODO: add them and functionality!
     __allowed_f_xi_type = ['numbers', 'pictures', 'both']
     #TODO: add 'pictures' and 'both' and functionality
 
     def __init__(self, output_period=100, saving_xi_period=100, f_xi='Ez',
-                 f_xi_type='numbers', axis_x=0, axis_y=0,
-                 auxiliary_x=0, auxiliary_y=1):
+                 f_xi_type='numbers', x_probe_lines=0, y_probe_lines=0,
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__f_xi_names = from_str_into_list(f_xi)
         for name in self.__f_xi_names:
@@ -63,14 +117,26 @@ class DiagnosticsFXi:
             raise Exception(f"{f_xi_type} type of f(xi) diagnostics is " +
                              "not supported.")
 
-        # The position of a `probe' line 1 from the center:
-        self.__axis_x, self.__axis_y = axis_x, axis_y
-        # THe position of a `probe' line 2 from the center:
-        self.__auxiliary_x, self.__auxiliary_y = auxiliary_x, auxiliary_y
+        # The position of `probe' lines from the center:
+        if ((type(x_probe_lines) == list or type(x_probe_lines) == np.ndarray) and
+            (type(y_probe_lines) == list or type(y_probe_lines) == np.ndarray)):
+            self.__x_probe = np.array(x_probe_lines)
+            self.__y_probe = np.array(y_probe_lines)
+            if len(self.__x_probe) != len(self.__y_probe):
+                raise Exception(f"Different number of x and y coordinates " +
+                                 "for probe lines!")
+        else:
+            # If x_probe_lines and y_probe_lines are only a number,
+            # as is the default.
+            self.__x_probe = x_probe_lines
+            self.__y_probe = y_probe_lines
 
         # Set time periodicity of detailed output and safving into a file:
         self.__output_period = output_period
         self.__saving_xi_period = saving_xi_period
+
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
 
         # We store data as a simple Python dictionary of lists for f(xi) data.
         # But I'm not sure this is the best way to handle data storing!
@@ -78,15 +144,14 @@ class DiagnosticsFXi:
         self.__data['xi'] = []
 
     def __repr__(self):
-        return (f"DiagnosticsFXi(output_period={self.__output_period}, " +
-                f"saving_xi_period={self.__saving_xi_period}, " +
-                f"saving_xi_period={self.__saving_xi_period}, " +
-                f"saving_xi_period={self.__saving_xi_period}, " +
-                f"f_xi='{','.join(self.__f_xi_names)}', " +
-                f"f_xi_type='{self.__f_xi_type}', " +
-                f"axis_x={self.__axis_x}, axis_y={self.__axis_y}, " +
-                f"auxiliary_x={self.__auxiliary_x}, " +
-                f"auxiliary_y={self.__auxiliary_y})")
+        return (
+            f"DiagnosticsFXi(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_xi_period}, " +
+            f"f_xi='{','.join(self.__f_xi_names)}', " +
+            f"f_xi_type='{self.__f_xi_type}', " +
+            f"x_probe_lines={self.__x_probe}, " +
+            f"y_probe_lines={self.__y_probe}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
@@ -94,17 +159,17 @@ class DiagnosticsFXi:
         grid_step_size = config.getfloat('window-width-step-size')
 
         # We change how we store the positions of the 'probe' lines:
-        self.__ax_x  = steps // 2 + round(self.__axis_x / grid_step_size)
-        self.__ax_y  = steps // 2 + round(self.__axis_y / grid_step_size)
-        self.__aux_x = steps // 2 + round(self.__auxiliary_x / grid_step_size)
-        self.__aux_y = steps // 2 + round(self.__auxiliary_y / grid_step_size)
+        self.__ax_x = (steps // 2 +
+                       np.round(self.__x_probe / grid_step_size)).astype(int)
+        self.__ax_y = (steps // 2 +
+                       np.round(self.__y_probe / grid_step_size)).astype(int)
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if output_period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
+        self.__grid_step_size = config.getfloat('window-width-step-size')
 
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
@@ -112,75 +177,82 @@ class DiagnosticsFXi:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
-
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
+            xp = plasma_particles.xp
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                     val = getattr(plasma_fields, name)[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'rho':
                     # TODO: It's just a crutch!!!
-                    val = getattr(plasma_currents, 'ro')[
-                        self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    val = getattr(plasma_currents, 'ro')[self.__ax_x, self.__ax_y]
+                    self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__ax_x, self.__ax_y]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
-                if name in ['Ez2', 'Bz2']:
-                    val = getattr(
-                        plasma_fields, name[:2])[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(val)
+                if name == 'Sf':
+                    val = calculate_energy_fluxes(self.__grid_step_size,
+                                                  plasma_particles,
+                                                  plasma_fields)
+                    self.__data[name].append(get(val))
 
-                if name == 'rho_beam2':
-                    val = ro_beam[self.__aux_x, self.__aux_y]
-                    self.__data[name].append(val)
+                if name in ['dx_chaotic', 'dy_chaotic',
+                            'dx_chaotic_perp', 'dy_chaotic_perp']:
+                    val = xp.amax(xp.absolute(getattr(plasma_particles, name)))
+                    self.__data[name].append(get(val))
 
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time)
+        if absremainder(xi_plasma_layer,
+                        self.__saving_xi_period) <= self.__xi_step_size / 2:
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
-        return current_time % self.__output_period == 0
+        return absremainder(current_time,
+                            self.__output_period) <= self.__time_step_size / 2
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         if self.conditions_check(current_time, inf):
-            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
-                np.savez(f'./diagnostics/f_xi_{current_time:08.2f}.npz',
-                            **self.__data)
+                plasma_particles.xp.savez(
+                    f'./diagnostics{self.__unique_directory_name}/' + 
+                    f'f_xi_{current_time:08.2f}.npz',
+                    **self.__data)
 
             if 'pictures' in self.__f_xi_type or 'both' in self.__f_xi_type:
-                for name in self.__f_xi_names:
+                for name in self.__f_xi_names:                        
                     plt.plot(self.__data['xi'], self.__data[name])
                     plt.savefig(
-                        f'./diagnostics/{name}_f_xi_{current_time:08.2f}.jpg')
+                        f'./diagnostics{self.__unique_directory_name}/' +
+                        f'{name}_f_xi_{current_time:08.2f}.jpg')
                                 # vmin=-1, vmax=1)
                     plt.close()
 
         # We now clean old data:
-        for name in self.__data:
-            self.__data[name] = []
+        if clean_data:
+            for name in self.__data:
+                self.__data[name] = []
 
 
 class DiagnosticsColormaps:
     # By default, colormaps are taken in (y, xi) plane.
     # TODO: Make (x, xi) plane an option.
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                           'Phi']
+                           'Phi', 'y_offt', 'y_plasma_particles']
                         # 'ni']
                     # TODO: add them and functionality!
     __allowed_colormaps_type = ['numbers']
@@ -189,7 +261,8 @@ class DiagnosticsColormaps:
     def __init__(self, output_period=100, saving_xi_period=1000, colormaps='Ez',
                  colormaps_type='numbers', xi_from=inf, xi_to=-inf,
                  r_from=-inf, r_to=inf,
-                 output_merging_r: int=1, output_merging_xi: int=1):
+                 output_merging_r: int=1, output_merging_xi: int=1,
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
         for name in self.__colormaps_names:
@@ -200,7 +273,7 @@ class DiagnosticsColormaps:
         if colormaps_type in self.__allowed_colormaps_type:
             self.__colormaps_type = colormaps_type
         else:
-            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+            raise Exception(f"{colormaps_type} type of colormap diagnostics " +
                              "is not supported.")
 
         # Set time periodicity of detailed output:
@@ -214,6 +287,9 @@ class DiagnosticsColormaps:
         # Set values for merging functionality:
         self.__merging_r  = round(output_merging_r)
         self.__merging_xi = round(output_merging_xi)
+
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
 
         # We store data as a Python dictionary of numpy arrays for colormaps
         # data. I'm not sure this is the best way to handle data storing.
@@ -229,16 +305,16 @@ class DiagnosticsColormaps:
             f"xi_from={self.__xi_from}, xi_to={self.__xi_to}, " + 
             f"r_from={self.__r_from}, r_to={self.__r_to}, " +
             f"output_merging_r={self.__merging_r}, " +
-            f"output_merging_xi={self.__merging_xi})")
+            f"output_merging_xi={self.__merging_xi}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         self.__grid_steps = config.getint('window-width-steps')
         grid_step_size = config.getfloat('window-width-step-size')
 
-        grid = ((np.arange(self.__grid_steps) - self.__grid_steps // 2) *
-                grid_step_size)
-        self.__data['transverse_grid'] = grid
+        self.__grid = ((np.arange(self.__grid_steps) - self.__grid_steps // 2) *
+                        grid_step_size)
 
         # Here we define subwindow borders in terms of number of steps:
         self.__r_f = self.__grid_steps // 2 + self.__r_from / grid_step_size
@@ -258,21 +334,19 @@ class DiagnosticsColormaps:
 
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
 
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
             # Firstly, it adds the current value of xi to data dictionary:
             self.__data['xi'].append(xi_plasma_layer)
@@ -281,46 +355,65 @@ class DiagnosticsColormaps:
                 if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                     val = getattr(plasma_fields, name)[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'rho':
-                    # val = getattr(plasma_currents, 'ro')[ # It isn't right!
                     val = getattr(plasma_currents, 'ro')[
                         self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
                     val = ro_beam[self.__grid_steps//2, self.__r_f:self.__r_t]
-                    self.__data[name].append(val)
+                    self.__data[name].append(get(val))
+
+                # NOTE: These two are very-very experimental diagnostics!
+                if name == 'y_offt':
+                    val = getattr(plasma_particles, 'y_offt')
+                    val = val[val.shape[0] // 2, :]
+                    # TODO: self.__r_f:self.__r_t won't work here, think about
+                    #       other ways for trajectories diagnostics.
+                    self.__data[name].append(get(val))
+
+                if name == 'y_plasma_particles':
+                    val = (getattr(plasma_particles, 'y_init') +
+                           getattr(plasma_particles, 'y_offt'))
+                    val = val[val.shape[0] // 2, :]
+                    # TODO: self.__r_f:self.__r_t won't work here, think about
+                    #       other ways for trajectories diagnostics.
+                    self.__data[name].append(get(val))
 
                 val = None
 
         # We use dump here to save data not only at the end of the simulation
         # window, but with some period too.
         # TODO: Do we really need this? Does it work right?
-        # if xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2:
-        #     self.dump(current_time, None, None, None, None)
+        if absremainder(xi_plasma_layer,
+                        self.__saving_xi_period) <= self.__xi_step_size / 2:
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
         # We can save data and then clean the memory after
         # the end of a subwindow.
         if (xi_plasma_layer <= self.__xi_to and
             (xi_plasma_layer + self.__xi_step_size) >= self.__xi_to):
-            self.dump(current_time, None, None, None, None)
-
-            for name in self.__data:
-                self.__data[name] = []
-
+            self.dump(
+                current_time, None, plasma_particles, None, None, None, False)
 
     def conditions_check(self, current_time, xi_plasma_layer):
-        return (current_time % self.__output_period == 0 and
-                xi_plasma_layer <= self.__xi_from and
-                xi_plasma_layer >= self.__xi_to)
+        return (
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
+            xi_plasma_layer <= self.__xi_from and
+            xi_plasma_layer >= self.__xi_to)
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         # In case of colormaps, we reshape every data list except for xi list.
-        if self.conditions_check(current_time, inf):
+        if absremainder(current_time,
+                        self.__output_period) <= self.__time_step_size / 2:
             data_for_saving = (self.__data).copy()
+            data_for_saving['transverse_grid'] = self.__grid
 
             size = len(self.__data['xi'])
             for name in self.__colormaps_names:
@@ -331,30 +424,35 @@ class DiagnosticsColormaps:
             if self.__merging_r > 1 or self.__merging_xi > 1:
                 for name in self.__colormaps_names:
                     data_for_saving[name] = conv_2d(
-                        data_for_saving[name], self.__merging_xi,
-                        self.__merging_r)
+                        data_for_saving[name],
+                        self.__merging_xi, self.__merging_r)
 
             # TODO: If there is a file with the same name with important data 
             #       and we want to save data there, we should just add new data,
             #       not rewrite a file.
-            Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+            Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
             if ('numbers' in self.__colormaps_type or
                 'both' in self.__colormaps_type):
-                np.savez(f'./diagnostics/colormaps_{current_time:08.2f}.npz',
-                    **data_for_saving)
+                np.savez(f'./diagnostics{self.__unique_directory_name}/' +
+                         f'colormaps_{current_time:08.2f}.npz',
+                         **data_for_saving)
 
             # Clean some memory. TODO: Better ways to do that?
             data_for_saving = 0
 
         # We now clean old data:
-        for name in self.__data:
-            self.__data[name] = []
+        if clean_data:
+            for name in self.__data:
+                self.__data[name] = []
 
 
 class DiagnosticsTransverse:
     __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho',
                            'rho_beam', 'Phi', # 'ni',
-                           'px', 'py', 'pz', 'x_offt', 'y_offt']
+                           'px', 'py', 'pz', 'x_offt', 'y_offt',
+                           'dx_chaotic', 'dy_chaotic',
+                           'dx_chaotic_perp', 'dy_chaotic_perp']
     # NOTE: If you want to save x_init, y_init, q, or m, use the SaveRunState
     #       diagnostics, as these values are constant throughout the window.
 
@@ -363,7 +461,8 @@ class DiagnosticsTransverse:
     #       on the grid: fields and currents.
 
     def __init__(self, output_period=100, saving_xi_period=1000,
-                 colormaps='rho', colormaps_type='pictures'):
+                 colormaps='rho', colormaps_type='pictures',
+                 unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
         for name in self.__colormaps_names:
@@ -374,26 +473,29 @@ class DiagnosticsTransverse:
         if colormaps_type in self.__allowed_colormaps_type:
             self.__colormaps_type = colormaps_type
         else:
-            raise Exception(f"{colormaps_type} type of colormap diagnostics" +
+            raise Exception(f"{colormaps_type} type of colormap diagnostics " +
                              "is not supported.")
 
         # Set time periodicity of detailed output:
         self.__output_period = output_period
         self.__saving_xi_period = saving_xi_period
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
     def __repr__(self) -> str:
         return (
             f"DiagnosticsTransverse(output_period={self.__output_period}, " +
             f"saving_xi_period={self.__saving_xi_period}, " +
             f"colormaps='{','.join(self.__colormaps_names)}', " +
-            f"colormaps_type='{self.__colormaps_type}')")
+            f"colormaps_type='{self.__colormaps_type}', " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         # Here we check if the output period is less than the time step size.
         # In that case each time step is diagnosed. The first time step is
-        # always diagnosed. And we check if period % time_step_size = 0,
-        # because otherwise it won't diagnosed anything.
+        # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
 
@@ -407,39 +509,38 @@ class DiagnosticsTransverse:
         if self.__saving_xi_period < self.__xi_step_size:
             self.__saving_xi_period = self.__xi_step_size
 
-        if self.__output_period % self.__time_step_size != 0:
-            raise Exception(
-                "The diagnostics will not work because " +
-                f"{self.__output_period} % {self.__time_step_size} != 0")
-
     def draw_figures(self, xi_plasma_layer, plasma_fields,
                      plasma_currents, ro_beam):
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+        Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+             parents=True, exist_ok=True)
 
         for name in self.__colormaps_names:
             fname = f'{name}_{xi_plasma_layer:+09.2f}.jpg'
 
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                 plt.imsave(
-                    './diagnostics/' + fname,
-                    getattr(plasma_fields, name).T, origin='lower',
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
+                    get(getattr(plasma_fields, name).T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho':
                 plt.imsave(
-                    './diagnostics/' + fname,
-                    getattr(plasma_currents, 'ro').T, origin='lower',
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
+                    get(getattr(plasma_currents, 'ro').T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho_beam':
                 plt.imsave(
-                    './diagnostics/' + fname,
-                    getattr(ro_beam, 'ro_beam').T, origin='lower',
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
+                    # getattr(ro_beam, 'ro_beam').T, origin='lower',
+                    get(ro_beam.T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
-    def save_to_file(self, current_time, xi_plasma_layer, plasma_particles,
-                     plasma_fields, plasma_currents, ro_beam):
-        Path('./diagnostics').mkdir(parents=True, exist_ok=True)
+    def save_to_file(self, current_time, xi_plasma_layer,
+                     plasma_particles: Arrays, plasma_fields: Arrays,
+                     plasma_currents: Arrays, ro_beam):
+        Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
+             parents=True, exist_ok=True)
 
         data_for_saving = {'transverse_grid': self.__grid}
 
@@ -453,15 +554,20 @@ class DiagnosticsTransverse:
             if name == 'rho_beam':
                 data_for_saving[name] = ro_beam
 
-            if name in ['px', 'py', 'pz', 'x_offt', 'y_offt']:
+            if name in ['px', 'py', 'pz', 'x_offt', 'y_offt',
+                        'dx_chaotic', 'dy_chaotic',
+                        'dx_chaotic_perp', 'dy_chaotic_perp']:
                 data_for_saving[name] = getattr(plasma_particles, name)
 
         file_name = \
             f'transverse_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
-        np.savez('./diagnostics/' + file_name, **data_for_saving)
+        plasma_particles.xp.savez(
+            f'./diagnostics{self.__unique_directory_name}/' + file_name,
+            **data_for_saving)
 
-    def after_step_dxi(self, current_time, xi_plasma_layer, plasma_particles,
-                       plasma_fields, plasma_currents, ro_beam):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
             # For xy diagnostics we save files to a file or plot a picture.
             if ('pictures' in self.__colormaps_type or
@@ -477,62 +583,130 @@ class DiagnosticsTransverse:
 
     def conditions_check(self, current_time, xi_plasma_layer):
         return (
-            current_time % self.__output_period == 0 and
-            xi_plasma_layer % self.__saving_xi_period <= self.__xi_step_size / 2)
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
+            absremainder(xi_plasma_layer,
+                         self.__saving_xi_period) <= self.__xi_step_size / 2)
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays,
+             beam_drain: BeamDrain, clean_data=True):
         pass
 
 
 class SaveRunState:
-    def __init__(self, saving_period=1000., save_beam=False, save_plasma=False):
-        self.__saving_period = saving_period
+    def __init__(self, output_period=1000, saving_xi_period=inf,
+                 save_beam=False, save_plasma=False, unique_directory_name=''):
+        self.__output_period = output_period
+        self.__saving_xi_period = saving_xi_period
         self.__save_beam = bool(save_beam)
         self.__save_plasma = bool(save_plasma)
 
+        # Set unique name for data storing directory:
+        self.__unique_directory_name = unique_directory_name
+
     def __repr__(self) -> str:
-        return(f"SaveRunState(saving_period={self.__saving_period}, " +
-            f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma})")
+        return(
+            f"SaveRunState(output_period={self.__output_period}, " +
+            f"saving_xi_period={self.__saving_xi_period}, " +
+            f"save_beam={self.__save_beam}, save_plasma={self.__save_plasma}, " +
+            f"unique_directory_name={self.__unique_directory_name})")
 
     def pull_config(self, config: Config):
         self.__time_step_size = config.getfloat('time-step')
+        self.__xi_step_size   = config.getfloat('xi-step')
 
-        if self.__saving_period < self.__time_step_size:
-            self.__saving_period = self.__time_step_size
+        if self.__output_period < self.__time_step_size:
+            self.__output_period = self.__time_step_size
 
-    def after_step_dxi(self, *parameters):
-        pass
+        if self.__saving_xi_period < self.__xi_step_size:
+            self.__saving_xi_period = self.__xi_step_size
+        
+        rigid_beam = config.getbool('rigid-beam')
+        if rigid_beam and self.__save_beam:
+            raise Exception("We cannot save the beam in the case of a rigid " +
+                            "beam. Please, change save_beam to False.")
 
-    def dump(self, current_time, plasma_particles, plasma_fields,
-             plasma_currents, beam_drain):
+    def after_step_dxi(self, current_time, xi_plasma_layer,
+                       plasma_particles: Arrays, plasma_fields: Arrays,
+                       plasma_currents: Arrays, ro_beam):
+        if (self.conditions_check(current_time, xi_plasma_layer) and
+            self.__save_plasma):
+            Path(f'./snapshots{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
+
+            file_name = \
+                f'plasmastate_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz'
+            plasma_particles.xp.savez_compressed(
+                file=f'./snapshots{self.__unique_directory_name}/' + file_name,
+                xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
+                x_init=plasma_particles.x_init,
+                y_init=plasma_particles.y_init,
+                x_offt=plasma_particles.x_offt,
+                y_offt=plasma_particles.y_offt,
+
+                dx_chaotic=plasma_particles.dx_chaotic,
+                dy_chaotic=plasma_particles.dy_chaotic,
+                dx_chaotic_perp=plasma_particles.dx_chaotic_perp,
+                dy_chaotic_perp=plasma_particles.dy_chaotic_perp,
+
+                px=plasma_particles.px, py=plasma_particles.py,
+                pz=plasma_particles.pz,
+                q=plasma_particles.q, m=plasma_particles.m,
+
+                Ex=plasma_fields.Ex, Bx=plasma_fields.Bx,
+                Ey=plasma_fields.Ey, By=plasma_fields.By,
+                Ez=plasma_fields.Ez, Bz=plasma_fields.Bz,
+
+                Phi=plasma_fields.Phi, ro=plasma_currents.ro,
+                jx=plasma_currents.jx, jy=plasma_currents.jy,
+                jz=plasma_currents.jz)
+
+    def conditions_check(self, current_time, xi_plasma_layer):
+        return (
+            absremainder(current_time,
+                         self.__output_period) <= self.__time_step_size / 2 and
+            absremainder(xi_plasma_layer,
+                         self.__saving_xi_period) <= self.__xi_step_size / 2)
+
+    def dump(self, current_time, xi_plasma_layer, plasma_particles: Arrays,
+             plasma_fields: Arrays, plasma_currents: Arrays, 
+             beam_drain: BeamDrain, clean_data=True):
         # The run is saved if the current_time differs from a multiple
         # of the saving period by less then dt/2.
-        if current_time % self.__saving_period <= self.__time_step_size / 2:
-            Path('./run_states').mkdir(parents=True, exist_ok=True)
+        if absremainder(current_time,
+                        self.__output_period) <= self.__time_step_size / 2:
+            Path(f'./run_states{self.__unique_directory_name}').mkdir(
+                 parents=True, exist_ok=True)
 
             if self.__save_beam:
                 beam_drain.beam_buffer.save(
-                    f'./run_states/beamfile_{current_time:08.2f}')
+                    f'./run_states{self.__unique_directory_name}/' +
+                    f'beamfile_{current_time:08.2f}')
 
             if self.__save_plasma:
-                # Important for saving arrays from GPU (is it really?)
-                plasma_particles = ArraysView(plasma_particles)
-                plasma_fields    = ArraysView(plasma_fields)
-                plasma_currents  = ArraysView(plasma_currents)
-
-                np.savez_compressed(
-                    file=f'./run_states/plasmastate_{current_time:08.2f}',
+                plasma_particles.xp.savez_compressed(
+                    file=f'./run_states{self.__unique_directory_name}/' +
+                    f'plasmastate_{current_time:08.2f}',
+                    xi_plasma_layer=plasma_particles.xp.array([xi_plasma_layer]),
                     x_init=plasma_particles.x_init,
                     y_init=plasma_particles.y_init,
                     x_offt=plasma_particles.x_offt,
                     y_offt=plasma_particles.y_offt,
+        
+                    dx_chaotic=plasma_particles.dx_chaotic,
+                    dy_chaotic=plasma_particles.dy_chaotic,
+                    dx_chaotic_perp=plasma_particles.dx_chaotic_perp,
+                    dy_chaotic_perp=plasma_particles.dy_chaotic_perp,
+
                     px=plasma_particles.px, py=plasma_particles.py,
                     pz=plasma_particles.pz,
                     q=plasma_particles.q, m=plasma_particles.m,
+
                     Ex=plasma_fields.Ex, Bx=plasma_fields.Bx,
                     Ey=plasma_fields.Ey, By=plasma_fields.By,
                     Ez=plasma_fields.Ez, Bz=plasma_fields.Bz,
+                    
                     Phi=plasma_fields.Phi, ro=plasma_currents.ro,
                     jx=plasma_currents.jx, jy=plasma_currents.jy,
                     jz=plasma_currents.jz)

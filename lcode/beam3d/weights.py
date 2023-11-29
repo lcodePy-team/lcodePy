@@ -37,7 +37,8 @@ def weight4(x, place):
 
 
 # Deposition and field interpolation #
-@nb.njit(parallel=True)
+
+@nb.njit #(parallel=True)
 def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
                        out_ro0, out_ro1, size):
     """

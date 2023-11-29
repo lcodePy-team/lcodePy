@@ -28,7 +28,7 @@ def dirichlet_matrix(xp: np, grid_steps, grid_step_size):
 
 # Solving Laplace or Helmholtz equation with mixed boundary conditions #
 
-def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_trick):
+def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_coeff):
     """
     Calculate a magical matrix that solves the Helmholtz or Laplace equation
     (subtraction_trick=True and subtraction_trick=False correspondingly)
@@ -42,7 +42,7 @@ def mixed_matrix(xp: np, grid_steps, grid_step_size, subtraction_trick):
     li = 4 / grid_step_size**2 * xp.sin(ki * xp.pi / (2 * (grid_steps - 1)))**2
     lj = 4 / grid_step_size**2 * xp.sin(kj * xp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = li[:, None], lj[None, :]
-    mul = 1 / (lambda_i + lambda_j + (1 if subtraction_trick else 0))
+    mul = 1 / (lambda_i + lambda_j + subtraction_coeff)
     return mul / (2 * (grid_steps - 1))**2  
     # return additional 2xDST normalization
 
@@ -92,6 +92,9 @@ def make_plasma_grid(xp: np, steps, step_size, fineness):
     if fineness % 2:  # some on zero axes, none on cell corners
         right_half = xp.arange(steps // 2 * fineness) * plasma_step
         left_half = -right_half[:0:-1]  # invert, reverse, drop zero
+    elif 0. < fineness and fineness < 1.:
+        right_half = xp.arange(steps // (2 / fineness)) * plasma_step
+        left_half = -right_half[:0:-1]  # invert, reverse, drop zero
     else:  # none on zero axes, none on cell corners
         right_half = (.5 + xp.arange(steps // 2 * fineness)) * plasma_step
         left_half = -right_half[::-1]  # invert, reverse
@@ -116,8 +119,8 @@ def make_plasma_single(xp: np, steps, cell_size, fineness=2):
     px = xp.zeros((Np, Np))
     py = xp.zeros((Np, Np))
     pz = xp.zeros((Np, Np))
-    q = xp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2
-    m = xp.ones((Np, Np)) * ELECTRON_MASS / fineness**2
+    q = xp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2 * cell_size**2
+    m = xp.ones((Np, Np)) * ELECTRON_MASS / fineness**2 * cell_size**2
 
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
@@ -201,8 +204,8 @@ def make_plasma_dual(xp: np, steps, cell_size, coarseness=2, fineness=2):
     coarse_px = xp.zeros((Nc, Nc))
     coarse_py = xp.zeros((Nc, Nc))
     coarse_pz = xp.zeros((Nc, Nc))
-    coarse_m = xp.ones((Nc, Nc)) * ELECTRON_MASS * coarseness**2
-    coarse_q = xp.ones((Nc, Nc)) * ELECTRON_CHARGE * coarseness**2
+    coarse_m = xp.ones((Nc, Nc)) * ELECTRON_MASS * coarseness**2 * cell_size**2
+    coarse_q = xp.ones((Nc, Nc)) * ELECTRON_CHARGE * coarseness**2 * cell_size**2
 
     # Calculate indices for coarse -> fine bilinear interpolation
 
@@ -313,9 +316,13 @@ def init_plasma(config: Config, current_time=0):
     grid_step_size        = config.getfloat('window-width-step-size')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
-    plasma_fineness       = config.getint('plasma-fineness')
-    solver_trick          = config.getint('field-solver-subtraction-trick')
+    plasma_fineness       = config.getfloat('plasma-fineness')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
+    subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
+    xi_step_size = config.getfloat('xi-step')
+
+    if plasma_fineness > 1:
+        plasma_fineness = int(plasma_fineness)
 
     # for convenient diagnostics, a cell should be in the center of the grid
     assert grid_steps % 2 == 1
@@ -353,11 +360,23 @@ def init_plasma(config: Config, current_time=0):
 
     # Here we change q and m arrays of plasma particles according to
     # set plasma_zhape:
-    q, m = change_by_plasma_zshape(config, current_time, q, m)    
+    q, m = change_by_plasma_zshape(config, current_time, q, m)
+
+    # We create arrays dx_chaotic, dy_chaotic, dx_chaotic_perp, dy_chaotic_perp
+    # that are used in noise filter, with right sizes:
+    size = x_offt.shape[0]
+    dx_chaotic = xp.zeros((size, size), dtype=xp.float64)
+    dy_chaotic = xp.zeros((size, size), dtype=xp.float64)
+    dx_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
+    dy_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
 
     particles = Arrays(xp, x_init=x_init, y_init=y_init,
                        x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
-                       q=q, m=m)
+                       q=q, m=m,
+                       dx_chaotic=dx_chaotic,
+                       dy_chaotic=dy_chaotic,
+                       dx_chaotic_perp=dx_chaotic_perp, 
+                       dy_chaotic_perp=dy_chaotic_perp)
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
@@ -367,7 +386,7 @@ def init_plasma(config: Config, current_time=0):
     ro_initial = -ro_electrons_initial
 
     dir_matrix = dirichlet_matrix(xp, grid_steps, grid_step_size)
-    mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, solver_trick)
+    mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, subtraction_coeff)
     neu_matrix = neumann_matrix(xp, grid_steps, grid_step_size)
 
     grid = ((np.arange(grid_steps) - grid_steps // 2) * grid_step_size)
@@ -395,14 +414,16 @@ def init_plasma(config: Config, current_time=0):
 
     fields = Arrays(xp, Ex=zeros(), Ey=zeros(), Ez=zeros(),
                     Bx=zeros(), By=zeros(), Bz=zeros(), Phi=zeros())
-
     currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
+    
+    xi_plasma_layer = xi_step_size # We need it this way to start from xi_i = 0
 
-    return fields, particles, currents, const_arrays
+    return fields, particles, currents, const_arrays, xi_plasma_layer
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents, const_arrays = init_plasma(config)
+    fields, particles, currents, const_arrays, xi_plasma_layer =\
+        init_plasma(config)
 
     with fields.xp.load(file=path_to_plasmastate) as state:
         fields = Arrays(fields.xp,
@@ -414,10 +435,22 @@ def load_plasma(config: Config, path_to_plasmastate: str):
                            x_init=state['x_init'], y_init=state['y_init'],
                            q=state['q'], m=state['m'],
                            x_offt=state['x_offt'], y_offt=state['y_offt'],
-                           px=state['px'], py=state['py'], pz=state['pz'])
+                           px=state['px'], py=state['py'], pz=state['pz'], 
+        
+                           dx_chaotic=state['dx_chaotic'],
+                           dy_chaotic=state['dy_chaotic'],
+                           dx_chaotic_perp=state['dx_chaotic_perp'],
+                           dy_chaotic_perp=state['dy_chaotic_perp'])
 
         currents = Arrays(fields.xp,
                           ro=state['ro'], jx=state['jx'],
                           jy=state['jy'], jz=state['jz'])
 
-    return fields, particles, currents, const_arrays
+        try:
+            const_arrays.ro_initial = state['ro_initial']
+        except:
+            pass
+        
+        xi_plasma_layer = float(state['xi_plasma_layer'][0])
+
+    return fields, particles, currents, const_arrays, xi_plasma_layer
