@@ -58,7 +58,7 @@ class BeamDrain:
         self.beam_buffer = BeamParticles(config.xp)
         self.lost_buffer = BeamParticles(config.xp)
 
-    def push_beam_slice(self, beam_layer: BeamParticles):
+    def push_beam_layer(self, beam_layer: BeamParticles):
         """
         Add a beam layer that was moved to the beam buffer.
         """
