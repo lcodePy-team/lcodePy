@@ -4,7 +4,7 @@ import numpy as np
 from .weights import (
     deposit_particles,
     particle_fields,
-    particles_weights,
+    beam_particle_weights,
 )
 
 from .data import BeamParticles as BeamParticles2D
@@ -388,10 +388,10 @@ class BeamCalculator2D():
         next_rho_layout = np.zeros_like(self.rho_layout)
         xi_end = (xi_i+1) * (-self.xi_step)
         if beam_layer.size != 0:
-            j, a00, a01, a10, a11 = particles_weights(beam_layer.r, 
-                                                      beam_layer.xi, 
-                                                      xi_end, self.r_step, 
-                                                      self.xi_step)
+            j, a00, a01, a10, a11 = beam_particle_weights(beam_layer.r, 
+                                                          beam_layer.xi, 
+                                                          xi_end, self.r_step, 
+                                                          self.xi_step)
             deposit_particles(beam_layer.q_norm, 
                               self.rho_layout, next_rho_layout, 
                               j, a00, a01, a10, a11)
