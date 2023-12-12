@@ -35,10 +35,10 @@ def generate_beam(config=default_config, beam_parameters: dict=None):
     # def_beam_segment_params go to BeamSegmentShape. By default, test 1 beam
     # is created.
     beam_shape_params = {
-        'current': 0.01, 'particles_in_layer': 2000, 'rng_seed': 1
+        'current': 0.05, 'particles_in_layer': 2000, 'rng_seed': 1
     }
     def_beam_segment_params = {
-        'length': 5.01, 'ampl': 5., 'xishape': 'cos', 'radius': 1.,
+        'length': 5.01, 'ampl': 1., 'xishape': 'cos', 'radius': 1.,
         'energy': 1000., 'xshift': 0, 'yshift': 0, 'rshape': 'g',
         'angspread': 1e-5, 'angshape': 'l', 'espread': 0, 'eshape': 'm',
         'mass_charge_ratio': 1
