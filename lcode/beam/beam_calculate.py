@@ -458,16 +458,15 @@ class BeamCalculator2D():
             layers : tuple of arrays
                 [lost, move, ramain] beam particles. 
         """
-        lost_slice = BeamParticles2D(0)
-        # lost_sorted_idxes = np.argsort(beam_slice.lost)
-        # beam_slice.particles = beam_slice.particles[lost_sorted_idxes]
-        # beam_slice.dt = beam_slice.dt[lost_sorted_idxes]
-        # beam_slice.remaining_steps = beam_slice.remaining_steps[lost_sorted_idxes]
-        # beam_slice.lost = beam_slice.lost[lost_sorted_idxes]
-        # lost_slice = beam_slice.get_subslice(0, beam_slice.nlost)
-        # beam_slice = beam_slice.get_subslice(beam_slice.nlost, beam_slice.size)
+        sorted_idxes = np.argsort(beam_slice.lost)[::-1]                                           
+        beam_slice.particles = beam_slice.particles[sorted_idxes]                                  
+        beam_slice.dt = beam_slice.dt[sorted_idxes]                                                
+        beam_slice.remaining_steps = beam_slice.remaining_steps[sorted_idxes]                      
+        beam_slice.lost = beam_slice.lost[sorted_idxes]                                            
+        lost_count = np.sum(beam_slice.lost)
+        lost_slice = beam_slice.get_subslice(0, lost_count)
         
-
+        beam_slice = beam_slice.get_subslice(lost_count, beam_slice.size)
         moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
         stable_count = moving_mask.size - np.sum(moving_mask)
 
