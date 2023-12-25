@@ -88,7 +88,7 @@ def vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r,
     layer_xi[idx] = r_vec[2]
     layer_p_r[idx] = (x * p_vec[0] + y * p_vec[1]) / layer_r[idx]
     layer_p_z[idx] = p_vec[2]
-    if magnetic_field == 0:
+    if magnetic_field != 0:
         layer_M[idx] = x * p_vec[1] - y * p_vec[0]
     layer_remaining_steps[idx] = steps_left
     if lost:
@@ -113,7 +113,7 @@ def configure_beam_pusher(config):
     xi_step_p = float(config.get('xi-step'))
     max_radius = float(config.get('window-width'))
     lost_boundary = max(0.9 * max_radius, max_radius - 1)
-    magnetic_field = float(config.get('magnetic-field'))
+    magnetic_field = config.getfloat('magnetic-field')
     locals_spec = {'r_step': nb.float64,
                    'xi_step': nb.float64,
                    'lost_boundary': nb.float64,
@@ -222,6 +222,7 @@ def configure_beam_pusher(config):
                     r_step,
                     xi_step_p,
                 )
+                b_vec[2] += magnetic_field
 
                 p_vec_half_step = p_vec + dt / 2 * np.sign(q_m) * \
                     (e_vec + cross_nb(p_vec / gamma_mass, b_vec))  # Just Lorentz
@@ -469,7 +470,6 @@ class BeamCalculator2D():
         beam_slice = beam_slice.get_subslice(lost_count, beam_slice.size)
         moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
         stable_count = moving_mask.size - np.sum(moving_mask)
-
         sorted_idxes = np.argsort(moving_mask)
         beam_slice.particles = beam_slice.particles[sorted_idxes]
         beam_slice.dt = beam_slice.dt[sorted_idxes]

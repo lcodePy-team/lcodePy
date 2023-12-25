@@ -135,7 +135,6 @@ def _move_one_particle(E_r, E_f, E_z, B_f, B_z,
     p_x = p_xo + d_px
     p_y = p_yo + d_py
     p_z = p_zo + d_pz
-
     # Transform back to cylindrical geometry
     x_new = r + dx
     r_new = np.sqrt(x_new ** 2 + dy ** 2)
@@ -217,13 +216,15 @@ def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
 def get_plasma_particles_mover(config: Config):
     grid_step_size = config.getfloat('window-width-step-size')
     max_radius     = config.getfloat('window-width')
+    magnetic_field = config.getfloat('magnetic-field')
 
     # Move particles one D_XIP step forward
     def move_particles(fields, particles_prev, noise_amplitude, xi_step_size):
         particles = particles_prev.copy()
 
         _move_particles_with_substepping(
-            fields.E_r, fields.E_f, fields.E_z, fields.B_f, fields.B_z,
+            fields.E_r, fields.E_f, fields.E_z, fields.B_f, 
+            fields.B_z + magnetic_field,
             particles.r, particles.p_r, particles.p_f, particles.p_z,
             particles.q, particles.m, particles.age,
             noise_amplitude, grid_step_size, xi_step_size, max_radius)

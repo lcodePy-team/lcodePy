@@ -41,8 +41,6 @@ default_config_values = {
     # Useless parameters (for now):
     'plasma-model': 'P',
     'magnetic-field': 0,
-    'magnetic-field-type': 'c',
-    'magnetic-field-period': 200,
 
     'plasma-temperature': 0,
     'ion-model': 'y',
