@@ -4,7 +4,7 @@ import numpy as np
 from .weights import (
     deposit_particles,
     particle_fields,
-    beam_particle_weights,
+    get_layer_weights,
 )
 
 from .data import BeamParticles as BeamParticles2D
@@ -194,11 +194,11 @@ def configure_beam_pusher(config):
             lost = False
             steps = layer_remaining_steps[idx]
 
-            # Initial impulse and position vectors
-            p_vec, r_vec = beam_to_vec(layer_xi[idx], layer_r[idx], 
-                                              layer_p_z[idx], layer_p_r[idx],
-                                              layer_M[idx])
             while steps > 0:
+                # Initial impulse and position vectors
+                p_vec, r_vec = beam_to_vec(layer_xi[idx], layer_r[idx], 
+                                                  layer_p_z[idx], layer_p_r[idx],
+                                                  layer_M[idx])
                 # Compute approximate position of the particle in the middle of the step
                 gamma_mass = np.sqrt((1 / q_m) ** 2 + np.sum(p_vec ** 2))
                 r_vec_half_step = r_vec + dt / 2 * p_vec / gamma_mass
@@ -240,10 +240,10 @@ def configure_beam_pusher(config):
                     nlost += 1 
                     layer_lost[idx] = True
                     break
-            vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
-                        layer_M, layer_remaining_steps, layer_id,
-                        idx, r_vec, p_vec, steps, lost, 
-                        magnetic_field)
+                vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
+                            layer_M, layer_remaining_steps, layer_id,
+                            idx, r_vec, p_vec, steps, lost, 
+                            magnetic_field)
         return nlost
     return push_particles
 
@@ -389,7 +389,7 @@ class BeamCalculator2D():
         next_rho_layout = np.zeros_like(self.rho_layout)
         xi_end = (xi_i+1) * (-self.xi_step)
         if beam_layer.size != 0:
-            j, a00, a01, a10, a11 = beam_particle_weights(beam_layer.r, 
+            j, a00, a01, a10, a11 = get_layer_weights(beam_layer.r, 
                                                           beam_layer.xi, 
                                                           xi_end, self.r_step, 
                                                           self.xi_step)

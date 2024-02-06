@@ -88,8 +88,7 @@ class MemoryBeamSource(BeamSource):
         self._used_count = 0
         if beam_slice.particles.size == 0:
             return
-        sorted_idxes = np.argsort(-self._beam_slice.xi)
-        self._beam_slice.particles = self._beam_slice.particles[sorted_idxes]
+        self._beam_slice.sort()
         # Remove stub particle for compatibility (xi = -100000)
         if (self._beam_slice.xi[-1] + 100000) < 1:
             self._beam_slice.particles = self._beam_slice.particles[:-1]

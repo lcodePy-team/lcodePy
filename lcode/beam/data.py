@@ -89,3 +89,20 @@ class BeamParticles:
     def mark_lost(self, idx):
         self.lost[idx] = True
         self.nlost += 1
+
+    def sort(self):
+        sorted_idxes = np.argsort(-self.xi)
+        self.particles = self.particles[sorted_idxes]
+        self.xi = self.particles['xi']
+        self.r = self.particles['r']
+        self.p_z = self.particles['p_z']
+        self.p_r = self.particles['p_r']
+        self.M = self.particles['M']
+        self.q_m = self.particles['q_m']
+        self.q_norm = self.particles['q_norm']
+        self.id = self.particles['id']
+
+        self.dt = self.dt[sorted_idxes]
+        self.remaining_steps = self.remaining_steps[sorted_idxes]
+        self.lost = self.lost[sorted_idxes]
+

@@ -23,6 +23,20 @@ def beam_particle_weights(r, xi, xi_end, r_step, xi_step_p):
     return j, a00, a01, a10, a11
 
 
+@nb.njit(cache=True, parallel=True)
+def get_layer_weights(r, xi, xi_end, r_step, xi_step_p):
+    size = r.shape[0]
+    j = np.zeros(size, dtype=np.int_)
+    a00 = np.zeros(size)
+    a01 = np.zeros(size)
+    a10 = np.zeros(size)
+    a11 = np.zeros(size)
+    for idx in nb.prange(size): 
+        j[idx], a00[idx], a01[idx], a10[idx], a11[idx] = \
+            beam_particle_weights(r[idx], xi[idx], xi_end, r_step, xi_step_p)
+    return j, a00, a01, a10, a11
+
+
 @nb.njit(cache=True)
 def deposit_particles(value, out0, out1, j, a00, a01, a10, a11):
     add_at(out0, j + 0, a00 * value)
