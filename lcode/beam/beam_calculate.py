@@ -211,6 +211,10 @@ def configure_beam_pusher(config):
                     # Particle hit the wall and is now lost
                     nlost += 1 
                     layer_lost[idx] = True
+                    vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
+                                layer_M, layer_remaining_steps, layer_id,
+                                idx, r_vec, p_vec, steps, lost, 
+                                magnetic_field)
                     break
 
                 # Interpolate fields and compute new impulse
@@ -239,6 +243,10 @@ def configure_beam_pusher(config):
                     # Particle hit the wall and is now lost
                     nlost += 1 
                     layer_lost[idx] = True
+                    vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
+                                layer_M, layer_remaining_steps, layer_id,
+                                idx, r_vec, p_vec, steps, lost, 
+                                magnetic_field)
                     break
                 vec_to_beam(layer_xi, layer_r, layer_p_z, layer_p_r, 
                             layer_M, layer_remaining_steps, layer_id,
