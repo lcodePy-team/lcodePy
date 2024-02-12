@@ -23,7 +23,7 @@ class BeamParticles:
 
         # Additional particle properties for substepping, not stored in beam
         self.dt = np.zeros(size, dtype=np.float64)
-        self.remaining_steps = np.full(size, 1, dtype=np.int64)
+        self.remaining_steps = np.ones(size, dtype=np.int64)
 
         self.nlost = 0
         self.lost = np.zeros(size, dtype=np.bool8)
