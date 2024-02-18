@@ -26,7 +26,7 @@ class BeamParticles:
         self.remaining_steps = np.ones(size, dtype=np.int64)
 
         self.nlost = 0
-        self.lost = np.zeros(size, dtype=np.bool8)
+        self.lost = np.zeros(size, dtype=np.bool_)
 
     def swap_particles(self, i, j):
         self.particles[i], self.particles[j] = self.particles[j], self.particles[i]
