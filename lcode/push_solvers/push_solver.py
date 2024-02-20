@@ -37,6 +37,10 @@ class PusherAndSolver():
             self.grid_steps = int(max_radius / r_step) + 1
         window_length = config.getfloat('window-length')
         self.xi_steps = int(window_length / self.dxi)
+        
+        #Final plasma state for tests
+        self._plasmastate = None
+    
     
     def _set_beam_particles(self, xp):
         pass
@@ -133,6 +137,7 @@ class PusherAndSolver():
                     pl_particles, pl_fields, rho_beam, moved)
 
             self._simple_diag(current_time, xi_i, pl_fields)
+        self._plasmastate = (pl_particles, pl_fields, pl_currents)
 
 
 class PusherAndSolver2D(PusherAndSolver):
