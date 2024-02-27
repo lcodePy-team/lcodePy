@@ -1,8 +1,9 @@
 import numpy as np
 import numba
 
-from lcode2dPy import DiagnosticsFXi, DiagnosticsColormaps, \
-                      DiagnosticsTransverse, SaveRunState, Cartesian3dSimulation
+from lcode import Simulation 
+from lcode.diagnostics.diagnostics_3d import  DiagnosticsFXi, \
+        DiagnosticsColormaps, DiagnosticsTransverse, SaveRunState
 
 # Checks the number of available threads.
 print(numba.config.NUMBA_NUM_THREADS) 
@@ -18,10 +19,10 @@ config = {
     'window-width-step-size': 0.05,
     'window-width': 16,
 
-    'window-length': 1.5,
+    'window-length': 5,
     'xi-step': 0.05,
 
-    'plasma-particles-per-cell': 1,
+    'plasma-particles-per-cell': 4,
     
     'rigid-beam': True
 }
@@ -40,13 +41,12 @@ print('The length of a beam is', 2 * np.sqrt(2 * np.pi) / COMPRESS)
 # Sets diagnostics and their parameters:
 diag = [DiagnosticsFXi(
             output_period=0, saving_xi_period=10,
-            f_xi='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,Sf,dx_chaotic,'+
-                 'dy_chaotic,dx_chaotic_perp,dy_chaotic_perp',
+            f_xi='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,Sf',
             f_xi_type='both',
             x_probe_lines=np.array([0, 1, 2]), y_probe_lines=[-5, 0, 5]),
         DiagnosticsTransverse(
-            output_period=0, saving_xi_period=1,
-            colormaps='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,px,py,pz,x_offt,y_offt,dx_chaotic,dy_chaotic,dx_chaotic_perp,dy_chaotic_perp',
+            output_period=0, saving_xi_period=0.2,
+            colormaps='Ex,Ey,Ez,Bx,By,Bz,rho,rho_beam,Phi,px,py,pz',
             colormaps_type='both'),
         DiagnosticsColormaps(
             output_period=0, 
@@ -57,7 +57,7 @@ diag = [DiagnosticsFXi(
 # and beam parameters:
 beam_parameters = rho_b_test1
 
-sim = Cartesian3dSimulation(config=config, diagnostics=diag,
+sim = Simulation(config=config, diagnostics=diag,
                             beam_parameters=beam_parameters)
 
 sim.step()
