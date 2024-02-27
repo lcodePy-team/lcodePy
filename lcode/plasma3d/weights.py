@@ -31,8 +31,8 @@ def weight4(x, place):
         return (1 / 2 + x) ** 4 / 24
 
 
-# Deposition #
-@nb.njit(parallel=True)
+# Deposition # TODO make it parallel
+@nb.njit#(parallel=True)
 def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
                          out_ro, out_jx, out_jy, out_jz, size):
     """
@@ -40,13 +40,7 @@ def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
     """
     x_h, y_h, m, q = x_h.ravel(), y_h.ravel(), m.ravel(), q.ravel()
     px, py, pz = px.ravel(), py.ravel(), pz.ravel()
-    num_threads = nb.get_num_threads()
-    out_ro_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
-    out_jx_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
-    out_jy_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
-    out_jz_ = np.zeros(shape = (num_threads, grid_steps, grid_steps))
-    for k in nb.prange(size):
-        thread = nb.get_thread_id()
+    for k in range(size):
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)
@@ -65,23 +59,11 @@ def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
                 w = wx * weight4(y_loc, ky) / grid_step_size 
                 index_x, index_y = ix + kx, iy + ky
 
-                out_ro_[thread, index_x, index_y] += dro * w
-                out_jx_[thread, index_x, index_y] += djx * w
-                out_jy_[thread, index_x, index_y] += djy * w
-                out_jz_[thread, index_x, index_y] += djz * w
+                out_ro[index_x, index_y] += dro * w
+                out_jx[index_x, index_y] += djx * w
+                out_jy[index_x, index_y] += djy * w
+                out_jz[index_x, index_y] += djz * w
 
-    for index_x in nb.prange(out_ro.shape[0]): 
-        for index_y in range(out_ro.shape[1]): 
-            c1 = c2 = c3 = c4 = 0
-            for i in range(num_threads):
-                c1 += out_ro_[i, index_x, index_y] 
-                c2 += out_jx_[i, index_x, index_y] 
-                c3 += out_jy_[i, index_x, index_y] 
-                c4 += out_jz_[i, index_x, index_y] 
-            out_ro[index_x, index_y] = c1
-            out_jx[index_x, index_y] = c2
-            out_jy[index_x, index_y] = c3
-            out_jz[index_x, index_y] = c4
 
 # Helper function for dual plasma approach, for GPU #
 
