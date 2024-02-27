@@ -115,9 +115,9 @@ class BeamCalculator:
 
     def move_beam_layer(self, beam_layer: BeamParticles, fell_size,
                         pl_layer_idx, fields_after_layer, fields_before_layer):
-        lost_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool8)
-        moved_idxes = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool8)
-        fell_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool8)
+        lost_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
+        moved_idxes = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
+        fell_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
 
         if beam_layer.id.size != 0:
             self.start_moving_layer(beam_layer, fell_size)
