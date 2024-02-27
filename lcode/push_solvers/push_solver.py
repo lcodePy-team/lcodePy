@@ -198,6 +198,7 @@ class PusherAndSolver3D:
         self.xi_step_size = config.getfloat('xi-step')
         self.xi_steps = round(self.xi_max / self.xi_step_size)
         self.grid_steps = config.getint('window-width-steps')
+        self._plasmastate = None
 
         # TODO: Get rid of time_step_size and how we change current_time
         #       in step_dt method later, when we figure out how time
@@ -274,3 +275,5 @@ class PusherAndSolver3D:
         for diagnostic in diagnostics_list:
             diagnostic.dump(current_time, xi_plasma_layer, plasma_particles,
                             plasma_fields, plasma_currents, beam_drain)
+        
+        self._plasmastate = (plasma_particles, plasma_fields, plasma_currents)
