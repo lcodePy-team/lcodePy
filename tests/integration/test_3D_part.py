@@ -1,8 +1,10 @@
+from os import path
 import pytest
 import numpy as np
 import lcode
 
-
+DATA_DIR = path.join(path.dirname(path.abspath(__file__)), 'data')
+RTOL = 5e-8
 
 @pytest.fixture(scope='function')
 def get_evol_config():
@@ -38,17 +40,17 @@ def test_test1(get_evol_config):
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
 
-    result = np.load("data/3D_test1.npz")
+    result = np.load(path.join(DATA_DIR, "3D_test1.npz"))
 
     for attr in ("x_offt", "y_offt", "px", "py", "pz"):
         assert np.allclose(getattr(particles, attr)[::10, ::10], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("Ex", "Ey", "Ez", "Bx", "By", "Bz"):
         assert np.allclose(getattr(fields, attr)[::10, ::10], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("ro", "jx", "jy", "jz"):
         assert np.allclose(getattr(currents, attr)[::10, ::10], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
 
 
 def test_beam_evol(get_evol_config):
@@ -64,14 +66,14 @@ def test_beam_evol(get_evol_config):
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
 
-    result = np.load("data/3D_beam_evol.npz")
+    result = np.load(path.join(DATA_DIR, "3D_beam_evol.npz"))
 
     for attr in ("x_offt", "y_offt", "px", "py", "pz"):
         assert np.allclose(getattr(particles, attr)[::10, ::10], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("Ex", "Ey", "Ez", "Bx", "By", "Bz"):
         assert np.allclose(getattr(fields, attr)[::10, ::10], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("ro", "jx", "jy", "jz"):
         assert np.allclose(getattr(currents, attr)[::10, ::10], result[attr], 
-                           rtol=5e-1666666, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)

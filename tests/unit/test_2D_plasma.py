@@ -1,20 +1,24 @@
+from os import path
 import numpy as np
 import pytest
 import lcode
 from lcode.plasma.data import Arrays
 
-init_pl_2D_states = ([("./data/init_plasma/2D_uniform_particles_3.bin", 3),
-                      ("./data/init_plasma/2D_uniform_particles_5.bin", 5),
-                      ("./data/init_plasma/2D_uniform_particles_7.bin", 7),
-                      ("./data/init_plasma/2D_uniform_particles_10.bin", 10),
+DATA_DIR = path.join(path.dirname(path.abspath(__file__)), 'data', 'plasma_solver')
+INIT_DIR = path.join(path.dirname(path.abspath(__file__)), 'data', 'init_plasma')
+
+init_pl_2D_states = ([(path.join(INIT_DIR, "2D_uniform_particles_3.bin"), 3),
+                      (path.join(INIT_DIR, "2D_uniform_particles_5.bin"), 5),
+                      (path.join(INIT_DIR, "2D_uniform_particles_7.bin"), 7),
+                      (path.join(INIT_DIR, "2D_uniform_particles_10.bin"), 10),
                     ])
 
-evol_pl_2D_states = ([("./data/plasma_solver/2D_state_0.npz"),
-                      ("./data/plasma_solver/2D_state_1.npz"),
-                      ("./data/plasma_solver/2D_state_2.npz"),
-                      ("./data/plasma_solver/2D_state_Bz0_0.npz"),
-                      ("./data/plasma_solver/2D_state_Bz0_1.npz"),
-                      ("./data/plasma_solver/2D_state_Bz0_2.npz"),
+evol_pl_2D_states = ([(path.join(DATA_DIR, "2D_state_0.npz")),
+                      (path.join(DATA_DIR, "2D_state_1.npz")),
+                      (path.join(DATA_DIR, "2D_state_2.npz")),
+                      (path.join(DATA_DIR, "2D_state_Bz0_0.npz")),
+                      (path.join(DATA_DIR, "2D_state_Bz0_1.npz")),
+                      (path.join(DATA_DIR, "2D_state_Bz0_2.npz")),
                     ])
 
 @pytest.fixture(scope='function')
