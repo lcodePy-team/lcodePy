@@ -7,10 +7,10 @@ from lcode.plasma.data import Arrays
 DATA_DIR = path.join(path.dirname(path.abspath(__file__)), 'data', 'plasma_solver')
 INIT_DIR = path.join(path.dirname(path.abspath(__file__)), 'data', 'init_plasma')
 
-init_pl_2D_states = ([(path.join(INIT_DIR, "2D_uniform_particles_3.bin"), 3),
-                      (path.join(INIT_DIR, "2D_uniform_particles_5.bin"), 5),
-                      (path.join(INIT_DIR, "2D_uniform_particles_7.bin"), 7),
-                      (path.join(INIT_DIR, "2D_uniform_particles_10.bin"), 10),
+init_pl_2D_states = ([(path.join(INIT_DIR, "2D_uniform_ppc_3.bin"), 3),
+                      (path.join(INIT_DIR, "2D_uniform_ppc_5.bin"), 5),
+                      (path.join(INIT_DIR, "2D_uniform_ppc_7.bin"), 7),
+                      (path.join(INIT_DIR, "2D_uniform_ppc_10.bin"), 10),
                     ])
 
 evol_pl_2D_states = ([(path.join(DATA_DIR, "2D_state_0.npz")),
