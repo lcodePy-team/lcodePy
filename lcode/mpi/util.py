@@ -35,7 +35,7 @@ def mpi_type_from_dtype(dtype: np.dtype) -> MPI.Datatype:
         return _mpi_type_from_builtin(dtype)
     elif dtype.isbuiltin == 2:
         raise ValueError(f'fully custom numpy dtype "{dtype}" is not supported')
-    total_size = particle_dtype.itemsize
+    total_size = dtype.itemsize
     mpi_types = []
     mpi_displacements = []
     for field_name, field_descr in dtype.fields.items():
@@ -46,37 +46,3 @@ def mpi_type_from_dtype(dtype: np.dtype) -> MPI.Datatype:
     struct_type = struct_type.Create_resized(0, total_size)
     struct_type.Commit()
     return struct_type
-
-
-class MPIWorker:
-    particles_type: ClassVar[MPI.Datatype] = mpi_type_from_dtype(particle_dtype)
-
-    def __init__(self, steps: int):
-        self._comm: MPI.Comm = MPI.COMM_WORLD
-        self._rank: int = self._comm.rank
-        self._size: int = self._comm.size
-        self._total_steps: int = steps
-        self._processed_steps: int = 0
-        self._remaining_steps: int = steps // self._size + (1 if steps % self._size > self._rank else 0)
-        if self._size == 1:
-            print('Single process available')
-
-    @property
-    def single_process(self):
-        return self._size == 1
-
-    @property
-    def first_step(self):
-        return self._rank == 0 and self._processed_steps == 0
-
-    @property
-    def last_step(self):
-        return self._rank == ((self._total_steps - 1) % self._size) and self._remaining_steps == 1
-
-    @property
-    def prev_node(self):
-        return (self._rank + self._size - 1) % self._size
-
-    @property
-    def next_node(self):
-        return (self._rank + 1) % self._size

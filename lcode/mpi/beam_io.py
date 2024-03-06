@@ -1,90 +1,112 @@
-import logging
-
 import numpy as np
-from mpi4py import MPI
+from ..beam.data import BeamParticles
+from .transport import MPITransport
+from ..beam3d.data import BeamParticles as BeamParticles3D
 
-from ..beam import BeamParticles
-from ..beam.beam_io import BeamSource, BeamDrain
-from .util import MPIWorker, particle_dtype
+class MPIBeamTransport(MPITransport):
+    def __init__(self, cfg, steps: int, initial_beam, dtype: np.dtype, BeamSource, BeamDrain):
+        MPITransport.__init__(self, steps, dtype)
+        
+        self.BeamSource = BeamSource
+        self.BeamDrain = BeamDrain
+        
+        self.cfg = cfg
+        self.initial_source = BeamSource(cfg, initial_beam)
+        self.final_drain = BeamDrain(cfg)
 
-MPI_TAG_PARTICLES = 1
-
-finish_layer_particle = BeamParticles(1, particles=np.zeros(1, dtype=particle_dtype))
-
-
-class MPIBeamSource(BeamSource, MPIWorker):
-    def __init__(self, steps: int, initial_source: BeamSource):
-        MPIWorker.__init__(self, steps)
-        if self._rank == 0:
-            self._initial_source: BeamSource = initial_source
-        self.xi_finished = 100000.0
-        logging.debug(f'MPIBeamSource: rank {self._rank}, size {self._size}, {steps} steps')
-
-    def _try_read_particles(self):
-        status = MPI.Status()
-        self._comm.Probe(source=self.prev_node, tag=MPI_TAG_PARTICLES, status=status)
-        particles_bufsize = status.Get_count(datatype=self.particles_type)
-        logging.debug(f'MPIBeamSource: probed {particles_bufsize} particles')
-        particles_buf = np.zeros(particles_bufsize, dtype=particle_dtype)
-        self._comm.Recv([particles_buf, MPIWorker.particles_type], source=self.prev_node, tag=MPI_TAG_PARTICLES)
-        return particles_buf
-
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
-        if self.first_step:
-            beam_slice = self._initial_source.get_beam_slice(xi_max, xi_min)
-            return beam_slice
-        assert xi_min < xi_max
-        if xi_min > self.xi_finished:
-            return BeamParticles(0, particles=np.zeros(0, dtype=particle_dtype))
-
-        beam_buffer = []
-        while xi_min <= self.xi_finished:
-            particles_buf = self._try_read_particles()
-            if len(particles_buf) == 1 and particles_buf[0]['id'] == 0:
-                self.xi_finished = particles_buf[0]['xi']
-                logging.debug(f'MPIBeamSource: layer xi = {self.xi_finished:.4} finished')
-                break
-            for particle in particles_buf:
-                if particle['xi'] < xi_min:
-                    logging.debug(f'MPIBeamSource: Wrong particle order, {particle["xi"]} < {xi_min}')
-                if particle['xi'] > xi_max:
-                    logging.debug(f'MPIBeamSource: Wrong particle order, {particle["xi"]} > {xi_max}')
-            beam_buffer.append(particles_buf)
-        if len(beam_buffer) != 0:
-            particles_buf = np.concatenate(beam_buffer)
-            return BeamParticles(len(particles_buf), particles=particles_buf)
-        else:
-            return BeamParticles(0)
-
-
-class MPIBeamDrain(BeamDrain, MPIWorker):
-    def __init__(self, steps: int, final_drain: BeamDrain):
-        MPIWorker.__init__(self, steps)
-        self._final_drain = final_drain
-        if self._rank == (self._total_steps - 1) % self._size:
-            self._final_drain = final_drain
-        logging.debug(f'MPIBeamDrain: rank {self._rank}, size {self._size}, {steps} steps')
-        self.xi_finished = 100000.0
-
-    def finish_layer(self, xi: float) -> None:
-        if xi >= self.xi_finished:
-            logging.debug(f'MPIBeamDrain: repeated finish_layer')
+        self.skip_first = True
+    
+    def push(self, beam_slice) -> None:
+        if self.final_step or self._rank == self._size - 1:
+            self.final_drain.push_beam_slice(beam_slice)
             return
-        if self.last_step:
-            self._final_drain.finish_layer(xi)
+        if self.skip_first:
+            self.skip_first = False
             return
-        finish_xi_particle = np.zeros(1, dtype=particle_dtype)
-        finish_xi_particle[0]['xi'] = xi
-        logging.debug(f'MPIBeamDrain: finish_layer {xi:.4}')
-        self._comm.Send([finish_xi_particle, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
-        self.xi_finished = xi
-
-    def push_beam_slice(self, beam_slice: BeamParticles):
-        if self.last_step:
-            self._final_drain.push_beam_slice(beam_slice)
+        self.send(beam_slice.particles)
+    
+    def push3d(self, beam_layer):
+        if self.final_step or self._rank == self._size - 1:
+            self.final_drain.push_beam_layer(beam_layer)
             return
-        self._comm.Send([beam_slice.particles, self.particles_type], self.next_node, MPI_TAG_PARTICLES)
-        logging.debug(f'MPIBeamDrain: sent {len(beam_slice.particles)} particles')
+        
+        if self.skip_first:
+            self.skip_first = False
+            return
 
-    def push_lost(self, time: float, beam_slice: BeamParticles):
-        pass
+        self.send(beam_layer.particles)
+
+    def pull(self, xi_max, xi_min) -> BeamParticles:
+        if self.first_step or self._rank == 0:
+            return self.initial_source.get_beam_slice(xi_max, xi_min)
+        
+        beam = self.recv()
+        return BeamParticles(beam.size, beam)
+    
+    def pull3d(self, plasma_layer_idx):
+        if self.first_step or self._rank == 0:
+            return self.initial_source.get_beam_layer_to_layout(plasma_layer_idx)
+        buf = self.recv()
+        beam = BeamParticles3D(self.cfg.xp)
+        beam.init_generated(buf)
+     
+        return beam
+    
+    
+    class MPIBeamDrain:
+        def __init__(self, beam_transport):
+            self.beam_transport = beam_transport
+        def push_beam_slice(self, beam_slice):
+            self.beam_transport.push(beam_slice)
+        def beam_slice(self):
+            return self.beam_transport.final_drain.beam_slice()
+        
+        def push_beam_layer(self, beam_layer):
+            self.beam_transport.push3d(beam_layer)
+        
+    
+    class MPIBeamSource:
+        def __init__(self, beam_transport):
+            self.beam_transport = beam_transport
+        def get_beam_slice(self, xi_max, xi_min) -> BeamParticles:
+            return self.beam_transport.pull(xi_max, xi_min)
+        def get_beam_layer_to_layout(self, plasma_layer_idx):
+            return self.beam_transport.pull3d(plasma_layer_idx)
+        
+
+    def get_transports(self):
+        if self.single_process:
+            return [self.initial_source, self.final_drain]
+        return [self.MPIBeamSource(self), self.MPIBeamDrain(self)]
+        
+    def next_step(self):
+
+        is_final = self.final_step
+        is_last = self.last_step
+        
+        self.processed_steps += 1
+        self.skip_first = True
+
+        if is_final:
+            return
+        
+        if self.single_process:
+            particles = self.final_drain.beam_slice()
+            self.initial_source = self.BeamSource(self.cfg, particles)
+            self.final_drain = self.BeamDrain(self.cfg)
+            return 
+        
+        if self._rank == self._size - 1:
+            particles = self.final_drain.beam_slice()
+            if type(particles) == np.ndarray:
+                self.send(particles)
+            else:
+                self.send(particles.particles)
+            self.final_drain = self.BeamDrain(self.cfg)
+            return
+        self.send(np.array([]))
+
+        if self._rank == 0 and not is_last:
+            particles = self.recv()
+            self.initial_source = self.BeamSource(self.cfg, particles)
+            return
