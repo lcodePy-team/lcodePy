@@ -34,7 +34,7 @@ class CylindricalPlasmaSolver(object):
         self.corrector_steps = config.getint('corrector-steps')
 
     # Performs one full step along xi
-    def step_dxi(self, particles, fields, currents, pl_const_arrays, 
+    def step_dxi(self, particles, fields, currents, const_arrays, 
                  rho_beam, rho_beam_prev):
         substeps = 0
         substepping_depth = 0
@@ -55,10 +55,10 @@ class CylindricalPlasmaSolver(object):
             # Predictor step
             particles_new = self.move_particles(
                 fields, particles,
-                noise_amplitude(currents.rho, self.noisereductor_enabled),
-                xi_step_p)
+                noise_amplitude(currents.rho[0,:], self.noisereductor_enabled),
+                xi_step_p, const_arrays)
 
-            currents_new = self.compute_rhoj(particles_new)
+            currents_new = self.compute_rhoj(particles_new, const_arrays)
             charge_move = np.abs(xi_step_p * currents_new.j_z).max()
             need_substepping = charge_move > self.substepping_sensitivity
 
@@ -77,10 +77,11 @@ class CylindricalPlasmaSolver(object):
                 )
                 particles_new = self.move_particles(
                     fields_average, particles,
-                    noise_amplitude(currents_new.rho, self.noisereductor_enabled),
-                    xi_step_p)
+                    noise_amplitude(currents_new.rho[0,:], 
+                                    self.noisereductor_enabled),
+                                    xi_step_p, const_arrays)
 
-                currents_new = self.compute_rhoj(particles_new)
+                currents_new = self.compute_rhoj(particles_new, const_arrays)
             substeps += 1
             while substepping_depth > 0 and substepping_state[substepping_depth] == 1:
                 substepping_state[substepping_depth] = 0

@@ -219,16 +219,19 @@ def get_plasma_particles_mover(config: Config):
     magnetic_field = config.getfloat('magnetic-field')
 
     # Move particles one D_XIP step forward
-    def move_particles(fields, particles_prev, noise_amplitude, xi_step_size):
-        particles = particles_prev.copy()
-
-        _move_particles_with_substepping(
-            fields.E_r, fields.E_f, fields.E_z, fields.B_f, 
-            fields.B_z + magnetic_field,
-            particles.r, particles.p_r, particles.p_f, particles.p_z,
-            particles.q, particles.m, particles.age,
-            noise_amplitude, grid_step_size, xi_step_size, max_radius)
+    def move_particles(fields, particles_prev, noise_amplitude, 
+                       xi_step_size, const_arrays):
+        new_particles = {}
+        for sort in const_arrays.sorts:
+            particles = particles_prev[sort].copy()
+            _move_particles_with_substepping(
+                fields.E_r, fields.E_f, fields.E_z, fields.B_f, 
+                fields.B_z + magnetic_field,
+                particles.r, particles.p_r, particles.p_f, particles.p_z,
+                particles.q, particles.m, particles.age,
+                noise_amplitude, grid_step_size, xi_step_size, max_radius)
+            new_particles[sort] = particles
         
-        return particles
+        return new_particles
     
     return move_particles

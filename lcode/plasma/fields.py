@@ -43,7 +43,6 @@ def compute_e_r(total_rho, j_r, j_r_previous, e_r_previous, previous_factor,
     total_rho_deriv_r = (total_rho[2:] - total_rho[:-2]) / 2 / r_step
 
     j_r_deriv_xi = (j_r - j_r_previous) / xi_step_p
-
     right_part = j_r_deriv_xi - previous_factor * e_r_previous
     right_part[1:-1] += total_rho_deriv_r
     # Boundary conditions
@@ -234,20 +233,22 @@ def get_field_computer(config: Config):
 
         # Other calculations:
         previous_factor = _compute_e_r_previous_factor(
-            currents.rho, currents.j_r, currents.j_f, currents.j_z,
-        )
-        total_rho = currents.rho + rho_beam
-        E_r = compute_e_r(total_rho, currents.j_r,
-                          currents_previous.j_r, fields.E_r,
+                              currents.rho[0,:], currents.j_r[0,:], 
+                              currents.j_f[0,:], currents.j_z[0,:],
+                          )
+        total_rho = np.sum(currents.rho, axis=0) + rho_beam
+        E_r = compute_e_r(total_rho, np.sum(currents.j_r, axis=0),
+                          np.sum(currents_previous.j_r, axis=0), fields.E_r,
                           previous_factor, grid_step_size, xi_step_p)
         previous_factor = np.ones_like(fields.E_f)
-        E_f = compute_e_phi(currents.j_f, currents_previous.j_f,
+        E_f = compute_e_phi(np.sum(currents.j_f, axis=0), 
+                            np.sum(currents_previous.j_f, axis=0),
                             fields.E_f, previous_factor,
                             grid_step_size, xi_step_p)
-        E_z = compute_e_z(currents.j_r, grid_step_size)
-        B_f = compute_b_phi(currents.rho, currents.j_z, E_r,
-                            grid_step_size)
-        B_z = compute_b_z(currents.j_f, grid_step_size)
+        E_z = compute_e_z(np.sum(currents.j_r, axis=0), grid_step_size)
+        B_f = compute_b_phi(np.sum(currents.rho,axis=0), 
+                            np.sum(currents.j_z,axis=0), E_r, grid_step_size)
+        B_z = compute_b_z(np.sum(currents.j_f, axis=0), grid_step_size)
 
         new_fields = Arrays(xp=np, E_r=E_r, E_f=E_f, E_z=E_z, B_f=B_f, B_z=B_z)
     
