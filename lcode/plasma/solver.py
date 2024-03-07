@@ -10,9 +10,10 @@ from .rhoj import get_rhoj_computer
 @njit
 def noise_amplitude(rho, enabled):
     if not enabled:
-        return np.zeros_like(rho)
-    noise_ampl = np.zeros_like(rho)
-    noise_ampl[1:-1] = 2 * rho[1:-1] - rho[2:] - rho[:-2]
+        return np.zeros_like(rho[0,:])
+    noise_ampl = np.zeros_like(rho[0,:])
+    noise_ampl[1:-1] = 2 * (rho[0,1:-1] - rho[1,1:-1]) 
+    noise_ampl[1:-1] += rho[1,2:] + rho[1,:-2] - rho[0,2:] - rho[0,:-2]
     noise_ampl[-1] = -noise_ampl[-2]
     noise_ampl /= 4
     return noise_ampl
@@ -55,8 +56,8 @@ class CylindricalPlasmaSolver(object):
             # Predictor step
             particles_new = self.move_particles(
                 fields, particles,
-                noise_amplitude(currents.rho[0,:], self.noisereductor_enabled),
-                xi_step_p, const_arrays)
+                noise_amplitude(currents.rho, self.noisereductor_enabled),
+                                xi_step_p, const_arrays)
 
             currents_new = self.compute_rhoj(particles_new, const_arrays)
             charge_move = np.abs(xi_step_p * currents_new.j_z).max()
@@ -77,7 +78,7 @@ class CylindricalPlasmaSolver(object):
                 )
                 particles_new = self.move_particles(
                     fields_average, particles,
-                    noise_amplitude(currents_new.rho[0,:], 
+                    noise_amplitude(currents_new.rho, 
                                     self.noisereductor_enabled),
                                     xi_step_p, const_arrays)
 
