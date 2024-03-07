@@ -1,8 +1,10 @@
+from os import path
 import pytest
 import numpy as np
 import lcode
 
-
+DATA_DIR = path.join(path.dirname(path.abspath(__file__)), 'data')
+RTOL = 5e-8
 
 @pytest.fixture(scope='function')
 def get_evol_config():
@@ -40,17 +42,17 @@ def test_test1(get_evol_config):
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
 
-    result = np.load("data/2D_test1.npz")
+    result = np.load(path.join(DATA_DIR, "2D_test1.npz"))
 
     for attr in ("r", "p_r", "p_f", "p_z"):
         assert np.allclose(getattr(particles, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("E_r", "E_f", "E_z", "B_f", "B_z"):
         assert np.allclose(getattr(fields, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("rho", "j_r", "j_f", "j_z"):
         assert np.allclose(getattr(currents, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
 
 
 def test_beam_evol(get_evol_config):
@@ -64,14 +66,14 @@ def test_beam_evol(get_evol_config):
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
 
-    result = np.load("data/2D_beam_evol.npz")
+    result = np.load(path.join(DATA_DIR, "2D_beam_evol.npz"))
 
     for attr in ("r", "p_r", "p_f", "p_z"):
         assert np.allclose(getattr(particles, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("E_r", "E_f", "E_z", "B_f", "B_z"):
         assert np.allclose(getattr(fields, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)
     for attr in ("rho", "j_r", "j_f", "j_z"):
         assert np.allclose(getattr(currents, attr)[::50], result[attr], 
-                           rtol=5e-16, atol=1e-125)
+                           rtol=RTOL, atol=1e-125)

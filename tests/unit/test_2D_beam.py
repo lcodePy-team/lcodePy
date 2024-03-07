@@ -1,14 +1,16 @@
+from os import path
 import numpy as np
 import pytest
 import lcode
 from lcode.plasma.data import Arrays
 
+DATA_DIR = path.join(path.dirname(path.abspath(__file__)), 'data', 'beam_solver')
 
-init_data_2D = ([("./data/beam_solver/2D_state_1.npz", 
+init_data_2D = ([(path.join(DATA_DIR, "2D_state_1.npz"), 
                    {}),
-                 ("./data/beam_solver/2D_state_2.npz",
+                 (path.join(DATA_DIR, "2D_state_2.npz"),
                    {"magnetic-field" : 5}),
-                 ("./data/beam_solver/2D_state_3.npz", 
+                 (path.join(DATA_DIR, "2D_state_3.npz"),
                    {"beam-substepping-energy" : 3900}),
                ])
 
@@ -28,7 +30,7 @@ def get_evol_config_2D():
 
 def test_memory_beam_source(get_evol_config_2D):
     conf = get_evol_config_2D
-    data = np.load("./data/beam_solver/2D_state_1.npz")
+    data = np.load(path.join(DATA_DIR, "2D_state_1.npz"))
     beam_layer = data["init_layer"]
     source = lcode.beam.beam_io.MemoryBeamSource(conf, beam_layer)
     sizes = [6, 106, 403]

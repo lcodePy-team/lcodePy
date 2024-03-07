@@ -38,6 +38,15 @@ class BeamParticles:
         self.id = xp.zeros(0, dtype=xp.int64)
         self.dt = xp.zeros(0, dtype=xp.float64)
         self.remaining_steps = xp.zeros(0, dtype=xp.int64)
+    
+    @property
+    def particles(self):
+        tmp = self.xp.column_stack((
+            self.xi,
+            self.x, self.y, self.px, self.py, self.pz,
+            self.q_m, self.q_norm, self.id
+        ))
+        return self.xp.array(list(zip(*tmp.T)), dtype=particle_dtype3d)
 
     def init_generated(self, beam_array: particle_dtype3d):
         self.xi = self.xp.array(beam_array['xi'])

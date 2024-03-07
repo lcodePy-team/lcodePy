@@ -2,6 +2,7 @@
 __pycache__/
 beamfile*
 venv
+lcode.egg-info/
 *npz
 *png
 *jpg

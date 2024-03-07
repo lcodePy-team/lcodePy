@@ -14,14 +14,15 @@ from .plasma3d import init_plasma_3d, load_plasma_3d
 # Imports beam module, 3d:
 from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D, \
                     RigidBeamSource3D, RigidBeamDrain3D
-
+from .beam3d.data import particle_dtype3d
 # Imports plasma module, 2d:
 from .push_solvers.push_solver import PusherAndSolver2D
 from .plasma import init_plasma_2d, load_plasma_2d
 
-# Imports beam module, 3d:
+# Imports beam module, 2d:
 from .beam import BeamParticles2D, BeamSource2D, BeamDrain2D
-
+from .beam.data import particle_dtype
+from .mpi import MPIBeamTransport
 
 class Simulation:
     """
@@ -92,6 +93,7 @@ class Simulation:
             raise Exception("Sorry, update geometry does not support now.")
             
         if self.__geometry == '3d':
+            self.particle_dtype = particle_dtype3d
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
@@ -101,7 +103,9 @@ class Simulation:
             else:
                 self.BeamParticles, self.BeamSource, self.BeamDrain = \
                     BeamParticles3D, BeamSource3D, BeamDrain3D
+            
         elif self.__geometry == '2d':
+            self.particle_dtype = particle_dtype
             self.__push_solver = PusherAndSolver2D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_2d, load_plasma_2d
@@ -212,6 +216,10 @@ class Simulation:
                                                    beam_particles)
                 self.beam_drain  = self.BeamDrain(self.__config)
 
+                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                                     beam_particles, self.particle_dtype,
+                                                     self.BeamSource, self.BeamDrain)
+
             if self.beam_source is None:
                 # Generate all parameters for a beam:
                 beam_particles = generate_beam(self.__config,
@@ -222,9 +230,17 @@ class Simulation:
                                                    beam_particles)
                 self.beam_drain  = self.BeamDrain(self.__config)
 
+                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                                beam_particles, self.particle_dtype,
+                                                self.BeamSource, self.BeamDrain)
+            
+            self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
+
             # 4. A loop that calculates N time steps:
-            for t_i in range(N_steps):
-                self.current_time = self.current_time + self.__time_step_size
+            for t_i in range(self.MPITransport.steps_per_node):
+
+                self.beam_source, self.beam_drain = self.MPITransport.get_transports()
+
 
                 plasmastate = self.__init_plasmastate(self.current_time)
 
@@ -237,11 +253,9 @@ class Simulation:
                 # Here we transfer beam particles from beam_buffer to
                 # beam_source for the next time step. And create a new beam
                 # drain that is empty.
-                beam_particles = self.beam_drain.beam_slice()
-                self.beam_source = self.BeamSource(self.__config, 
-                                                   beam_particles)
-                self.beam_drain  = self.BeamDrain(self.__config)
+                self.MPITransport.next_step()
 
+                self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
             # 4. As in lcode2d, we save the beam state on reaching the time limit:
             # self.beam_source.beam.save('beamfile') # Do we need it?
             # TODO: Make checkpoints where all simulation information,

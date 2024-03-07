@@ -95,7 +95,6 @@ class PusherAndSolver():
         rho_beam_prev = self._set_rho_beam_array(xp, self.grid_steps)
 
         for xi_i in np.arange(self.xi_steps + 1):
-
             # Get beam particles with xi in [dxi*{xi_i + 1}, dxi*{xi_i})
             # This use to finish rho_beam[xi_i]
             beam_layer_to_layout = self._get_beam_layer(beam_source, xi_i)
@@ -135,8 +134,8 @@ class PusherAndSolver():
                 diagnostic.process(
                     self.config, current_time, xi_i, 
                     pl_particles, pl_fields, rho_beam, moved)
-
-            self._simple_diag(current_time, xi_i, pl_fields)
+            if xi_i % 10 == 0:
+                self._simple_diag(current_time, xi_i, pl_fields)
         self._plasmastate = (pl_particles, pl_fields, pl_currents)
 
 
@@ -175,7 +174,7 @@ class PusherAndSolver2D(PusherAndSolver):
 
             print(
                 f't={current_time:+.4f}, ' + 
-                f'xi={-xi_i * self.dxi:+.4f} Ez={Ez_00:+.16e}'
+                f'xi={-xi_i * self.dxi:+.4f} Ez={Ez_00:+.16e}', flush=True
             )
 
 
@@ -267,8 +266,8 @@ class PusherAndSolver3D:
                 Ez_00 = get(
                     plasma_fields.Ez[self.grid_steps//2, self.grid_steps//2])
                 print(
-                    # f't={current_time:+.4f}, ' + 
-                    f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}')
+                    f't={current_time:+.4f}, ' + 
+                    f'xi={-xi_i * self.xi_step_size:+.4f} Ez={Ez_00:+.4e}', flush=True)
 
         # Perform diagnostics
         xi_plasma_layer = - self.xi_step_size * self.xi_steps
