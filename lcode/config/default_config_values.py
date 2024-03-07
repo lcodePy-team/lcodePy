@@ -43,7 +43,7 @@ default_config_values = {
     'magnetic-field': 0,
 
     'plasma-temperature': 0,
-    'ion-model': 'y',
+    'ion-model': 'mobile',
     'ion-mass': 1836,
 
     # Parameters of plasma model in 2d simulations:
