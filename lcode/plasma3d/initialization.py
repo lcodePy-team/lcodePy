@@ -320,6 +320,7 @@ def init_plasma(config: Config, current_time=0):
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
     subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
     xi_step_size = config.getfloat('xi-step')
+    ion_model = config.get("ion-model")
 
     if plasma_fineness > 1:
         plasma_fineness = int(plasma_fineness)
@@ -370,20 +371,22 @@ def init_plasma(config: Config, current_time=0):
     dx_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
     dy_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
 
-    particles = Arrays(xp, x_init=x_init, y_init=y_init,
-                       x_offt=x_offt, y_offt=y_offt, px=px, py=py, pz=pz,
-                       q=q, m=m,
-                       dx_chaotic=dx_chaotic,
-                       dy_chaotic=dy_chaotic,
-                       dx_chaotic_perp=dx_chaotic_perp, 
-                       dy_chaotic_perp=dy_chaotic_perp)
+    particles = {'electrons' : Arrays(xp, x_init=x_init, y_init=y_init,
+                                      x_offt=x_offt, y_offt=y_offt, 
+                                      px=px, py=py, pz=pz,
+                                      q=q, m=m,
+                                      dx_chaotic=dx_chaotic,
+                                      dy_chaotic=dy_chaotic,
+                                      dx_chaotic_perp=dx_chaotic_perp, 
+                                      dy_chaotic_perp=dy_chaotic_perp)
+                }
 
     # Determine the background ion charge density by depositing the electrons
     # with their initial parameters and negating the result.
     initial_deposition = get_deposit_plasma(config)
-
+    virt_params.sorts = {"electrons" : 0}
     ro_electrons_initial, _, _, _ = initial_deposition(particles, virt_params)
-    ro_initial = -ro_electrons_initial
+    ro_initial = -ro_electrons_initial[0,:,:]
 
     dir_matrix = dirichlet_matrix(xp, grid_steps, grid_step_size)
     mix_matrix = mixed_matrix(xp, grid_steps, grid_step_size, subtraction_coeff)
@@ -409,13 +412,36 @@ def init_plasma(config: Config, current_time=0):
             field_mixed_matrix=mix_matrix,
             neumann_matrix=neu_matrix)
 
-    def zeros():
-        return xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
+    def zeros(size=1):
+        if size == 1:
+            return xp.zeros((grid_steps, grid_steps), dtype=np.float64)
+        else:
+            return xp.zeros(shape=(size,grid_steps, grid_steps), 
+                            dtype=np.float64)
 
     fields = Arrays(xp, Ex=zeros(), Ey=zeros(), Ez=zeros(),
                     Bx=zeros(), By=zeros(), Bz=zeros(), Phi=zeros())
-    currents = Arrays(xp, ro=zeros(), jx=zeros(), jy=zeros(), jz=zeros())
-    
+    currents = Arrays(xp, ro=zeros(2), jx=zeros(2), jy=zeros(2), jz=zeros(2))
+
+    if ion_model == "background" and not dual_plasma_approach:
+        const_arrays.sorts = {"electrons" : 0}
+    elif ion_model == "mobile" and not dual_plasma_approach:
+        ion_mass = config.getfloat("ion-mass")
+        particles["ions"] = Arrays(xp, 
+                                   x_init=x_init.copy(), y_init=y_init.copy(),
+                                   x_offt=x_offt.copy(), y_offt=y_offt.copy(), 
+                                   px=px.copy(), py=py.copy(), pz=pz.copy(),
+                                   q=-q.copy(), m=ion_mass * m.copy(),
+                                   dx_chaotic=dx_chaotic.copy(),
+                                   dy_chaotic=dy_chaotic.copy(),
+                                   dx_chaotic_perp=dx_chaotic_perp.copy(), 
+                                   dy_chaotic_perp=dy_chaotic_perp.copy()
+                                  )
+        const_arrays.sorts = {"electrons" : 0, "ions" : 1}
+                
+        
+
+
     xi_plasma_layer = xi_step_size # We need it this way to start from xi_i = 0
 
     return fields, particles, currents, const_arrays, xi_plasma_layer

@@ -275,9 +275,21 @@ def get_field_computer(config: Config):
 
     def compute_fields(
         fields, fields_prev, const, rho_beam_full, rho_beam_prev,
-        currents_prev, currents_full
+        _currents_prev, _currents_full
     ):
         # Looks terrible! TODO: rewrite this function entirely
+        xp = _currents_full.xp
+        currents_full = Arrays(xp=xp,
+                               ro=xp.sum(_currents_full.ro, axis=0), 
+                               jx=xp.sum(_currents_full.jx, axis=0), 
+                               jy=xp.sum(_currents_full.jy, axis=0), 
+                               jz=xp.sum(_currents_full.jz, axis=0))
+        
+        currents_prev = Arrays(xp=xp,
+                               ro=xp.sum(_currents_prev.ro, axis=0), 
+                               jx=xp.sum(_currents_prev.jx, axis=0), 
+                               jy=xp.sum(_currents_prev.jy, axis=0), 
+                               jz=xp.sum(_currents_prev.jz, axis=0),)
 
         Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By(
             mix2d, grid_step_size, xi_step_size, subtraction_coeff, const,
