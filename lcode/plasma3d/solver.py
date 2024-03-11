@@ -14,7 +14,7 @@ class Plane2d3vPlasmaSolver(object):
             get_plasma_particles_mover(config)
 
         self.noise_filter = get_noise_filter(config)
-        self.noise_filter_enabled = config.getbool('enable-noise-filter')
+        self.noise_filter_enabled = config.getbool('noise-reductor-enabled')
 
     # Perfoms one full step along xi.
     # To understand the numerical scheme, read values as following:

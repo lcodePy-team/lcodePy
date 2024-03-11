@@ -11,7 +11,7 @@ def get_evol_config():
     return { 'geometry': '3d',
              'processing-unit-type': 'cpu',
 
-             'window-width': 16,
+             'window-width': 8,
              'window-width-step-size': 0.05,
 
              'window-length': 10, 
@@ -59,7 +59,6 @@ def test_beam_evol(get_evol_config):
     config = get_evol_config
     config["window-length"] = 5
     config["time-limit"] = 5
-    config["enable-noise-filter"] = False
     beam_parameters = {'current': 0.5, 'particles_in_layer': 1000} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,

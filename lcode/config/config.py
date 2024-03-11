@@ -127,6 +127,18 @@ class Config:
                 import cupy as cp
                 self.xp = cp
 
+        if (option_name == 'geometry' and \
+            self.config_values['geometry'] == "circ"):
+            # 2d and circ are now the same.
+            self.config_values['geometry'] = '2d'
+
+    def _correct_window_width_3d(self):
+        """
+        Adjust the width of the window to fit the 2d case.
+        """
+        if self.get('geometry')  == '3d':
+            self.set('window-width', 2 * self.getfloat('window-width'))
+
     def adjust_window_width_and_steps_3d(self):
         """
         Calculates the optimal number for window-width-steps and uses
