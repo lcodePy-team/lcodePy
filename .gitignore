@@ -1,6 +1,8 @@
 .ipynb_checkpoints/
 __pycache__/
 beamfile*
+.pytest_cache/
+.vscode
 venv
 lcode.egg-info/
 *npz
@@ -8,4 +10,6 @@ lcode.egg-info/
 *jpg
 *.prof
 diagnostics/
+!lcode/diagnostics/
+
 # *.ipynb
