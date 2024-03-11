@@ -3,7 +3,10 @@ import functools
 from .beam_segment_shape import BeamSegmentShape
 
 class BeamShape:
-    def __init__(self, **beam_shape_params):
+    def __init__(self, config, **beam_shape_params):
+        # adjust current to match 2d and 3d beam
+        if config.get("geometry").lower() == "3d":
+            beam_shape_params['current'] *= 2 * 3.1415926535897932
         self.current = beam_shape_params['current']
         self.particles_in_layer = beam_shape_params['particles_in_layer']
         self.rng_seed = beam_shape_params['rng_seed']

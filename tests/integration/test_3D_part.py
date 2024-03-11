@@ -31,7 +31,7 @@ def test_test1(get_evol_config):
 
     config = get_evol_config
     default = {'length' : 5.013256548}
-    beam_parameters = {'current': 0.05 * (2*3.14), 'particles_in_layer': 5000, 
+    beam_parameters = {'current': 0.05, 'particles_in_layer': 5000, 
                        'default' : default} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
@@ -60,7 +60,7 @@ def test_beam_evol(get_evol_config):
     config["window-length"] = 5
     config["time-limit"] = 5
     config["enable-noise-filter"] = False
-    beam_parameters = {'current': 0.5 * (2*3.14), 'particles_in_layer': 1000} 
+    beam_parameters = {'current': 0.5, 'particles_in_layer': 1000} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
                                  beam_parameters=beam_parameters)
