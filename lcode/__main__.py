@@ -14,13 +14,13 @@ def main():
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(help="sub-command help", dest="subparser_name")
     
-    generate_parser = subparsers.add_parser("generate", help="create default config")
+    generate_parser = subparsers.add_parser("get", help="generate example")
     __available_configs = get_available_configs()
     generate_parser.add_argument('config_name', type=str, help="Name of the config: {}".format(", ".join(__available_configs)))
     args = parser.parse_args()
     
 
-    if args.subparser_name == "generate":
+    if args.subparser_name == "get":
         if args.config_name not in __available_configs:
             print(f'Choose from {" ,".join(__available_configs)}')
             return

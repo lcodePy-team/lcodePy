@@ -70,7 +70,7 @@ def conv_2d(arr: np.ndarray, merging_xi: int, merging_r: int):
 def calculate_energy_fluxes(grid_step_size,
                             plasma_particles: Arrays, plasma_fields: Arrays):
     # xp is either np (numpy) or cp (cupy):
-    xp = plasma_particles.xp
+    xp = plasma_particles['electrons'].xp
 
     # The perturbation to the flux density of the electromagnetic energy:
     Se = (plasma_fields.Ez ** 2 + plasma_fields.Bz ** 2 +
@@ -78,6 +78,7 @@ def calculate_energy_fluxes(grid_step_size,
          (plasma_fields.Ey + plasma_fields.Bx) ** 2) * grid_step_size ** 2 / 2
 
     # Additional array to calculate the motion energy of plasma particles:
+    plasma_particles = plasma_particles['electrons'] # TODO fix it
     gamma_m = xp.sqrt(plasma_particles.m ** 2  + plasma_particles.px ** 2 +
                       plasma_particles.py ** 2 + plasma_particles.pz ** 2)
     motion_energy = gamma_m - plasma_particles.m
@@ -92,7 +93,7 @@ def calculate_energy_fluxes(grid_step_size,
 # TODO: Add a template class for diagnostics.
 
 class DiagnosticsFXi:
-    __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
+    __allowed_f_xi = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'ni' 'rho_beam',
                       'Phi', 'Sf',
                       'dx_chaotic', 'dy_chaotic',
                       'dx_chaotic_perp', 'dy_chaotic_perp']
@@ -181,7 +182,7 @@ class DiagnosticsFXi:
                        plasma_particles: Arrays, plasma_fields: Arrays,
                        plasma_currents: Arrays, ro_beam):
         if self.conditions_check(current_time, xi_plasma_layer):
-            xp = plasma_particles.xp
+            xp = plasma_particles["electrons"].xp
             self.__data['xi'].append(xi_plasma_layer)
 
             for name in self.__f_xi_names:
@@ -189,9 +190,14 @@ class DiagnosticsFXi:
                     val = getattr(plasma_fields, name)[self.__ax_x, self.__ax_y]
                     self.__data[name].append(get(val))
 
-                if name == 'rho':
+                if name == 'ne':
                     # TODO: It's just a crutch!!!
-                    val = getattr(plasma_currents, 'ro')[self.__ax_x, self.__ax_y]
+                    val = getattr(plasma_currents, 'ro')[0,self.__ax_x, self.__ax_y]
+                    self.__data[name].append(get(val))
+                
+                if name == 'ni':
+                    # TODO: It's just a crutch!!!
+                    val = getattr(plasma_currents, 'ro')[1,self.__ax_x, self.__ax_y]
                     self.__data[name].append(get(val))
 
                 if name == 'rho_beam':
@@ -203,13 +209,13 @@ class DiagnosticsFXi:
                                                   plasma_particles,
                                                   plasma_fields)
                     self.__data[name].append(get(val))
-
+                
                 if name in ['dx_chaotic', 'dy_chaotic']:
-                    val = xp.amax(xp.absolute(getattr(plasma_particles, name)))
+                    val = xp.amax(xp.absolute(getattr(plasma_particles['electrons'], name)))
                     self.__data[name].append(get(val))
 
                 if name in ['dx_chaotic_perp', 'dy_chaotic_perp']:
-                    kvl_mass = getattr(plasma_particles, name[0:10])
+                    kvl_mass = getattr(plasma_particles['electrons'], name[0:10])
                     a1 = int(xp.shape(kvl_mass)[0] / 6)
                     a2 = 5 * a1
                     val = xp.amax(xp.absolute(kvl_mass[a1:a2,a1:a2]))
@@ -234,7 +240,7 @@ class DiagnosticsFXi:
             Path(f'./diagnostics{self.__unique_directory_name}').mkdir(
                  parents=True, exist_ok=True)
             if 'numbers' in self.__f_xi_type or 'both' in self.__f_xi_type:
-                plasma_particles.xp.savez(
+                plasma_particles["electrons"].xp.savez(
                     f'./diagnostics{self.__unique_directory_name}/' + 
                     f'f_xi_{current_time:08.2f}.npz',
                     **self.__data)
@@ -257,8 +263,8 @@ class DiagnosticsFXi:
 class DiagnosticsColormaps:
     # By default, colormaps are taken in (y, xi) plane.
     # TODO: Make (x, xi) plane an option.
-    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho', 'rho_beam',
-                           'Phi', 'y_offt', 'y_plasma_particles']
+    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne', 'ni', 
+                           'rho_beam', 'Phi', 'y_offt', 'y_plasma_particles']
                         # 'ni']
                     # TODO: add them and functionality!
     __allowed_colormaps_type = ['numbers']
@@ -363,8 +369,13 @@ class DiagnosticsColormaps:
                         self.__grid_steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(get(val))
 
-                if name == 'rho':
-                    val = getattr(plasma_currents, 'ro')[
+                if name == 'ne':
+                    val = getattr(plasma_currents, 'ro')[0,
+                        self.__grid_steps//2, self.__r_f:self.__r_t]
+                    self.__data[name].append(get(val))
+
+                if name == 'ni':
+                    val = getattr(plasma_currents, 'ro')[1,
                         self.__grid_steps//2, self.__r_f:self.__r_t]
                     self.__data[name].append(get(val))
 
@@ -454,8 +465,8 @@ class DiagnosticsColormaps:
 
 
 class DiagnosticsTransverse:
-    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'rho',
-                           'rho_beam', 'Phi', # 'ni',
+    __allowed_colormaps = ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'ne',
+                           'rho_beam', 'Phi', 'ni',
                            'px', 'py', 'pz', 'x_offt', 'y_offt',
                            'dx_chaotic', 'dy_chaotic',
                            'dx_chaotic_perp', 'dy_chaotic_perp']
@@ -467,7 +478,7 @@ class DiagnosticsTransverse:
     #       on the grid: fields and currents.
 
     def __init__(self, output_period=100, saving_xi_period=1000,
-                 colormaps='rho', colormaps_type='pictures',
+                 colormaps='ne', colormaps_type='pictures',
                  unique_directory_name=''):
         # It creates a list of string elements such as Ez, Ex, By...
         self.__colormaps_names = from_str_into_list(colormaps)
@@ -529,10 +540,16 @@ class DiagnosticsTransverse:
                     get(getattr(plasma_fields, name).T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
-            if name == 'rho':
+            if name == 'ne':
                 plt.imsave(
                     f'./diagnostics{self.__unique_directory_name}/' + fname,
-                    get(getattr(plasma_currents, 'ro').T), origin='lower',
+                    get(getattr(plasma_currents, 'ro')[0,:,:].T), origin='lower',
+                    vmin=-0.1, vmax=0.1, cmap='bwr')
+            
+            if name == 'ni':
+                plt.imsave(
+                    f'./diagnostics{self.__unique_directory_name}/' + fname,
+                    get(getattr(plasma_currents, 'ro')[1,:,:].T), origin='lower',
                     vmin=-0.1, vmax=0.1, cmap='bwr')
 
             if name == 'rho_beam':
@@ -554,8 +571,11 @@ class DiagnosticsTransverse:
             if name in ['Ex', 'Ey', 'Ez', 'Bx', 'By', 'Bz', 'Phi']:
                 data_for_saving[name] = getattr(plasma_fields, name)
 
-            if name == 'rho':
-                data_for_saving[name] = getattr(plasma_currents, 'ro')
+            if name == 'ne':
+                data_for_saving[name] = getattr(plasma_currents, 'ro')[0,:,:]
+
+            if name == 'ni':
+                data_for_saving[name] = getattr(plasma_currents, 'ro')[1,:,:]
 
             if name == 'rho_beam':
                 data_for_saving[name] = ro_beam
