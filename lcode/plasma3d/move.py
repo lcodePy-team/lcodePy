@@ -294,48 +294,55 @@ def get_plasma_particles_mover(config: Config):
         move_wo_fields_kernel = get_move_wo_fields_kernel_cupy()
         move_smart_kernel = get_move_smart_kernel_cupy()
 
-    def move_particles_wo_fields(particles: Arrays):
+    def move_particles_wo_fields(particles: dict, const_arrays: Arrays):
         """
         Move coarse plasma particles as if there were no fields.
         Also reflect the particles from `+-reflect_boundary`.
         """
         # NOTE: We need to copy particles to discriminate
         #       particles_full and particles_prev.
-        particles_full = particles.copy()
+        particles_full = {}
+        for sort in const_arrays.sorts:
+            particles_full[sort] = particles[sort].copy()
 
-        move_wo_fields_kernel(
-            xi_step_size, reflect_boundary, particles_full.m,
-            particles_full.x_init, particles_full.y_init,
-            particles_full.x_offt, particles_full.y_offt,
-            particles_full.px, particles_full.py, particles_full.pz,
-            size=particles_full.m.size)
+        for sort in const_arrays.sorts:
+            move_wo_fields_kernel(
+                xi_step_size, reflect_boundary, particles_full[sort].m,
+                particles_full[sort].x_init, particles_full[sort].y_init,
+                particles_full[sort].x_offt, particles_full[sort].y_offt,
+                particles_full[sort].px, particles_full[sort].py, 
+                particles_full[sort].pz, size=particles_full[sort].m.size)
 
         return particles_full
 
     def move_particles_smart(
-        fields: Arrays, particles_prev: Arrays, particles_full: Arrays):
+        fields: Arrays, particles_prev: dict, particles_full: dict,
+        const_arrays: Arrays):
         """
         Update plasma particle coordinates and momenta according to the
         field values interpolated halfway between the previous plasma
         particle location and the the best estimation of its next location
         currently available to us.
         """
-        move_smart_kernel(
-            xi_step_size, reflect_boundary, grid_step_size, grid_steps,
+        for sort in const_arrays.sorts:
+            move_smart_kernel(
+                xi_step_size, reflect_boundary, grid_step_size, grid_steps,
 
-            particles_prev.m, particles_prev.q,
-            particles_prev.x_init, particles_prev.y_init,
+                particles_prev[sort].m, particles_prev[sort].q,
+                particles_prev[sort].x_init, particles_prev[sort].y_init,
 
-            particles_prev.x_offt, particles_prev.y_offt,
-            particles_prev.px, particles_prev.py, particles_prev.pz,
+                particles_prev[sort].x_offt, particles_prev[sort].y_offt,
+                particles_prev[sort].px, particles_prev[sort].py, 
+                particles_prev[sort].pz,
 
-            fields.Ex, fields.Ey, fields.Ez,
-            fields.Bx, fields.By, fields.Bz,
+                fields.Ex, fields.Ey, fields.Ez,
+                fields.Bx, fields.By, fields.Bz,
 
-            particles_full.x_offt, particles_full.y_offt,
-            particles_full.px, particles_full.py, particles_full.pz,
+                particles_full[sort].x_offt, particles_full[sort].y_offt,
+                particles_full[sort].px, particles_full[sort].py, 
+                particles_full[sort].pz,
 
-            size=particles_prev.m.size)
+                size=particles_prev[sort].m.size)
 
         return particles_full
 

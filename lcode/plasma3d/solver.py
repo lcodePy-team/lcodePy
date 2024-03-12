@@ -14,7 +14,7 @@ class Plane2d3vPlasmaSolver(object):
             get_plasma_particles_mover(config)
 
         self.noise_filter = get_noise_filter(config)
-        self.noise_filter_enabled = config.getbool('enable-noise-filter')
+        self.noise_filter_enabled = config.getbool('noise-reductor-enabled')
 
     # Perfoms one full step along xi.
     # To understand the numerical scheme, read values as following:
@@ -26,12 +26,13 @@ class Plane2d3vPlasmaSolver(object):
         self, particles_prev, fields_prev, currents_prev, const_arrays,
         rho_beam_full, rho_beam_prev
     ):
-        particles_full = self.move_particles_wo_fields(particles_prev)
+        particles_full = self.move_particles_wo_fields(particles_prev, 
+                                                       const_arrays)
 
         # particles_full = self.noise_filter(particles_full, particles_prev)
 
         particles_full = self.move_particles(
-            fields_prev, particles_prev, particles_full
+            fields_prev, particles_prev, particles_full, const_arrays
         )
 
         # particles_full = self.noise_filter(particles_full, particles_prev)
@@ -46,7 +47,7 @@ class Plane2d3vPlasmaSolver(object):
         )
 
         particles_full = self.move_particles(
-            fields_half, particles_prev, particles_full
+            fields_half, particles_prev, particles_full, const_arrays
         )
 
         # particles_full = self.noise_filter(particles_full, particles_prev)
@@ -61,12 +62,14 @@ class Plane2d3vPlasmaSolver(object):
         )
 
         particles_full = self.move_particles(
-            fields_half, particles_prev, particles_full
+            fields_half, particles_prev, particles_full, const_arrays
         )
 
         if self.noise_filter_enabled:
             # Here we perform noise filtering after the end of the movement:
-            particles_full = self.noise_filter(particles_full, particles_prev)
+            particles_full["electrons"] = \
+                            self.noise_filter(particles_full["electrons"], 
+                                              particles_prev["electrons"])
 
         currents_full = self.compute_rhoj(
             particles_full, const_arrays

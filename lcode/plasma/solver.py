@@ -10,9 +10,10 @@ from .rhoj import get_rhoj_computer
 @njit
 def noise_amplitude(rho, enabled):
     if not enabled:
-        return np.zeros_like(rho)
-    noise_ampl = np.zeros_like(rho)
-    noise_ampl[1:-1] = 2 * rho[1:-1] - rho[2:] - rho[:-2]
+        return np.zeros_like(rho[0,:])
+    noise_ampl = np.zeros_like(rho[0,:])
+    noise_ampl[1:-1] = 2 * (rho[0,1:-1] - rho[1,1:-1]) 
+    noise_ampl[1:-1] += rho[1,2:] + rho[1,:-2] - rho[0,2:] - rho[0,:-2]
     noise_ampl[-1] = -noise_ampl[-2]
     noise_ampl /= 4
     return noise_ampl
@@ -34,7 +35,7 @@ class CylindricalPlasmaSolver(object):
         self.corrector_steps = config.getint('corrector-steps')
 
     # Performs one full step along xi
-    def step_dxi(self, particles, fields, currents, pl_const_arrays, 
+    def step_dxi(self, particles, fields, currents, const_arrays, 
                  rho_beam, rho_beam_prev):
         substeps = 0
         substepping_depth = 0
@@ -56,9 +57,9 @@ class CylindricalPlasmaSolver(object):
             particles_new = self.move_particles(
                 fields, particles,
                 noise_amplitude(currents.rho, self.noisereductor_enabled),
-                xi_step_p)
+                                xi_step_p, const_arrays)
 
-            currents_new = self.compute_rhoj(particles_new)
+            currents_new = self.compute_rhoj(particles_new, const_arrays)
             charge_move = np.abs(xi_step_p * currents_new.j_z).max()
             need_substepping = charge_move > self.substepping_sensitivity
 
@@ -77,10 +78,11 @@ class CylindricalPlasmaSolver(object):
                 )
                 particles_new = self.move_particles(
                     fields_average, particles,
-                    noise_amplitude(currents_new.rho, self.noisereductor_enabled),
-                    xi_step_p)
+                    noise_amplitude(currents_new.rho, 
+                                    self.noisereductor_enabled),
+                                    xi_step_p, const_arrays)
 
-                currents_new = self.compute_rhoj(particles_new)
+                currents_new = self.compute_rhoj(particles_new, const_arrays)
             substeps += 1
             while substepping_depth > 0 and substepping_state[substepping_depth] == 1:
                 substepping_state[substepping_depth] = 0

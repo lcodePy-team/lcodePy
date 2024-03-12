@@ -23,6 +23,7 @@ def get_evol_config():
 
             'plasma-particles-per-cell': 10,
             'noise-reductor-enabled' : False,
+            
            }
 
     
@@ -32,6 +33,7 @@ def get_evol_config():
 def test_test1(get_evol_config):
 
     config = get_evol_config
+    config["ion-model"] = 'background'
     default = {'length' : 5.013256548}
     beam_parameters = {'current': 0.05, 'particles_in_layer': 5000, 
                        'default' : default} 
@@ -41,6 +43,7 @@ def test_test1(get_evol_config):
    
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
+    particles = particles["electrons"]
 
     result = np.load(path.join(DATA_DIR, "2D_test1.npz"))
 
@@ -51,7 +54,7 @@ def test_test1(get_evol_config):
         assert np.allclose(getattr(fields, attr)[::50], result[attr], 
                            rtol=RTOL, atol=1e-125)
     for attr in ("rho", "j_r", "j_f", "j_z"):
-        assert np.allclose(getattr(currents, attr)[::50], result[attr], 
+        assert np.allclose(getattr(currents, attr)[0,::50], result[attr], 
                            rtol=RTOL, atol=1e-125)
 
 
@@ -65,6 +68,7 @@ def test_beam_evol(get_evol_config):
                                  beam_parameters=beam_parameters)
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
+    particles = particles["electrons"]
 
     result = np.load(path.join(DATA_DIR, "2D_beam_evol.npz"))
 
@@ -75,5 +79,5 @@ def test_beam_evol(get_evol_config):
         assert np.allclose(getattr(fields, attr)[::50], result[attr], 
                            rtol=RTOL, atol=1e-125)
     for attr in ("rho", "j_r", "j_f", "j_z"):
-        assert np.allclose(getattr(currents, attr)[::50], result[attr], 
+        assert np.allclose(getattr(currents, attr)[0,::50], result[attr], 
                            rtol=RTOL, atol=1e-125)

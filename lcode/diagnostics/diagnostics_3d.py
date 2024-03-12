@@ -204,9 +204,15 @@ class DiagnosticsFXi:
                                                   plasma_fields)
                     self.__data[name].append(get(val))
 
-                if name in ['dx_chaotic', 'dy_chaotic',
-                            'dx_chaotic_perp', 'dy_chaotic_perp']:
+                if name in ['dx_chaotic', 'dy_chaotic']:
                     val = xp.amax(xp.absolute(getattr(plasma_particles, name)))
+                    self.__data[name].append(get(val))
+
+                if name in ['dx_chaotic_perp', 'dy_chaotic_perp']:
+                    kvl_mass = getattr(plasma_particles, name[0:10])
+                    a1 = int(xp.shape(kvl_mass)[0] / 6)
+                    a2 = 5 * a1
+                    val = xp.amax(xp.absolute(kvl_mass[a1:a2,a1:a2]))
                     self.__data[name].append(get(val))
 
         # We use dump here to save data not only at the end of the simulation

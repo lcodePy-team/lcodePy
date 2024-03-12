@@ -1,7 +1,7 @@
 """Default values for a lcodePy config."""
 
 default_config_values = {
-    'geometry': 'circ', # or 3d or 2d_plane
+    'geometry': 'circ', # circ or 3d now available.
 
     # Here we set the type of processing unit: CPU or GPU.
     # For now, GPU can be used only for 3d simulations.
@@ -9,77 +9,96 @@ default_config_values = {
 
     # Parameters of simulation window:
 
-    # window-width has different meanings in 2d and 3d! window-width is the length
-    # of the square window in 3d, border to border. And window-width is the length
-    # from the main axis to a border in 2d.
+    ## Window-width from the main axis to a boundary.
     'window-width': 5.0,
     'window-width-step-size': 0.05,
 
-    # Here we set a window length along xi axis.
+    ## Here we set a window length along xi axis.
     'window-length': 15.0,
     'xi-step': 0.05,
 
-    # Set time-limit a bit bigger than the last time moment you want to calculate.
+    ## Set time-limit a bit bigger than the last time moment you want to calculate.
     'time-limit': 200.5,
     'time-step': 25,
-    'continuation': 'n', # for 3d - only 'n' is available
-    # TODO: implement other models for 3d simulation
 
     # Parameters of plasma model:
-    # The number of plasma particles per one cell must be the square of a number
-    # in 3d. This parameter will be adjusted if 3d geometry is chosen by finding
-    # the closest square number to plasma-particles-per-cell parameter.
+
+    ## The number of plasma particles per one cell must be the square of a number
+    ## in 3d. This parameter will be adjusted if 3d geometry is chosen by finding
+    ## the closest square number to plasma-particles-per-cell parameter.
     'plasma-particles-per-cell': 10,
-
-    # Parameters of beam model:
-    'rigid-beam': False, # Only this parameter from this group is used in 3d
-    'beam-substepping-energy': 2,
-    'focusing': 'n',
-    'foc-period': 100,
-    'foc-strength': 0.1,
-
-    # Useless parameters (for now):
-    'plasma-model': 'P',
-    'magnetic-field': 0,
-
-    'plasma-temperature': 0,
-    'ion-model': 'y',
+    'ion-model': 'mobile',
     'ion-mass': 1836,
 
-    # Parameters of plasma model in 2d simulations:
-    'trapped-path-limit': 0,
+    ## Numerical noise reduction.
     'noise-reductor-enabled': False,
+    ### The following parameters are used for 3d noise reduction, 
+    ### for 2d they are ignored. 
+    'filter-window-length': 3,
+    'filter-coefficient': 0.3,
+    'damping-coefficient': 0.1,
+    'dx-max': 1e-3,
+    
+    
+    ## Longitudinal profile for plasma density. For 3d only. 
+    'plasma-zshape': '',
 
+
+    # Parameters of beam model:
+    'beam-substepping-energy': 2,
+
+#This part of the configuration contains experimental and unfinished options. 
+#There is no guarantee that it will work or develop in the future. 
+
+    # Partially supported options: 
+
+    # Plasma:
+    ## Bz amplitude, supported for 2D only.
+    'magnetic-field': 0,
+    
+    ## Plasma transverse profile settings, 2d only.
     'plasma-profile': 1,
     'plasma-width': 2,
     'plasma-width-2': 1,
     'plasma-density-2': 0.5,
-
+    
+    ## Longitudinal substepping, 2d only
     'substepping-depth': 3,
     'substepping-sensitivity': 0.2,
 
-    # Parameters of plasma model in 3d simulations:
-    # TODO: add other parameters to 3d simulations
-    # For more information about these parameters, look up the documentation manual
-    # of lcode3d.
-    'plasma-zshape': '',
-    
-    'field-solver-variant-A': True,
-
+    ## Parameters of the area available for motion of plasma particles, 3d only.
     'reflect-padding-steps': 10,
     'plasma-padding-steps': 15,
 
+    ## Dual plasma approache for 3d, only GPU  
     'dual-plasma-approach': False,
     'plasma-coarseness': 5,
+    # Beam:
 
-    # Conflicts:
+    ## It works for 3d with an unusual beam configuration.
+    'rigid-beam': False, 
+    ####
+    
+    # Options not currently supported:
+
+    ## Plasma:
+    'plasma-temperature': 0,
+    'trapped-path-limit': 0,
+
+    ## Beam:
+    'focusing': 'n',
+    'foc-period': 100,
+    'foc-strength': 0.1,
+    ####
+
+# Developer settings
+    'field-solver-subtraction-coefficient': 1,
+    'field-solver-variant-A': True,
     'corrector-steps': 2, # Can we even change this???
 
-    'filter-window-length': 5,
+
+# Useless legacy parameters.
     'filter-polyorder': 3,
-    'filter-coefficient': 0,
-    'damping-coefficient': 0,
-    'dx-max': 1,
-    'field-solver-subtraction-coefficient': 1,
-    'enable-noise-filter': True
+    'plasma-model': 'P',
+    'continuation': 'n', 
 }

@@ -94,6 +94,7 @@ class Simulation:
             
         if self.__geometry == '3d':
             self.particle_dtype = particle_dtype3d
+            self.__config._correct_window_width_3d()
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
@@ -113,7 +114,7 @@ class Simulation:
                 BeamParticles2D, BeamSource2D, BeamDrain2D
         else:
             raise Exception("Sorry, you set a wrong type of geometry. " +
-                            "For now, we support only 2d and 3d geometry.")
+                            "For now, we support only circ and 3d geometry.")
             
 
         # Finally, we set the diagnostics.

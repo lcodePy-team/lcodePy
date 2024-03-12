@@ -51,7 +51,7 @@ def generate_beam(config=default_config, beam_parameters: dict=None):
                 beam_shape_params[key] = beam_parameters[key]
         
         # Creates a beam shape.
-        beam_shape = BeamShape(**beam_shape_params)
+        beam_shape = BeamShape(config, **beam_shape_params)
 
         for key in beam_parameters.keys():            
             if type(beam_parameters[key]) == dict:
@@ -86,7 +86,7 @@ def generate_beam(config=default_config, beam_parameters: dict=None):
             beam_shape.add_segment(beam_segment)
 
     else:
-        beam_shape = BeamShape(**beam_shape_params)
+        beam_shape = BeamShape(config, **beam_shape_params)
         beam_segment = BeamSegmentShape(**def_beam_segment_params)
         beam_shape.add_segment(beam_segment)
 

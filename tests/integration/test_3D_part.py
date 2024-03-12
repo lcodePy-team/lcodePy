@@ -11,7 +11,7 @@ def get_evol_config():
     return { 'geometry': '3d',
              'processing-unit-type': 'cpu',
 
-             'window-width': 16,
+             'window-width': 8,
              'window-width-step-size': 0.05,
 
              'window-length': 10, 
@@ -19,7 +19,7 @@ def get_evol_config():
 
              'time-limit': 1,
              'time-step': 1,
-
+             'ion-model' : 'background',
              'plasma-particles-per-cell': 4,
            }
 
@@ -31,7 +31,7 @@ def test_test1(get_evol_config):
 
     config = get_evol_config
     default = {'length' : 5.013256548}
-    beam_parameters = {'current': 0.05 * (2*3.14), 'particles_in_layer': 5000, 
+    beam_parameters = {'current': 0.05, 'particles_in_layer': 5000, 
                        'default' : default} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
@@ -39,6 +39,7 @@ def test_test1(get_evol_config):
    
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
+    particles = particles["electrons"]
 
     result = np.load(path.join(DATA_DIR, "3D_test1.npz"))
 
@@ -49,8 +50,8 @@ def test_test1(get_evol_config):
         assert np.allclose(getattr(fields, attr)[::10, ::10], result[attr], 
                            rtol=RTOL, atol=1e-125)
     for attr in ("ro", "jx", "jy", "jz"):
-        assert np.allclose(getattr(currents, attr)[::10, ::10], result[attr], 
-                           rtol=RTOL, atol=1e-125)
+        assert np.allclose(getattr(currents, attr)[:,::10, ::10].sum(axis=0), 
+                           result[attr], rtol=RTOL, atol=1e-125)
 
 
 def test_beam_evol(get_evol_config):
@@ -58,13 +59,13 @@ def test_beam_evol(get_evol_config):
     config = get_evol_config
     config["window-length"] = 5
     config["time-limit"] = 5
-    config["enable-noise-filter"] = False
-    beam_parameters = {'current': 0.5 * (2*3.14), 'particles_in_layer': 1000} 
+    beam_parameters = {'current': 0.5, 'particles_in_layer': 1000} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
                                  beam_parameters=beam_parameters)
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
+    particles = particles["electrons"]
 
     result = np.load(path.join(DATA_DIR, "3D_beam_evol.npz"))
 
@@ -75,5 +76,5 @@ def test_beam_evol(get_evol_config):
         assert np.allclose(getattr(fields, attr)[::10, ::10], result[attr], 
                            rtol=RTOL, atol=1e-125)
     for attr in ("ro", "jx", "jy", "jz"):
-        assert np.allclose(getattr(currents, attr)[::10, ::10], result[attr], 
-                           rtol=RTOL, atol=1e-125)
+        assert np.allclose(getattr(currents, attr)[:,::10, ::10].sum(axis=0), 
+                           result[attr], rtol=RTOL, atol=1e-125)
