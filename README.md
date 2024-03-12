@@ -22,7 +22,7 @@ Any other python installation should work fine, but has not been tested.
 
 - Create a new environment and install the dependencies:
 ```
-conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib
+conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib mpi4py
 ```
 or 
 ```

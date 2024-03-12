@@ -25,9 +25,9 @@ if __name__ == '__main__':
         include_package_data=True,
         classifiers=[
           'Programming Language :: Python',
-          'Development Status :: 3 - Alpha',
+          'Development Status :: 4 - Beta',
           'Intended Audience :: Science/Research',
-          "Topic :: Scientific/Engineering :: Physics",
+          'Topic :: Scientific/Engineering :: Physics',
           'Environment :: Console',
           'Operating System :: OS Independent'
         ],
