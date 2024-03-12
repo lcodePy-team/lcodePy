@@ -132,12 +132,15 @@ class Config:
             # 2d and circ are now the same.
             self.config_values['geometry'] = '2d'
 
-    def _correct_window_width_3d(self):
+    def _correct_3d_settings(self):
         """
         Adjust the width of the window to fit the 2d case.
         """
         if self.get('geometry')  == '3d':
             self.set('window-width', 2 * self.getfloat('window-width'))
+        if self.get('geometry')  == '3d':
+            self.set('field-solver-subtraction-coefficient', 
+                     1 + self.getfloat('xi-step'))
 
     def adjust_window_width_and_steps_3d(self):
         """

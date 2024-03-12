@@ -94,7 +94,7 @@ class Simulation:
             
         if self.__geometry == '3d':
             self.particle_dtype = particle_dtype3d
-            self.__config._correct_window_width_3d()
+            self.__config._correct_3d_settings()
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
