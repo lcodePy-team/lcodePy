@@ -31,7 +31,7 @@ class Simulation:
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config=default_config_values, beam_parameters={},
-                 diagnostics=[]):
+                 diagnostics=[], runas_filename="runas.py"):
         """
             Initializes a simulation.
 
@@ -55,6 +55,7 @@ class Simulation:
         self.config = copy.copy(config)
         self.beam_parameters = copy.copy(beam_parameters)
         self.diagnostics_list = copy.copy(diagnostics)
+        self.runas_filename = runas_filename
 
         # We use this time as a general time value:
         self.current_time = 0.
@@ -178,6 +179,8 @@ class Simulation:
         # 0. It analyzes config values:
         #TODO: explicit config update. If we change xi-step we must change beam.
         self.__pull_config()
+        if self.runas_filename:
+            self.__config.dump(self.runas_filename)
 
         # 1. If we use an external plasma state, we load it:
         if self.external_plasmastate:

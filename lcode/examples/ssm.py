@@ -27,7 +27,7 @@ config = {
         """,
 
     'plasma-particles-per-cell': 1,
-    'ino-model' : 'background',
+    'ion-model' : 'background',
 
     'declustering-averaging': 11,
     'declustering-force': 0.003,

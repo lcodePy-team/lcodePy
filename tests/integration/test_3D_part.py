@@ -37,7 +37,7 @@ def test_test1(get_evol_config):
                        'default' : default} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
-                                 beam_parameters=beam_parameters)
+                           beam_parameters=beam_parameters, runas_filename='')
    
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
@@ -64,7 +64,7 @@ def test_beam_evol(get_evol_config):
     beam_parameters = {'current': 0.5, 'particles_in_layer': 1000} 
     diags = [] 
     sim = lcode.Simulation(config=config, diagnostics=diags,
-                                 beam_parameters=beam_parameters)
+                           beam_parameters=beam_parameters, runas_filename='')
     sim.step()
     particles, fields, currents = sim._Simulation__push_solver._plasmastate
     particles = particles["electrons"]
