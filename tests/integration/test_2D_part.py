@@ -12,7 +12,7 @@ def get_evol_config():
             'geometry': '2d',
             'processing-unit-type': 'cpu',
             
-            'window-width-step-size': 0.01,
+            'transverse-step': 0.01,
             'window-width': 16,
 
             'window-length': 10, 

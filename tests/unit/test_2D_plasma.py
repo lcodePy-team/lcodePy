@@ -27,7 +27,7 @@ evol_pl_2D_states = ([(path.join(DATA_DIR, "2D_state_0.npz")),
 def get_evol_config():
     config = {'geometry': '2d',
               'processing-2D_unit-type': 'cpu',
-              'window-width-step-size': 0.01,
+              'transverse-step': 0.01,
               'window-width': 2,
               'xi-step': 0.01,
               'plasma-particles-per-cell': 10,
@@ -43,7 +43,7 @@ def test_initialization(path_to_reference, nppc):
     correct_2D_state = np.fromfile(path_to_reference, 
                                 dtype="float64").reshape(6, -1)
     _config = {'geometry': '2d',
-              'window-width-step-size': 0.01,
+              'transverse-step': 0.01,
               'window-width': 1,
               'plasma-particles-per-cell': nppc,
               'ion-model' : 'background'

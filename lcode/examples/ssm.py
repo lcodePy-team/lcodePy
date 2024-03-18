@@ -10,7 +10,7 @@ from lcode.diagnostics.diagnostics_3d import DiagnosticsFXi, SaveRunState, \
 config = {
     'geometry': '3d',
     'processing-unit-type': 'cpu',
-    'window-width-step-size': 0.02,
+    'transverse-step': 0.02,
     'window-width': 2.5,
 
     'window-length': 160,
@@ -19,19 +19,20 @@ config = {
     'time-limit': 10000,
     'time-step': 50,
     
-    'plasma-zshape':"""
-    200 1.0 L 1.0
-    500 1.0 L 1.085
-    1000000 1.085 L 1.085
-    """,
+    'plasma-zshape': 
+        """
+        200 1.0 L 1.0
+        500 1.0 L 1.085
+        1000000 1.085 L 1.085
+        """,
 
     'plasma-particles-per-cell': 1,
     'ino-model' : 'background',
 
-    'filter-window-length': 11,
-    'filter-coefficient': 0.003,
-    'damping-coefficient': 0.001,
-    'dx-max': 1e-3,
+    'declustering-averaging': 11,
+    'declustering-force': 0.003,
+    'damping-declustering': 0.001,
+    'declustering-limit': 1e-3,
 
     'beam-substepping-energy': 1200
 }

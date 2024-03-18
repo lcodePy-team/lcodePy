@@ -190,7 +190,7 @@ def get_deposit_plasma(config: Config):
     Check if a user set dual-plasma-approach to True or False and return
     the deposition function for the set approach.
     """
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     grid_steps = config.getint('window-width-steps')
     plasma_fineness = config.getint('plasma-fineness')
     dual_plasma_approach = config.getbool('dual-plasma-approach')

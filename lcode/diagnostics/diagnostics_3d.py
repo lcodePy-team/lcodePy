@@ -157,7 +157,7 @@ class DiagnosticsFXi:
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         steps = config.getint('window-width-steps')
-        grid_step_size = config.getfloat('window-width-step-size')
+        grid_step_size = config.getfloat('transverse-step')
 
         # We change how we store the positions of the 'probe' lines:
         self.__ax_x = (steps // 2 +
@@ -170,7 +170,7 @@ class DiagnosticsFXi:
         # always diagnosed.
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
-        self.__grid_step_size = config.getfloat('window-width-step-size')
+        self.__grid_step_size = config.getfloat('transverse-step')
 
         if self.__output_period < self.__time_step_size:
             self.__output_period = self.__time_step_size
@@ -323,7 +323,7 @@ class DiagnosticsColormaps:
     def pull_config(self, config: Config):
         """Pulls a config to get all required parameters."""
         self.__grid_steps = config.getint('window-width-steps')
-        grid_step_size = config.getfloat('window-width-step-size')
+        grid_step_size = config.getfloat('transverse-step')
 
         self.__grid = ((np.arange(self.__grid_steps) - self.__grid_steps // 2) *
                         grid_step_size)
@@ -517,7 +517,7 @@ class DiagnosticsTransverse:
         self.__xi_step_size   = config.getfloat('xi-step')
 
         grid_steps     = config.getint('window-width-steps')
-        grid_step_size = config.getfloat('window-width-step-size')
+        grid_step_size = config.getfloat('transverse-step')
         self.__grid = (np.arange(grid_steps) - grid_steps // 2) * grid_step_size
 
         if self.__output_period < self.__time_step_size:

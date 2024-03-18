@@ -11,19 +11,16 @@ def get_noise_filter(config: Config):
     # and not just give them to the noise_filter along with the particles arrays.
     xi_step_size = config.getfloat('xi-step')
 
-    filter_window_length = config.getint('filter-window-length')
-    filter_polyorder = config.getint('filter-polyorder')
-    filter_coefficient = config.getfloat('filter-coefficient')
-    damping_coefficient = config.getfloat('damping-coefficient')
-    dx_max = config.getfloat('dx-max')
+    filter_window_length = config.getint('declustering-averaging')
+    filter_coefficient = config.getfloat('declustering-force')
+    damping_coefficient = config.getfloat('damping-declustering')
+    dx_max = config.getfloat('declustering-limit')
 
     pu_type = config.get('processing-unit-type').lower()
     if pu_type == 'cpu':
-        # from scipy.signal import savgol_filter
         from scipy.ndimage import fourier_gaussian
     elif pu_type == 'gpu':
         from cupyx.scipy.ndimage import fourier_gaussian
-        # from .savgol_filter_cp import savgol_filter
 
     def calculate_inhomogeneity(d_offt, xp: np, axis):
         if axis: d_offt = d_offt.T

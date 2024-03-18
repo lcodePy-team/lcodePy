@@ -109,7 +109,7 @@ def configure_beam_pusher(config):
     push_particles : function
         Function that calculates the motion of the beam particles.
     """
-    r_step = float(config.get('window-width-step-size'))
+    r_step = float(config.get('transverse-step'))
     xi_step_p = float(config.get('xi-step'))
     max_radius = float(config.get('window-width'))
     lost_boundary = max(0.9 * max_radius, max_radius - 1)
@@ -367,7 +367,7 @@ class BeamCalculator2D():
             The set of base parameters to perform the simulation.
         """
         # Get main calculation parameters.
-        self.r_step = config.getfloat('window-width-step-size')
+        self.r_step = config.getfloat('transverse-step')
         self.grid_steps = int(config.getfloat('window-width') / self.r_step) + 1
         self.xi_step = config.getfloat('xi-step')
         self.move_beam_slice = get_beam_slice_mover(config)

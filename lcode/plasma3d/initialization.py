@@ -313,7 +313,7 @@ def init_plasma(config: Config, current_time=0):
         import cupy as xp
 
     grid_steps            = config.getint('window-width-steps')
-    grid_step_size        = config.getfloat('window-width-step-size')
+    grid_step_size        = config.getfloat('transverse-step')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getfloat('plasma-fineness')

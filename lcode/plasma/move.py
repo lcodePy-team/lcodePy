@@ -214,7 +214,7 @@ def _move_particles_with_substepping(E_r, E_f, E_z, B_f, B_z,
 
 
 def get_plasma_particles_mover(config: Config):
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     max_radius     = config.getfloat('window-width')
     magnetic_field = config.getfloat('magnetic-field')
 

@@ -19,7 +19,7 @@ def get_evol_config_2D():
     config = {'geometry': '2d',
               'processing-unit-type': 'cpu',
               'time-step' : 40,
-              'window-width-step-size': 0.01,
+              'transverse-step': 0.01,
               'window-width': 2,
               'xi-step': 0.01,
               'plasma-particles-per-cell': 10,

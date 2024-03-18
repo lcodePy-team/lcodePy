@@ -12,7 +12,7 @@ def get_evol_config():
              'processing-unit-type': 'cpu',
 
              'window-width': 8,
-             'window-width-step-size': 0.05,
+             'transverse-step': 0.05,
 
              'window-length': 10, 
              'xi-step': 0.05,
@@ -21,6 +21,8 @@ def get_evol_config():
              'time-step': 1,
              'ion-model' : 'background',
              'plasma-particles-per-cell': 4,
+
+             'field-solver-subtraction-coefficient' : 1.0,
            }
 
     

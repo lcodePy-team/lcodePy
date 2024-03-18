@@ -267,7 +267,7 @@ def calculate_Bz(dct2d: dctn, grid_step_size, const: Arrays, currents: Arrays):
 
 
 def get_field_computer(config: Config):
-    grid_step_size    = config.getfloat('window-width-step-size')
+    grid_step_size    = config.getfloat('transverse-step')
     xi_step_size      = config.getfloat('xi-step')
     subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
 

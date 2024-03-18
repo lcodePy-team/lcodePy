@@ -14,7 +14,7 @@ class Plane2d3vPlasmaSolver(object):
             get_plasma_particles_mover(config)
 
         self.noise_filter = get_noise_filter(config)
-        self.noise_filter_enabled = config.getbool('noise-reductor-enabled')
+        self.declustering_enabled = config.getbool('declustering-enabled')
 
     # Perfoms one full step along xi.
     # To understand the numerical scheme, read values as following:
@@ -65,7 +65,7 @@ class Plane2d3vPlasmaSolver(object):
             fields_half, particles_prev, particles_full, const_arrays
         )
 
-        if self.noise_filter_enabled:
+        if self.declustering_enabled:
             # Here we perform noise filtering after the end of the movement:
             particles_full["electrons"] = \
                             self.noise_filter(particles_full["electrons"], 

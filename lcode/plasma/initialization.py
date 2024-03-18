@@ -9,7 +9,7 @@ from .rhoj import get_rhoj_computer
 
 def init_plasma(config: Config, current_time=0):
     window_width = config.getfloat('window-width')
-    r_step = config.getfloat('window-width-step-size')
+    r_step = config.getfloat('transverse-step')
     part_per_cell = config.getint('plasma-particles-per-cell')
     path_lim = config.getfloat('trapped-path-limit')
     ion_model = config.get("ion-model")

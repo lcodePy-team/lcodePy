@@ -278,7 +278,7 @@ def get_move_beam_particles_kernel_cupy():
 
 def get_move_beam_particles(config: Config):
     xi_step_size = config.getfloat('xi-step')
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     grid_steps = config.getint('window-width-steps')
 
     # Calculate the radius that marks that a particle is lost.

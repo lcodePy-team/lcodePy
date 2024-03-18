@@ -44,7 +44,7 @@ class BaseProfile(ABC):
 class CylindricalProfile(BaseProfile, ABC):
     def __init__(self, config):
         self.max_radius = config.getfloat('window-width')
-        self.r_step = config.getfloat('window-width-step-size')
+        self.r_step = config.getfloat('transverse-step')
 
     def cylindrical_weights(self, particle_positions):
         r_step_p = particle_positions[1] - particle_positions[0]

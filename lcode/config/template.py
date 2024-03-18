@@ -2,7 +2,7 @@
 lcode_template = '''
 # Simulation area:
 geometry = c
-window-width = {window-width};          r-step = {window-width-step-size}
+window-width = {window-width};          transverse-step = {r-step}
 window-length = {window-length};        xi-step = {xi-step}
 time-limit = {time-limit};         time-step = {time-step}
 continuation = n # Plasma continuation (no/beam/longplasma, n/y/Y)

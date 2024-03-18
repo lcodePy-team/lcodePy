@@ -93,7 +93,7 @@ def _cell_volume(r_step, particles_per_cell, n_cells):
 
 
 def get_rhoj_computer(config: Config):
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     max_radius = config.getfloat('window-width')
     n_cells = int(max_radius / grid_step_size) + 1
     particles_per_cell = config.getint('plasma-particles-per-cell')

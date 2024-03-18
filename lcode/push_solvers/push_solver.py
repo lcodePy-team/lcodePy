@@ -33,7 +33,7 @@ class PusherAndSolver():
         self.grid_steps = config.getint('window-width-steps') 
         if not self.grid_steps:
             max_radius = config.getfloat('window-width')
-            r_step = config.getfloat('window-width-step-size')
+            r_step = config.getfloat('transverse-step')
             self.grid_steps = int(max_radius / r_step) + 1
         window_length = config.getfloat('window-length')
         self.xi_steps = int(window_length / self.dxi)

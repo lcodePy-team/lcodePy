@@ -94,7 +94,7 @@ class Simulation:
             
         if self.__geometry == '3d':
             self.particle_dtype = particle_dtype3d
-            self.__config._correct_3d_settings()
+            self.__config._adjust_config_values_3d()
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
@@ -200,72 +200,60 @@ class Simulation:
                   f"the code will simulate till time limit = {self.__time_limit},",
                   f"with a time step size = {self.__time_step_size}.")
 
-        # 2. Checks for plasma continuation mode:
-        if self.__cont_mode == 'n' or self.__cont_mode == 'no':
-            # 3. If a beam source is empty (None), we generate
-            #    a new beam according to set parameters:
+        # Check for a beam being rigid:
+        if self.__rigid_beam:
+            # For now, beam_parameters is just a function representing
+            # the charge distribution of a rigid beam. In the future,
+            # we want to use the same beam_parameters as for a non-rigid
+            # beam in both cases.
+            beam_particles = self.beam_parameters
 
-            # Check for a beam being rigid:
-            if self.__rigid_beam:
-                # For now, beam_parameters is just a function representing
-                # the charge distribution of a rigid beam. In the future,
-                # we want to use the same beam_parameters as for a non-rigid
-                # beam in both cases.
-                beam_particles = self.beam_parameters
+            self.beam_source = self.BeamSource(self.__config,
+                                               beam_particles)
+            self.beam_drain  = self.BeamDrain(self.__config)
 
-                self.beam_source = self.BeamSource(self.__config,
-                                                   beam_particles)
-                self.beam_drain  = self.BeamDrain(self.__config)
+            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                                 beam_particles, self.particle_dtype,
+                                                 self.BeamSource, self.BeamDrain)
 
-                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                                     beam_particles, self.particle_dtype,
-                                                     self.BeamSource, self.BeamDrain)
+        if self.beam_source is None:
+            # Generate all parameters for a beam:
+            beam_particles = generate_beam(self.__config,
+                                           self.beam_parameters)
 
-            if self.beam_source is None:
-                # Generate all parameters for a beam:
-                beam_particles = generate_beam(self.__config,
-                                               self.beam_parameters)
+            # Here we create a beam source and a beam drain:
+            self.beam_source = self.BeamSource(self.__config,
+                                               beam_particles)
+            self.beam_drain  = self.BeamDrain(self.__config)
 
-                # Here we create a beam source and a beam drain:
-                self.beam_source = self.BeamSource(self.__config,
-                                                   beam_particles)
-                self.beam_drain  = self.BeamDrain(self.__config)
+            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                            beam_particles, self.particle_dtype,
+                                            self.BeamSource, self.BeamDrain)
+        
+        self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
 
-                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                                beam_particles, self.particle_dtype,
-                                                self.BeamSource, self.BeamDrain)
-            
-            self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
+        # 4. A loop that calculates N time steps:
+        for t_i in range(self.MPITransport.steps_per_node):
 
-            # 4. A loop that calculates N time steps:
-            for t_i in range(self.MPITransport.steps_per_node):
-
-                self.beam_source, self.beam_drain = self.MPITransport.get_transports()
+            self.beam_source, self.beam_drain = self.MPITransport.get_transports()
 
 
-                plasmastate = self.__init_plasmastate(self.current_time)
+            plasmastate = self.__init_plasmastate(self.current_time)
 
-                # Calculates one time step:
-                self.__push_solver.step_dt(
-                    *plasmastate, self.beam_source, self.beam_drain,
-                    self.current_time, self.diagnostics_list
-                )
+            # Calculates one time step:
+            self.__push_solver.step_dt(
+                *plasmastate, self.beam_source, self.beam_drain,
+                self.current_time, self.diagnostics_list
+            )
 
-                # Here we transfer beam particles from beam_buffer to
-                # beam_source for the next time step. And create a new beam
-                # drain that is empty.
-                self.MPITransport.next_step()
+            # Here we transfer beam particles from beam_buffer to
+            # beam_source for the next time step. And create a new beam
+            # drain that is empty.
+            self.MPITransport.next_step()
 
-                self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
-            # 4. As in lcode2d, we save the beam state on reaching the time limit:
-            # self.beam_source.beam.save('beamfile') # Do we need it?
-            # TODO: Make checkpoints where all simulation information,
-            #       including beam and current time, is saved.
-            print('The work is done!')
-
-        # Other plasma continuation mode has not been implemented yet.
-        # If you are writing these modes, just change where you put
-        # init_plasma(...) and generate_beam(...)
-        else:
-            raise Exception("Sorry, for now, only 'no' mode of plasma" +
-                            "continuation is supported.")
+            self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
+        # 4. As in lcode2d, we save the beam state on reaching the time limit:
+        # self.beam_source.beam.save('beamfile') # Do we need it?
+        # TODO: Make checkpoints where all simulation information,
+        #       including beam and current time, is saved.
+        print('The work is done!')

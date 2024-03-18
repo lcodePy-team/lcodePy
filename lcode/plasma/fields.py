@@ -198,7 +198,7 @@ def _compute_e_r_previous_factor(rho, j_r, j_phi, j_z):
 
 
 def get_field_computer(config: Config):
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
 
     def compute_fields(fields, fields_prev, rho_beam,
                        currents_previous, currents, xi_step_p):

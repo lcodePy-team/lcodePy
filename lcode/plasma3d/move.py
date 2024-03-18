@@ -281,7 +281,7 @@ def get_move_wo_fields_kernel_cupy():
 
 def get_plasma_particles_mover(config: Config):
     xi_step_size     = config.getfloat('xi-step')
-    grid_step_size   = config.getfloat('window-width-step-size')
+    grid_step_size   = config.getfloat('transverse-step')
     grid_steps       = config.getint('window-width-steps')
     reflect_padding_steps = config.getint('reflect-padding-steps')
     reflect_boundary = grid_step_size * (grid_steps / 2 - reflect_padding_steps)

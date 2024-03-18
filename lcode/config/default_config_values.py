@@ -1,48 +1,53 @@
-"""Default values for a lcodePy config."""
+"""Default values for a lcodePy config"""
 
 default_config_values = {
-    'geometry': 'circ', # circ or 3d now available.
+    'geometry': 'circ', # 'circ' or '3d' 
 
-    # Here we set the type of processing unit: CPU or GPU.
+    # Here we set the type of processing unit: 'cpu' or 'gpu'.
     # For now, GPU can be used only for 3d simulations.
     'processing-unit-type': 'cpu',
 
     # Parameters of simulation window:
 
-    ## Window-width from the main axis to a boundary.
+    ## Transverse size of the window from axis to boundary and transverse grid step (dr in 2d or 
+    ## dx(=dy) in 3d). The window width is adjusted to the closest "good" value
+    ## to ensure fft performance. 
     'window-width': 5.0,
-    'window-width-step-size': 0.05,
+    'transverse-step': 0.05,
 
-    ## Here we set a window length along xi axis.
+    ## Window length along xi-axis and grid step in dxi.
     'window-length': 15.0,
     'xi-step': 0.05,
 
-    ## Set time-limit a bit bigger than the last time moment you want to calculate.
+    ## Time limit for beam evolution and time step.
     'time-limit': 200.5,
     'time-step': 25,
 
     # Parameters of plasma model:
 
-    ## The number of plasma particles per one cell must be the square of a number
-    ## in 3d. This parameter will be adjusted if 3d geometry is chosen by finding
-    ## the closest square number to plasma-particles-per-cell parameter.
+    ## The number of plasma particles per one cell must be the square of 
+    ## an integer in 3d. This parameter will be adjusted in 3d geometry
+    ## to the nearest integer squared (to 9 by default).
     'plasma-particles-per-cell': 10,
-    'ion-model': 'mobile',
+    'ion-model': 'mobile', # 'mobile' or 'background'
+
+	## Mass of plasma ions in unita of electron mass
     'ion-mass': 1836,
 
-    ## Numerical noise reduction.
-    'noise-reductor-enabled': False,
-    ### The following parameters are used for 3d noise reduction, 
-    ### for 2d they are ignored. 
-    'filter-window-length': 3,
-    'filter-coefficient': 0.3,
-    'damping-coefficient': 0.1,
-    'dx-max': 1e-3,
+    ## Declustering of plasma electrons
+    'declustering-enabled': False,
+    ### The following parameters are used for 3d declustering, 
+    ### In 2d they are ignored. 
+    'declustering-averaging': 3,
+    'declustering-force': 0.3,
+    'declustering-damping': 0.1,
+    'declustering-limit': 1e-3,
     
     
-    ## Longitudinal profile for plasma density. For 3d only. 
-    'plasma-zshape': '',
-
+    ## Longitudinal profile of the plasma density. For 3d only. 
+    ## example https://lcode.info/site-files/manual.pdf p. 17
+    'plasma-zshape': '''
+        ''',
 
     # Parameters of beam model:
     'beam-substepping-energy': 2,
@@ -53,7 +58,7 @@ default_config_values = {
     # Partially supported options: 
 
     # Plasma:
-    ## Bz amplitude, supported for 2D only.
+    ## External Bz amplitude, 2D only.
     'magnetic-field': 0,
     
     ## Plasma transverse profile settings, 2d only.
@@ -62,7 +67,7 @@ default_config_values = {
     'plasma-width-2': 1,
     'plasma-density-2': 0.5,
     
-    ## Longitudinal substepping, 2d only
+    ## Plasma substepping for xi, 2d only
     'substepping-depth': 3,
     'substepping-sensitivity': 0.2,
 
@@ -73,32 +78,19 @@ default_config_values = {
     ## Dual plasma approache for 3d, only GPU  
     'dual-plasma-approach': False,
     'plasma-coarseness': 5,
-    # Beam:
-
-    ## It works for 3d with an unusual beam configuration.
-    'rigid-beam': False, 
-    ####
     
-    # Options not currently supported:
-
-    ## Plasma:
-    'plasma-temperature': 0,
-    'trapped-path-limit': 0,
-
-    ## Beam:
-    'focusing': 'n',
-    'foc-period': 100,
-    'foc-strength': 0.1,
+    # Beam:
+    ## Works for 3d with an unusual beam configuration.
+    'rigid-beam': False, 
     ####
 
 # Developer settings
-    'field-solver-subtraction-coefficient': 1,
-    'field-solver-variant-A': True,
-    'corrector-steps': 2, # Can we even change this???
-
-
-# Useless legacy parameters.
-    'filter-polyorder': 3,
-    'plasma-model': 'P',
-    'continuation': 'n', 
+    
+    ## Only 3d, default value is 1+dxi
+    'field-solver-subtraction-coefficient': 1, 
+    
+    ## Only 2d
+    ## Plasma:
+    'trapped-path-limit': 0,
+    'correctotransverse-steps': 2, # Can we even change this???
 }
