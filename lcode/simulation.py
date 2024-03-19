@@ -64,6 +64,8 @@ class Simulation:
         # We initialize a beam source and a beam drain:
         self.beam_source = None
         self.beam_drain = None
+        # To save particles from a load for MPIBeamTransport
+        self.__beam_particles = None
 
         # We set that initially the code doesn't use an external plasma state:
         self.external_plasmastate = False
@@ -134,12 +136,15 @@ class Simulation:
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
         if self.__rigid_beam:
             raise Exception("We cannot load a beam in the case of a rigid beam.")
-
-        beam_particles = self.BeamParticles(self.__config.xp)
+        if self.__geometry == '3d':
+            beam_particles = self.BeamParticles(self.__config.xp)
+        else:
+            beam_particles = self.BeamParticles()
         beam_particles.load(path_to_beamfile)
+        self.__beam_particles = beam_particles
 
-        self.beam_source = self.BeamSource(self.__config, beam_particles)
-        self.beam_drain  = self.BeamDrain(self.__config)
+       # self.beam_source = self.BeamSource(self.__config, beam_particles)
+       # self.beam_drain  = self.BeamDrain(self.__config)
 
     # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
     #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
@@ -221,8 +226,11 @@ class Simulation:
 
         if self.beam_source is None:
             # Generate all parameters for a beam:
-            beam_particles = generate_beam(self.__config,
-                                           self.beam_parameters)
+            if self.__beam_particles is None:
+                beam_particles = generate_beam(self.__config,
+                                               self.beam_parameters)
+            else: 
+                beam_particles = self.__beam_particles
 
             # Here we create a beam source and a beam drain:
             self.beam_source = self.BeamSource(self.__config,
@@ -237,7 +245,6 @@ class Simulation:
 
         # 4. A loop that calculates N time steps:
         for t_i in range(self.MPITransport.steps_per_node):
-
             self.beam_source, self.beam_drain = self.MPITransport.get_transports()
 
 

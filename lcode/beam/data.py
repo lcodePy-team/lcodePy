@@ -6,7 +6,7 @@ particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'),
                            ('q_norm', 'f8'), ('id', 'i8')])
 
 class BeamParticles:
-    def __init__(self, size, particles=None):
+    def __init__(self, size=0, particles=None):
         self.size = size
         if particles is not None:
             self.particles = particles
@@ -106,3 +106,29 @@ class BeamParticles:
         self.remaining_steps = self.remaining_steps[sorted_idxes]
         self.lost = self.lost[sorted_idxes]
 
+    def load(self, *args, **kwargs):
+        with np.load(*args, **kwargs) as loaded:
+            self.size = loaded['xi'].shape[0]
+            self.particles = np.zeros(self.size, dtype=particle_dtype)
+            self.particles['xi'] = loaded['xi']
+            self.particles['r'] = loaded['r']
+            self.particles['p_r'] = loaded['p_r']
+            self.particles['p_z'] = loaded['p_z']
+            self.particles['M'] = loaded['M']
+            self.particles['q_m'] = loaded['q_m']
+            self.particles['q_norm'] = loaded['q_norm']
+            self.particles['id'] = loaded['id']
+            self.xi = self.particles['xi']
+            self.r = self.particles['r']
+            self.p_r = self.particles['p_r']
+            self.p_z = self.particles['p_z']
+            self.M = self.particles['M']
+            self.q_m = self.particles['q_m']
+            self.q_norm = self.particles['q_norm']
+            self.id = self.particles['id']
+
+            self.dt = np.zeros(self.size, dtype=np.float64)
+            self.remaining_steps = np.ones(self.size, dtype=np.int64)
+
+            self.nlost = 0
+            self.lost = np.zeros(self.size, dtype=np.bool_)
