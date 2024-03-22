@@ -9,13 +9,29 @@ from .weights import weight4, weight4_cupy
 from .data import Arrays
 
 # Field interpolation and particle movement (fused), for CPU #
+        #    move_smart_kernel(
+        #        xi_step_size, reflect_boundary, grid_step_size, grid_steps,
+        #        
+        #        fields.Ex, fields.Ey, fields.Ez,
+        #        fields.Bx, fields.By, fields.Bz,
+
+        #        particles_prev[sort].x_init, particles_prev[sort].y_init,
+
+        #        particles_prev[sort].x_offt, particles_prev[sort].y_offt,
+        #        particles_prev[sort].px, particles_prev[sort].py, 
+        #        particles_prev[sort].pz,
+
+        #        
+        #        particles_full[sort].m, particles_full[sort].q, 
+        #        particles_full[sort].x_offt, particles_full[sort].y_offt,
 
 @nb.njit(parallel=True)
 def move_smart_kernel_numba(
     xi_step_size, reflect_boundary, grid_step_size, grid_steps,
-    ms, qs, x_init, y_init,
-    x_offt_prev, y_offt_prev, px_prev, py_prev, pz_prev,
     Ex_avg, Ey_avg, Ez_avg, Bx_avg, By_avg, Bz_avg,
+    x_init, y_init, 
+    x_offt_prev, y_offt_prev, px_prev, py_prev, pz_prev,
+    ms, qs,
     x_offt_full, y_offt_full, px_full, py_full, pz_full,
     size):
     """
@@ -107,14 +123,19 @@ def move_smart_kernel_numba(
             y = -2 * reflect_boundary - y
             y_offt = y - y_init[k]
             py = -py
+        
+        # Protect from crazy particles.
+        if x >= +reflect_boundary or x <= -reflect_boundary \
+           or y >= +reflect_boundary or y <= -reflect_boundary:
+            x_offt = y_offt = px = py = pz = q = 0
 
         # Save the results into the output arrays  # TODO: get rid of that
         x_offt_full[k], y_offt_full[k] = x_offt, y_offt
         px_full[k], py_full[k], pz_full[k] = px, py, pz
 
 
-def move_estimate_wo_fields_numba(xi_step, reflect_boundary, m, x_init, y_init,
-                                  x_offt, y_offt, px, py, pz, size):
+def move_estimate_wo_fields_numba(xi_step, reflect_boundary, x_init, y_init, 
+                                  m, q, x_offt, y_offt, px, py, pz, size):
     """
     Move coarse plasma particles as if there were no fields.
     Also reflect the particles from `+-reflect_boundary`.
@@ -134,6 +155,12 @@ def move_estimate_wo_fields_numba(xi_step, reflect_boundary, m, x_init, y_init,
     y[y >= +reflect] = +2 * reflect - y[y >= +reflect]
     y[y <= -reflect] = -2 * reflect - y[y <= -reflect]
     # TODO: Do we want to update momentum or is it not that important?
+    
+    # Protect from crazy particles.
+    mask = (x >= +reflect) | (x <= -reflect) | (y >= +reflect) | (y <= -reflect)
+    x[mask] = x_init[mask]
+    y[mask] = y_init[mask]
+    px[mask] = py[mask] =pz[mask] = q[mask] = 1
 
     x_offt, y_offt = x - x_init, y - y_init
 
@@ -148,14 +175,15 @@ def get_move_smart_kernel_cupy():
         in_params="""
         float64 xi_step_size, float64 reflect_boundary,
         float64 grid_step_size, float64 grid_steps,
-        raw T m, raw T q, raw T x_init, raw T y_init,
+        raw T Ex_avg, raw T Ey_avg, raw T Ez_avg,
+        raw T Bx_avg, raw T By_avg, raw T Bz_avg,
+        raw T x_init, raw T y_init,
         raw T x_offt_prev, raw T y_offt_prev,
         raw T px_prev, raw T py_prev, raw T pz_prev,
-        raw T Ex_avg, raw T Ey_avg, raw T Ez_avg,
-        raw T Bx_avg, raw T By_avg, raw T Bz_avg
+        raw T m
         """,
         out_params="""
-        raw T x_offt_full, raw T y_offt_full,
+        raw T q, raw T x_offt_full, raw T y_offt_full,
         raw T px_full, raw T py_full, raw T pz_full
         """,
         operation="""
@@ -228,6 +256,13 @@ def get_move_smart_kernel_cupy():
             y_offt = y - y_init[i];
             py = -py;
         }
+        
+        if (x >= +reflect_boundary || x <= -reflect_boundary 
+            || y >= +reflect_boundary || y <= -reflect_boundary) {
+            x_offt_full[i] = y_offt_full[i] = 0;
+            px_full[i] = py_full[i] = pz_full[i] = 0;
+            q[i] = 0; 
+        }
 
         x_offt_full[i] = x_offt; y_offt_full[i] = y_offt;
         px_full[i] = px; py_full[i] = py; pz_full[i] = pz;
@@ -243,10 +278,10 @@ def get_move_wo_fields_kernel_cupy():
     return cp.ElementwiseKernel(
         in_params="""
         float64 xi_step_size, float64 reflect_boundary,
-        raw T m, raw T x_init, raw T y_init
+        raw T x_init, raw T y_init, raw T m 
         """,
         out_params="""
-        raw T x_offt, raw T y_offt, raw T px, raw T py, raw T pz
+        raw T q, raw T x_offt, raw T y_offt, raw T px, raw T py, raw T pz
         """,
         operation="""
         const T gamma_m = sqrt(
@@ -271,6 +306,12 @@ def get_move_wo_fields_kernel_cupy():
         if (y < -reflect_boundary) {
             y = -2 * reflect_boundary - y;
             py[i] = -py[i];
+        }
+        if (x >= +reflect_boundary || x <= -reflect_boundary 
+            || y >= +reflect_boundary || y <= -reflect_boundary) {
+            x_offt[i] = y_offt[i] = 0;
+            px[i] = py[i] = pz[i] = 0;
+            q[i] = 0; 
         }
 
         x_offt[i] = x - x_init[i]; y_offt[i] = y - y_init[i];
@@ -307,11 +348,13 @@ def get_plasma_particles_mover(config: Config):
 
         for sort in const_arrays.sorts:
             move_wo_fields_kernel(
-                xi_step_size, reflect_boundary, particles_full[sort].m,
+                xi_step_size, reflect_boundary, 
                 particles_full[sort].x_init, particles_full[sort].y_init,
+                particles_full[sort].m, particles_full[sort].q,
                 particles_full[sort].x_offt, particles_full[sort].y_offt,
                 particles_full[sort].px, particles_full[sort].py, 
-                particles_full[sort].pz, size=particles_full[sort].m.size)
+                particles_full[sort].pz, 
+                size = particles_full[sort].m.size)
 
         return particles_full
 
@@ -327,17 +370,18 @@ def get_plasma_particles_mover(config: Config):
         for sort in const_arrays.sorts:
             move_smart_kernel(
                 xi_step_size, reflect_boundary, grid_step_size, grid_steps,
+                
+                fields.Ex, fields.Ey, fields.Ez,
+                fields.Bx, fields.By, fields.Bz,
 
-                particles_prev[sort].m, particles_prev[sort].q,
                 particles_prev[sort].x_init, particles_prev[sort].y_init,
 
                 particles_prev[sort].x_offt, particles_prev[sort].y_offt,
                 particles_prev[sort].px, particles_prev[sort].py, 
                 particles_prev[sort].pz,
 
-                fields.Ex, fields.Ey, fields.Ez,
-                fields.Bx, fields.By, fields.Bz,
-
+                
+                particles_full[sort].m, particles_full[sort].q, 
                 particles_full[sort].x_offt, particles_full[sort].y_offt,
                 particles_full[sort].px, particles_full[sort].py, 
                 particles_full[sort].pz,
