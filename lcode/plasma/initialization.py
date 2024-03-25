@@ -10,6 +10,7 @@ from .rhoj import get_rhoj_computer
 def init_plasma(config: Config, current_time=0):
     window_width = config.getfloat('window-width')
     r_step = config.getfloat('transverse-step')
+    xi_step = config.getfloat('xi-step')
     part_per_cell = config.getint('plasma-particles-per-cell')
     path_lim = config.getfloat('trapped-path-limit')
     ion_model = config.get("ion-model")
@@ -73,22 +74,37 @@ def init_plasma(config: Config, current_time=0):
         const_arrays = Arrays(xp=np)
         const_arrays.sorts = {'electrons' : 0, 'ions' : 1}
 
-    
-    return fields, particles, currents, const_arrays
+    xi_plasma_layer_start = xi_step
+    return fields, particles, currents, const_arrays, xi_plasma_layer_start
 
 
 def load_plasma(config: Config, path_to_plasmastate: str):
-    fields, particles, currents = init_plasma(config)
-
+    fields, particles, currents, const_arrays, xi_plasma_layer =\
+        init_plasma(config)
+    xp = fields.xp
     with np.load(file=path_to_plasmastate) as state:
-        fields = Arrays(xp=np, E_r=state['Er'], E_f=state['Ef'],
-                        E_z=state['Ez'], B_f=state['Bf'], B_z=state['Bz'])
+        fields = Arrays(xp=xp,
+                        E_r=state['E_r'], E_f=state['E_f'], E_z=state['E_z'],
+                        B_f=state['B_f'], B_z=state['B_z'])
+        for sort in const_arrays.sorts:
+            particles[sort] = Arrays(
+                xp=xp,
+                r=state[sort]['r'], q=state[sort]['q'], m=state[sort]['m'], 
+                p_r=state[sort]['p_r'], p_f=state[sort]['p_f'], 
+                p_z=state[sort]['p_z'], age=state[sort]['age'],
+            )
 
-        particles = Arrays(xp=np, r=state['r'],
-                           p_r=state['pr'], p_f=state['pf'], p_z=state['pz'],
-                           q=state['q'], m=state['m'], age=state['age'])
+        currents = Arrays(xp=xp,
+                          rho=xp.array(state['rho']), j_r=xp.array(state['j_r']),
+                          j_f=xp.array(state['j_f']), j_z=xp.array(state['j_z']))
 
-        currents = Arrays(xp=np, rho=state['ro'],
-                          j_x=state['jx'], j_y=state['jy'], j_z=state['jz'])
+        try:
+            const_arrays.ni = state['ni']
+        except:
+            pass
+        try: 
+            xi_plasma_layer = float(state['xi_plasma_layer'])
+        except:
+            xi_plasma_layer = 0
 
-    return fields, particles, currents
+    return fields, particles, currents, const_arrays, xi_plasma_layer

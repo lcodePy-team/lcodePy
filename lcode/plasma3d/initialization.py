@@ -450,33 +450,44 @@ def init_plasma(config: Config, current_time=0):
 def load_plasma(config: Config, path_to_plasmastate: str):
     fields, particles, currents, const_arrays, xi_plasma_layer =\
         init_plasma(config)
+    xp = fields.xp
+    # Load by numpy in RAM after that convert to cupy array if necessary.
+    # It is done because the particle type for cupy.load is too complex.
+    with np.load(file=path_to_plasmastate) as state:
+        fields = Arrays(xp=xp,
+                        Ex=xp.array(state['Ex']), Ey=xp.array(state['Ey']), 
+                        Ez=xp.array(state['Ez']),
+                        Bx=xp.array(state['Bx']), By=xp.array(state['By']), 
+                        Bz=xp.array(state['Bz']),
+                        Phi=xp.array(state['Phi']))
+        for sort in const_arrays.sorts:
+            particles[sort] = Arrays(
+                xp=xp,
+                x_init=xp.array(state[sort]['x_init']), 
+                y_init=xp.array(state[sort]['y_init']),
+                q=xp.array(state[sort]['q']), m=xp.array(state[sort]['m']),
+                x_offt=xp.array(state[sort]['x_offt']), 
+                y_offt=xp.array(state[sort]['y_offt']),
+                px=xp.array(state[sort]['px']), py=xp.array(state[sort]['py']), 
+                pz=xp.array(state[sort]['pz']), 
+            
+                dx_chaotic=xp.array(state[sort]['dx_chaotic']),
+                dy_chaotic=xp.array(state[sort]['dy_chaotic']),
+                dx_chaotic_perp=xp.array(state[sort]['dx_chaotic_perp']),
+                dy_chaotic_perp=xp.array(state[sort]['dy_chaotic_perp'])
+            )
 
-    with fields.xp.load(file=path_to_plasmastate) as state:
-        fields = Arrays(fields.xp,
-                        Ex=state['Ex'], Ey=state['Ey'], Ez=state['Ez'],
-                        Bx=state['Bx'], By=state['By'], Bz=state['Bz'],
-                        Phi=state['Phi'])
-
-        particles = Arrays(fields.xp,
-                           x_init=state['x_init'], y_init=state['y_init'],
-                           q=state['q'], m=state['m'],
-                           x_offt=state['x_offt'], y_offt=state['y_offt'],
-                           px=state['px'], py=state['py'], pz=state['pz'], 
-        
-                           dx_chaotic=state['dx_chaotic'],
-                           dy_chaotic=state['dy_chaotic'],
-                           dx_chaotic_perp=state['dx_chaotic_perp'],
-                           dy_chaotic_perp=state['dy_chaotic_perp'])
-
-        currents = Arrays(fields.xp,
-                          ro=state['ro'], jx=state['jx'],
-                          jy=state['jy'], jz=state['jz'])
+        currents = Arrays(xp=xp,
+                          ro=xp.array(state['ro']), jx=xp.array(state['jx']),
+                          jy=xp.array(state['jy']), jz=xp.array(state['jz']))
 
         try:
-            const_arrays.ro_initial = state['ro_initial']
+            const_arrays.ro_initial = xp.array(state['rho_initial'])
         except:
             pass
-        
-        xi_plasma_layer = float(state['xi_plasma_layer'][0])
+        try: 
+            xi_plasma_layer = float(state['xi_plasma_layer'])
+        except:
+            pass
 
     return fields, particles, currents, const_arrays, xi_plasma_layer
