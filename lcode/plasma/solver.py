@@ -31,7 +31,7 @@ class CylindricalPlasmaSolver(object):
         self.substepping_sensitivity = config.getfloat('substepping-sensitivity')
         self.substepping_max_depth = config.getint('substepping-depth')
         self.path_lim = config.getfloat('trapped-path-limit')
-        self.noisereductor_enabled = config.getbool('noise-reductor-enabled')
+        self.noisereductor_enabled = config.getbool('declustering-enabled')
         self.corrector_steps = config.getint('correctotransverse-steps')
 
     # Performs one full step along xi
