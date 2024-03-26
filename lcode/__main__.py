@@ -5,7 +5,7 @@ from lcode import __version__
 __EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), 'examples')
 def get_available_configs():
     configs = os.listdir(__EXAMPLE_DIR)
-    configs = [config.replace('.py', '') for config in configs]
+    configs = [conf.replace('.py', '') for conf in configs if conf[0] != '_']
     return configs
 
 def main():
@@ -22,7 +22,7 @@ def main():
 
     if args.subparser_name == "get":
         if args.config_name not in __available_configs:
-            print(f'Choose from {" ,".join(__available_configs)}')
+            print(f'Choose from: {", ".join(__available_configs)}')
             return
         with open(os.path.join(__EXAMPLE_DIR,'{}.py'.format(args.config_name)), 'r') as input, \
              open('run.py', 'w') as output:

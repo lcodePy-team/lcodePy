@@ -3,9 +3,9 @@ channels:
     - conda-forge
     - defaults
 dependencies:
-    - numba=0.56
+    - python
+    - numba
     - numpy
     - scipy
     - matplotlib
     - mpi4py
-    - argparse

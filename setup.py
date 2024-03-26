@@ -1,9 +1,12 @@
 from setuptools import setup, find_packages
+from distutils.command.install import INSTALL_SCHEMES
 from lcode import __version__
     
 with open('README.md', 'r') as f:
     long_description = f.read()
 
+for scheme in INSTALL_SCHEMES.values():
+    scheme['data'] = scheme['purelib']
 
 with open('requirements.txt', 'r') as f:
     requirements = f.read().split('\n')
@@ -22,6 +25,7 @@ if __name__ == '__main__':
         download_url='https://github.com/lcodePy-team/lcodePy',
         packages=find_packages(),
         install_requires=requirements,
+        package_data={'lcode': ['examples/*.py']},
         include_package_data=True,
         classifiers=[
           'Programming Language :: Python',
