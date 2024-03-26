@@ -314,7 +314,7 @@ def init_plasma(config: Config, current_time=0):
 
     grid_steps            = config.getint('window-width-steps')
     grid_step_size        = config.getfloat('transverse-step')
-    reflect_padding_steps = config.getint('reflect-padding-steps')
+    bound_padding_steps = config.getint('bound-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getfloat('plasma-fineness')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
@@ -329,16 +329,16 @@ def init_plasma(config: Config, current_time=0):
     assert grid_steps % 2 == 1
 
     # particles should not reach the window pre-boundary cells
-    if reflect_padding_steps <= 2:
-        raise Exception("'reflect_padding_steps' parameter is too low.\n" +
-                        "Details: 'reflect_padding_steps' must be bigger than" +
-                        " 2. By default it is 5.")
+    if bound_padding_steps <= 2:
+        raise Exception("'bound_padding_steps' parameter is too low.\n" +
+                        "Details: 'bound_padding_steps' must be bigger than" +
+                        " 2. By default it is 10.")
 
     if dual_plasma_approach and pu_type == 'gpu':
         plasma_coarseness = config.getint('plasma-coarseness')
 
         # virtual particles should not reach the window pre-boundary cells
-        assert reflect_padding_steps > plasma_coarseness + 1
+        assert bound_padding_steps > plasma_coarseness + 1
         # TODO: The (costly) alternative is to reflect after plasma virtualization,
         #       but it's better for stabitily, or is it?
 

@@ -86,7 +86,7 @@ class Config:
         if 'extra' in runas_name:
             n_lines = -1
         else:
-            n_lines = 82
+            n_lines = 88
         path_to_default = '/'.join(__file__.split('/')[:-1]) \
                           + "/default_config_values.py"
         conf_file = open(path_to_default,'r').readlines()

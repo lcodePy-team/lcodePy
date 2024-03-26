@@ -9,8 +9,9 @@ default_config_values = {
 
     # Parameters of simulation window:
 
-    ## Transverse size of the window from axis to boundary and transverse grid step (dr in 2d or 
-    ## dx(=dy) in 3d). The window width is adjusted to the closest "good" value
+    ## Transverse size of the window from axis to boundary and 
+    ## transverse grid step (dr in 2d or dx(=dy) in 3d). 
+    ## The window width is adjusted to the closest "good" value
     ## to ensure fft performance. 
     'window-width': 5.0,
     'transverse-step': 0.05,
@@ -45,7 +46,8 @@ default_config_values = {
     
     
     ## Longitudinal profile of the plasma density. For 3d only. 
-    ## example https://lcode.info/site-files/manual.pdf p. 17
+    ## Example https://lcode.info/site-files/manual.pdf p. 17
+    ## Only linear increase/decrease are available. 
     'plasma-zshape': '''
         ''',
 
@@ -72,7 +74,7 @@ default_config_values = {
     'substepping-sensitivity': 0.2,
 
     ## Parameters of the area available for motion of plasma particles, 3d only.
-    'reflect-padding-steps': 10,
+    'bound-padding-steps': 10,
     'plasma-padding-steps': 15,
 
     ## Dual plasma approache for 3d, only GPU  
