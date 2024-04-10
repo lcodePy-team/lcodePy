@@ -9,3 +9,5 @@ lcode.egg-info/
 *.prof
 diagnostics/
 # *.ipynb
+
+docs/_build

@@ -42,14 +42,14 @@ class Simulation:
                     Default : default_config_values from lcodePy2d/config/
                     (TODO: Should we use Config class insted Dict by default?)
 
-            beam_parametrs : Dict, otianal
+            beam_parametrs : Dict, optional
                     Configuration of the charge beam.
                     The beam desibled by default.      
                     (TODO: set default beam)
 
-            diagnostics : List, optianal
+            diagnostics : List, optional
                     Collection of diagnostics that should be run.
-                    By default, diagnostics are desibled.      
+                    By default, diagnostics are disabled.      
         """
 
         self.config = copy.copy(config)
