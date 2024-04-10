@@ -1,7 +1,6 @@
 Simulation
 ===================================
 
-This section describes `Simulation` class
 
 .. autoclass:: lcode.Simulation()
     

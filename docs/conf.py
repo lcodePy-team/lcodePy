@@ -5,10 +5,10 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-import lcode
+
 import sys
 
-sys.path.insert(0, lcode.__path__[0])
+sys.path.insert(0, '../.')
 
 project = 'LCODE'
 copyright = '2024, LCODE Team'
@@ -17,8 +17,8 @@ author = 'Petr Tuev, Nikita Okhotnikov, Konstantin Lotov, Ivan Kargapolov'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc']
-
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosectionlabel']
+suppress_warnings = ['autosectionlabel.*']
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 

@@ -1,5 +1,5 @@
 Welcome to LCODE's documentation!
-=====
+=================================
 
 LCODE is a free software for numerical simulation of
 particle beam-driven plasma wakefield acceleration.
@@ -24,13 +24,26 @@ http://lcode.info/.
     * needed for consistent HTML-PDF-EPUB chapters
     */
    section#installation,
-   section#usage {
+   section#usage,
+   section#overview,
+   section#details {
        display:none;
    }
    </style>
    
+
+Overview
+-----------------
+.. toctree::
+   :caption: OVERVIEW
+   :maxdepth: 1
+   :hidden:
+
+   overview/problem
+   overview/quickstart
+   
 Installation
------
+-----------------
 .. toctree::
    :caption: INSTALLATION
    :maxdepth: 1
@@ -39,7 +52,7 @@ Installation
    install/installation
    
 Usage
------
+-----------------
 .. toctree::
    :caption: USAGE
    :maxdepth: 1
@@ -49,3 +62,14 @@ Usage
    usage/beam
    usage/diagnostics
    usage/simulation
+
+
+Details
+-----------------
+.. toctree::
+   :caption: DETAILS
+   :maxdepth: 1
+   :hidden:
+
+   details/noisereductor
+

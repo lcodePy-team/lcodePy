@@ -1,9 +1,60 @@
 Installation
 ===================================
 
+Pip
+---------------
 
-We use https://www.continuum.io/why-anaconda and we recommend 
-installing lcode in a separate environment. 
+First, you need to install the `lcode` package along with its dependencies.
+
+If you want to work with a virtual environment, then you need to create and activate it beforehand.
+
+.. code-block:: shell
+
+    # linux
+    python -m venv venv
+    source venv/bin/activate # linux
+
+.. code-block:: powershell
+    
+    # Windows
+    python -m venv venv
+    .\venv\scripts\Activate
+
+Then install lcode:
+
+.. code-block:: shell
+
+    pip install lcode
+
+
+From source
+---------------
+
+Create and activate the virtual environment as at the beginning of the :ref:`pip` section.
+
+Then clone the lcode source code to yourself:
+
+.. code-block:: shell
+
+    git clone https://github.com/lcodePy-team/lcodePy.git
+    cd lcodepy
+
+Now install all dependencies and lcode itself
+
+.. code-block:: shell
+
+    pip install -r requirements.txt
+    pip install -e .
+
+.. note::
+    If you want to use GPU, you need to install the `cupy` library yourself [`Install Cupy`_].
+.. _`Install Cupy`: https://docs.cupy.dev/en/stable/install.html
+
+Conda
+---------------
+
+
+We recommend installing lcode in a separate environment. 
 Any other python installation should work fine, but has not been tested. 
 
 
@@ -35,16 +86,14 @@ where `conda-env.yml` is avalible in sources.
     conda create -n lcode-env -c conda-forge numba numpy scipy matplotlib cupy
 
 
-- Install lcode:
+.. raw:: html
 
-.. code-block::
+    <script>
+    window.addEventListener('load', function() {
+        console.log('asd')
+        document.querySelectorAll('a.reference.external').forEach(function(link) {
 
-    pip install lcode
-
-or download sources from GitHub and run the forlowing command
-in downloaded directory:
-
-.. code-block::
-
-    pip install .
-
+            link.target = '_blank';
+        });
+    });
+    </script>
