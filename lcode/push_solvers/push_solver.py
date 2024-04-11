@@ -129,13 +129,21 @@ class PusherAndSolver():
             beam_drain.push_beam_slice(moved)
             # beam_drain.finish_layer(xi_i * -self.dxi)
             
+            xi_plasma_layer = - xi_i * self.dxi
             # Every xi step diagnostics
             for diagnostic in diagnostics_list:
-                diagnostic.process(
-                    self.config, current_time, xi_i, 
-                    pl_particles, pl_fields, rho_beam, moved)
+                # diagnostic.process(
+                #     self.config, current_time, xi_i, 
+                #     pl_particles, pl_fields, rho_beam, moved)
+                diagnostic.after_step_dxi(
+                    current_time, xi_plasma_layer, pl_particles,
+                    pl_fields, pl_currents, rho_beam)
             if xi_i % 10 == 0:
                 self._simple_diag(current_time, xi_i, pl_fields)
+
+        for diagnostic in diagnostics_list:
+            diagnostic.dump(current_time, xi_plasma_layer, pl_particles,
+                            pl_fields, pl_currents, beam_drain)
         self._plasmastate = (pl_particles, pl_fields, pl_currents)
 
 
