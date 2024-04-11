@@ -2,13 +2,15 @@
 from pathlib import Path
 from collections import defaultdict
 import numpy as np
+import matplotlib.pyplot as plt
+
+from ..utils import Diagnostic, OUTPUT_TYPE
+from ...config.config import Config
 
 from .Strategy3D import _3D_FXi
 from .StrategyCircular import _CIRC_FXi
 from .Strategy import Strategy
 
-from ..utils import Diagnostic, OUTPUT_TYPE
-from ...config.config import Config
 
 class FXi_Type:
     __slots__ = ()
@@ -118,6 +120,18 @@ class FXi(Diagnostic):
             if self.__output_type & OUTPUT_TYPE.NUMBERS:
                 self.xp.savez(dirname, **self._data)
             
+            if self.__output_type & OUTPUT_TYPE.PICTURES:
+                for name, data in self._data.items():
+                    if name == 'xi':
+                        continue
+                    self.__make_picture(current_time, self._data['xi'], name, data)
+
             self._data = defaultdict(list)
 
+    def __make_picture(self, current_time, xi, name, data):
+
+        plt.plot(xi, data)
+        plt.title(name)
+        plt.savefig(self.__directory / f'{name}_{current_time:08.2f}.jpg')
+        plt.close()
 
