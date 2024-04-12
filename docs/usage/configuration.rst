@@ -1,5 +1,5 @@
-Config
-======
+Configuration
+=============
 
 The config is a python dictionary that is passed to the `Simulation` class to configure the simulation. 
 
@@ -85,7 +85,7 @@ CPU/GPU
 Noise reductor
 -----------------------
 
-Read more in the section :doc:`../details/noisereductor`
+Read more in the section :doc:`../advanced_usege/noisereductor`
 
 * ``enable-noise-filter`` (`bool`) optional (default `True`)
 

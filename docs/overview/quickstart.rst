@@ -43,7 +43,7 @@ Then install lcode:
 
 After generation, we can change the simulation parameters in the run.py file. More details about the parameters are written in the corresponding sections:
 
-- :doc:`../usage/config` - About general simulation settings
+- :doc:`../usage/configuration` - About general simulation settings
 - :doc:`../usage/beam` - About beam settings
 - :doc:`../usage/diagnostics` - About selecting diagnostics
 - :doc:`../usage/simulation` - About starting the simulation

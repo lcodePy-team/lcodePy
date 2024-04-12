@@ -26,9 +26,9 @@ http://lcode.info/.
    section#installation,
    section#usage,
    section#overview,
-   section#details {
+   section#advanced_use /* {
        display:none;
-   }
+   }*/
    </style>
    
 
@@ -36,10 +36,10 @@ Overview
 -----------------
 .. toctree::
    :caption: OVERVIEW
-   :maxdepth: 1
+   :maxdepth: 3
    :hidden:
 
-   overview/problem
+   overview/basics
    overview/quickstart
    
 Installation
@@ -58,18 +58,31 @@ Usage
    :maxdepth: 1
    :hidden:
 
-   usage/config
+   usage/simulation
+   usage/configuration
    usage/beam
    usage/diagnostics
-   usage/simulation
+   usage/units
+   usage/examples
 
 
-Details
+Advanced usege
 -----------------
 .. toctree::
-   :caption: DETAILS
+   :caption: ADVANCED USEGE
    :maxdepth: 1
-   :hidden:
+   :hidden: 
 
-   details/noisereductor
+   advanced_usege/noisereductor
 
+
+Underling physics
+-----------------
+.. toctree::
+   :caption: UNDERLING PHYSICS
+   :maxdepth: 3
+   :hidden: 
+
+   underlying_physics/QSA
+   underlying_physics/plasma_model
+   underlying_physics/beam_model
