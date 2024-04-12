@@ -46,7 +46,7 @@ class FXi(Diagnostic):
         
         self.__f_xi = f_xi
         self.__output_period = output_period
-        self.__saving_xi_period = saving_xi_period
+        self.__saving_xi_period = saving_xi_period # not implemented
         self.__output_type = output_type
         self._probe_lines = probe_lines
 
