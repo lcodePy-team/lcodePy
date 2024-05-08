@@ -1,6 +1,6 @@
 from math import remainder
 from ..config.config import Config
-class OUTPUT_TYPE:
+class OutputType:
 
     __slots__ = ()
     
@@ -36,3 +36,16 @@ class Diagnostic:
              beam_drain, clean_data=True):
         raise NotImplementedError
     
+def absremainder(x, y):
+    """
+    This is a universal modulo operator that behaves predictably not only for
+    integers, but also for floating point numbers.
+    """
+    # Due to the nature of floating-number arithmetic, the regular % operator
+    # doesn't work as expected for floats. Thus, we use math.remainder that 
+    # behaves a little more predictably. Still, while 0.15 % 0.05 = 0.04999...,
+    # math.remainder(0.15, 0.05) = -1.3877787807814457e-17. Also, math.remainder
+    # isn't exactly the modulo operator like math.fmod and may produce results
+    # such as math.remainder(14, 5) = -1.0, but it solves the puzzle of
+    # floating-number arithmetic.
+    return abs(remainder(x, y))

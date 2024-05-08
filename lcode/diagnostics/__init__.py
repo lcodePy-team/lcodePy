@@ -1,3 +1,5 @@
 
-from .FXi import FXi, FXi_Type
-from .utils import OUTPUT_TYPE
+from .FXi import FXiDiag, FXiType
+from .utils import OutputType
+
+from .slice import SliceDiag, SliceType, SliceValue

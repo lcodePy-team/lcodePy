@@ -1,2 +1,2 @@
 
-from .FXi import FXi, FXi_Type
+from .FXi import FXiDiag, FXiType

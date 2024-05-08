@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ..utils import Diagnostic, OUTPUT_TYPE
+from ..utils import Diagnostic, OutputType
 from ...config.config import Config
 
 from .Strategy3D import _3D_FXi
@@ -12,7 +12,7 @@ from .StrategyCircular import _CIRC_FXi
 from .Strategy import Strategy
 
 
-class FXi_Type:
+class FXiType:
     __slots__ = ()
 
     Ex = 0x1
@@ -39,10 +39,10 @@ class FXi_Type:
 
 
 
-class FXi(Diagnostic):
+class FXiDiag(Diagnostic):
 
-    def __init__(self, output_period = 100, saving_xi_period = 100, f_xi: FXi_Type = FXi_Type.Ez,
-                 output_type = OUTPUT_TYPE.NUMBERS, probe_lines = None, directory_name = None):
+    def __init__(self, output_period = 100, saving_xi_period = 100, f_xi = FXiType.Ez,
+                 output_type = OutputType.NUMBERS, probe_lines = None, directory_name = None):
         
         self.__f_xi = f_xi
         self.__output_period = output_period
@@ -82,29 +82,29 @@ class FXi(Diagnostic):
                        rho_beam):
         if self.condition_check(current_time, self.__output_period, self.__time_step_size):
             
-            if self.__f_xi & FXi_Type.Ex:
+            if self.__f_xi & FXiType.Ex:
                 self.strategy.process_field(plasma_fields, 'Ex')
-            if self.__f_xi & FXi_Type.Ey:
+            if self.__f_xi & FXiType.Ey:
                 self.strategy.process_field(plasma_fields, 'Ey')
-            if self.__f_xi & FXi_Type.Ez:
+            if self.__f_xi & FXiType.Ez:
                 self.strategy.process_field(plasma_fields, 'Ez')
-            if self.__f_xi & FXi_Type.Bx:
+            if self.__f_xi & FXiType.Bx:
                 self.strategy.process_field(plasma_fields, 'Bx')
-            if self.__f_xi & FXi_Type.By:
+            if self.__f_xi & FXiType.By:
                 self.strategy.process_field(plasma_fields, 'By')
-            if self.__f_xi & FXi_Type.Bz:
+            if self.__f_xi & FXiType.Bz:
                 self.strategy.process_field(plasma_fields, 'Bz')
             
-            if self.__f_xi & FXi_Type.ne:
+            if self.__f_xi & FXiType.ne:
                 self.strategy.process_n(plasma_currents, 'ne')
             
-            if self.__f_xi & FXi_Type.ni:
+            if self.__f_xi & FXiType.ni:
                 self.strategy.process_n(plasma_currents, 'ni')
             
-            if self.__f_xi & FXi_Type.rho_beam:
+            if self.__f_xi & FXiType.rho_beam:
                 self.strategy.process_rho(rho_beam)
             
-            if self.__f_xi & FXi_Type.Phi:
+            if self.__f_xi & FXiType.Phi:
                 self.strategy.process_Phi(plasma_fields)
 
            
@@ -117,10 +117,10 @@ class FXi(Diagnostic):
             Path(self.__directory).mkdir(parents=True, exist_ok=True)
             dirname = self.__directory / f'f_xi_{current_time:08.2f}.npz'
 
-            if self.__output_type & OUTPUT_TYPE.NUMBERS:
+            if self.__output_type & OutputType.NUMBERS:
                 self.xp.savez(dirname, **self._data)
             
-            if self.__output_type & OUTPUT_TYPE.PICTURES:
+            if self.__output_type & OutputType.PICTURES:
                 for name, data in self._data.items():
                     if name == 'xi':
                         continue
