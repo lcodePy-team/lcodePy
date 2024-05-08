@@ -4,6 +4,7 @@ import numpy as np
 from ..config.config import Config
 from .weights import get_deposit_plasma
 from .data import Arrays
+from .profile import profile_initial_plasma
 
 ELECTRON_CHARGE = -1
 ELECTRON_MASS = 1
@@ -103,24 +104,33 @@ def make_plasma_grid(xp: np, steps, step_size, fineness):
     return plasma_grid
 
 
-def make_plasma_single(xp: np, steps, cell_size, fineness=2):
+def make_plasma_single(config, current_time, steps, cell_size, fineness=2):
     """
     Initialize default plasma state, fineness**2 particles per cell.
     """
+    xp = config.xp
     pl_grid = make_plasma_grid(xp, steps, cell_size, fineness)
 
     Np = len(pl_grid)
 
     y_init = xp.broadcast_to(pl_grid, (Np, Np))
-    x_init = y_init.T
+    x_init = y_init.T.copy()
+    q = xp.ones_like(x_init) * ELECTRON_CHARGE / fineness**2 * cell_size**2
+    m = xp.ones_like(x_init) * ELECTRON_MASS / fineness**2 * cell_size**2
+    
+    # Here we change q and m arrays of plasma particles according to
+    # set plasma_zhape:
+    q, m  = profile_initial_plasma(config, current_time, 
+                                   x_init, y_init, q, m)
 
-    x_offt = xp.zeros((Np, Np))
-    y_offt = xp.zeros((Np, Np))
-    px = xp.zeros((Np, Np))
-    py = xp.zeros((Np, Np))
-    pz = xp.zeros((Np, Np))
-    q = xp.ones((Np, Np)) * ELECTRON_CHARGE / fineness**2 * cell_size**2
-    m = xp.ones((Np, Np)) * ELECTRON_MASS / fineness**2 * cell_size**2
+    x_offt = xp.zeros_like(x_init)
+    y_offt = xp.zeros_like(x_init)
+   # mask = q == 0
+   # x_offt[mask] = config.getfloat('window-width') * 100
+   # y_offt[mask] = config.getfloat('window-width') * 100
+    px = xp.zeros_like(x_init)
+    py = xp.zeros_like(x_init)
+    pz = xp.zeros_like(x_init)
 
     return x_init, y_init, x_offt, y_offt, px, py, pz, q, m
 
@@ -262,59 +272,18 @@ def make_plasma_dual(xp: np, steps, cell_size, coarseness=2, fineness=2):
     )
 
 
-# TODO: when more zshapes are created, move this fun to a separate file.
-def change_by_plasma_zshape(config: Config, current_time, q, m):
-    # Get required parameters:
-    time_step_size = config.getfloat('time-step')
-    plasma_zshape  = config.get('plasma-zshape')
-    time_middle = current_time - time_step_size / 2 # Just like in lcode2d
 
-    # Check if plasma_zshape is empty and nothing should be done with q and m
-    if plasma_zshape.isspace():
-        return q, m
-
-    # List comprehension to create an array that is easy to handle
-    lines = [line.split() for line in plasma_zshape.splitlines()
-             if len(line) != 0] # without empty lines
-
-    # TODO: Do we need to check ValueError?
-    for line in lines:
-        # Check if time_middle lies in one of the regions:
-        if time_middle < float(line[0]):
-            if line[2] == 'L': # Only linear rise/decrease is implemented now
-                coef = (float(line[1]) * (float(line[0]) - time_middle) +
-                        float(line[3]) * time_middle) / float(line[0])
-                if coef >= 0:
-                    return q * coef, m * coef
-                else:
-                    print('A density that is < 0 is not available, ' +
-                          'a density of 1 is assumed.')
-                    break
-            else:
-                print(line[2], 'segment shape is not available, a density ' +
-                      'of 1 is assumed.')
-                break
-        else:
-            time_middle -= float(line[0])
-
-    # If the total length is too small, hence we finished the loop above,
-    # or we broke from the loop, a density of 1 is assumed:
-    return q, m
 
 
 def init_plasma(config: Config, current_time=0):
     """
     Initialize all the arrays needed (for what?).
     """
-    pu_type = config.get('processing-unit-type').lower()
-    if pu_type == 'cpu':
-        xp = np
-    elif pu_type == 'gpu':
-        import cupy as xp
+    xp = config.xp
 
     grid_steps            = config.getint('window-width-steps')
     grid_step_size        = config.getfloat('transverse-step')
-    bound_padding_steps = config.getint('bound-padding-steps')
+    bound_padding_steps   = config.getint('bound-padding-steps')
     plasma_padding_steps  = config.getint('plasma-padding-steps')
     plasma_fineness       = config.getfloat('plasma-fineness')
     dual_plasma_approach  = config.getbool('dual-plasma-approach')
@@ -356,20 +325,18 @@ def init_plasma(config: Config, current_time=0):
 
         x_init, y_init, x_offt, y_offt, px, py, pz, q, m = \
             make_plasma_single(
-                xp, steps=grid_steps - plasma_padding_steps * 2,
+                config, current_time, 
+                steps=grid_steps - plasma_padding_steps * 2,
                 cell_size=grid_step_size, fineness=plasma_fineness)
 
-    # Here we change q and m arrays of plasma particles according to
-    # set plasma_zhape:
-    q, m = change_by_plasma_zshape(config, current_time, q, m)
 
     # We create arrays dx_chaotic, dy_chaotic, dx_chaotic_perp, dy_chaotic_perp
     # that are used in noise filter, with right sizes:
     size = x_offt.shape[0]
-    dx_chaotic = xp.zeros((size, size), dtype=xp.float64)
-    dy_chaotic = xp.zeros((size, size), dtype=xp.float64)
-    dx_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
-    dy_chaotic_perp = xp.zeros((size, size), dtype=xp.float64)
+    dx_chaotic = xp.zeros_like(x_init)
+    dy_chaotic = xp.zeros_like(x_init)
+    dx_chaotic_perp = xp.zeros_like(x_init)
+    dy_chaotic_perp = xp.zeros_like(x_init)
 
     particles = {'electrons' : Arrays(xp, x_init=x_init, y_init=y_init,
                                       x_offt=x_offt, y_offt=y_offt, 

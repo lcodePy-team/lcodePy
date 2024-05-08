@@ -41,6 +41,8 @@ def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
     x_h, y_h, m, q = x_h.ravel(), y_h.ravel(), m.ravel(), q.ravel()
     px, py, pz = px.ravel(), py.ravel(), pz.ravel()
     for k in range(size):
+        if q[k] == 0:
+            continue
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)
@@ -156,6 +158,9 @@ def get_deposit_plasma_cupy():
         """,
         out_params='raw T out_ro, raw T out_jx, raw T out_jy, raw T out_jz',
         operation="""
+        if (q[i] == 0){
+            continue;
+        }
         const T gamma_m = sqrt(
             m[i]*m[i] + px[i]*px[i] + py[i]*py[i] + pz[i]*pz[i]);
         const T dro = q[i] / (1 - pz[i] / gamma_m);

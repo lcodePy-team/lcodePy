@@ -33,9 +33,13 @@ class Config:
 
     def get(self, option_name: str, fallback: str = '') -> str:
         if option_name in self.config_values:
-            return self.config_values.get(option_name)
+            return str(self.config_values.get(option_name))
         else:
             return fallback
+
+    def getraw(self, option_name):
+        return self.config_values.get(option_name)
+
 
     def getbool(self, option_name: str, fallback: bool = 0) -> bool:
         str_value = self.get(option_name).lower()
@@ -59,7 +63,7 @@ class Config:
             return fallback
 
     def set(self, option_name: str, option_value: Any):
-        self.config_values[option_name] = str(option_value)
+        self.config_values[option_name] = option_value
 
         # We intercept the setting of a new configuration value
         # in order to adjust other values:
@@ -77,16 +81,19 @@ class Config:
         # We can add this part if we want to support **karg
         # for key in kconfig_values:
         #     self.set(key, kconfig_values[key])
+
     def dump(self, runas_name):
-        str_keys = set(['plasma-zshape', 
-                        'ion-model',
-                        'processing-unit-type',
+        str_keys = set(['processing-unit-type',
                         'geometry',
+                        'ion-model',
+                        'plasma-shape',
+                        'plasma-zshape', 
+                        'plasma-rshape',
                         ])
         if 'extra' in runas_name:
             n_lines = -1
         else:
-            n_lines = 88
+            n_lines = 94
         path_to_default = '/'.join(__file__.split('/')[:-1]) \
                           + "/default_config_values.py"
         conf_file = open(path_to_default,'r').readlines()
@@ -101,14 +108,30 @@ class Config:
         for key, value in self.config_values.items():
             old_line = fr"'{key}': .*?(?=,)"
             if key in str_keys:
-                new_line = fr"'{key}': '{value.lower()}'"
-                if value.lower() == '2d':
-                    new_line = fr"'{key}': 'circ'"
                 if key == "plasma-zshape": 
                     profile = [8 * " " + x.strip() for x in 
                                value.lower().strip().split('\n')]
-                    profile = "\n".join(profile) + "\n" + 8 * " " + "'''"
+                    profile = r"\n".join(profile) + r"\n" + 8 * r" " + r"'''"
                     new_line = fr"'{key}': '''\n{profile}"
+                    old_line = fr"'{key}': '''\n        '''"
+                    
+                elif key == "plasma-rshape":
+                    if isinstance(value, int):
+                        new_line = fr"'{key}': {value}"
+                        continue
+                    elif len(value.split()) == 1:
+                        new_line = fr"'{key}': '{value.lower()}'"
+                        continue
+                    profile = [8 * " " + x.strip() for x in 
+                               value.lower().strip().split('\n')]
+                    profile = r"\n".join(profile) + r"\n" + 8 * r" " + r"'''"
+                    new_line = fr"'{key}': '''\n{profile}"
+                    
+                elif key == 'plasma-shape' and callable(value):
+                    new_line = fr"'{key}': 'external function {value}'"
+                    
+                else: 
+                    new_line = fr"'{key}': '{value.lower()}'"
             else:
                 new_line = fr"'{key}': {value}"
             conf_file = re.sub(old_line, new_line, conf_file)

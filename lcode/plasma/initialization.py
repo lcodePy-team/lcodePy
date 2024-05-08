@@ -3,9 +3,17 @@ import numpy as np
 
 from ..config.config import Config
 from .data import Arrays
-from .profiles import get_plasma_profile
 from .rhoj import get_rhoj_computer
+from ..plasma3d.profile import profile_initial_plasma
 
+def _place_particles(window_width, r_step, particles_per_cell):
+    n_particles = int(window_width / r_step) * particles_per_cell
+    r_step_p = window_width / n_particles
+    return (np.arange(n_particles) + 0.5) * r_step_p
+
+def _weight_particles(particle_positions):
+    r_step_p = particle_positions[1] - particle_positions[0]
+    return 2 * np.pi * r_step_p * particle_positions
 
 def init_plasma(config: Config, current_time=0):
     window_width = config.getfloat('window-width')
@@ -16,12 +24,16 @@ def init_plasma(config: Config, current_time=0):
     ion_model = config.get("ion-model")
     grid_length = int(window_width / r_step) + 1
 
-    plasma_profile = get_plasma_profile(config)
-
-    r_p = plasma_profile.place_particles(part_per_cell)
-    m_p = plasma_profile.weigh_particles(r_p)
-    
+    r_p = _place_particles(window_width, r_step, part_per_cell)
+    m_p = _weight_particles(r_p)
     q_p = -np.copy(m_p)
+    q_p, m_p  = profile_initial_plasma(config, current_time, r_p, 
+                                       np.zeros_like(r_p), q_p, m_p)
+    mask = q_p != 0
+    q_p = q_p[mask].copy()
+    m_p = m_p[mask].copy()
+    r_p = r_p[mask].copy()
+    
     p_r_p = np.zeros_like(r_p)
     p_f_p = np.zeros_like(r_p)
     p_z_p = np.zeros_like(r_p)

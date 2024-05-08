@@ -72,6 +72,8 @@ def move_smart_kernel_numba(
     px_full, py_full, pz_full = px_full.ravel(), py_full.ravel(), pz_full.ravel()
 
     for k in nb.prange(size):
+        if qs[k] == 0:
+            continue
         m, q = ms[k], qs[k]
 
         opx, opy, opz = px_prev[k], py_prev[k], pz_prev[k]
@@ -146,14 +148,21 @@ def move_smart_kernel_numba(
         px_full[k], py_full[k], pz_full[k] = px, py, pz
 
 
+@nb.njit(parallel=True)
 def move_estimate_wo_fields_numba(xi_step, m, x_offt, y_offt, px, py, pz, size):
     """
     Move coarse plasma particles as if there were no fields.
     """
-    gamma_m = np.sqrt(m**2 + pz**2 + px**2 + py**2)
+    m = m.ravel()
+    px, py, pz = px.ravel(), py.ravel(), pz.ravel()
+    x_offt, y_offt = x_offt.ravel(), y_offt.ravel()
+    for k in nb.prange(size):
+        if m[k] == 0:
+            continue
+        gamma_m = np.sqrt(m[k]**2 + pz[k]**2 + px[k]**2 + py[k]**2)
 
-    x_offt += px / (gamma_m - pz) * xi_step
-    y_offt += py / (gamma_m - pz) * xi_step
+        x_offt[k] += px[k] / (gamma_m - pz[k]) * xi_step
+        y_offt[k] += py[k] / (gamma_m - pz[k]) * xi_step
 
     
 # TODO: Not very smart to get a kernel this way.
@@ -176,6 +185,9 @@ def get_move_smart_kernel_cupy():
         raw T px_full, raw T py_full, raw T pz_full
         """,
         operation="""
+        if (q[i] == 0){
+            continue;
+        }
         T px = px_prev[i], py = py_prev[i], pz = pz_prev[i];
         T x_halfstep = x_init[i] + (x_offt_prev[i] + x_offt_full[i]) / 2;
         T y_halfstep = y_init[i] + (y_offt_prev[i] + y_offt_full[i]) / 2;
@@ -288,6 +300,9 @@ def get_move_wo_fields_kernel_cupy():
         raw T x_offt, raw T y_offt, raw T px, raw T py, raw T pz
         """,
         operation="""
+        if (m[i] == 0){
+            continue;
+        }
         const T gamma_m = sqrt(
             m[i]*m[i] + px[i]*px[i] + py[i]*py[i] + pz[i]*pz[i]);
 

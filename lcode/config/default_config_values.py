@@ -32,8 +32,27 @@ default_config_values = {
     'plasma-particles-per-cell': 10,
     'ion-model': 'mobile', # 'mobile' or 'background'
 
-	## Mass of plasma ions in unita of electron mass
+    ## Mass of plasma ions in unita of electron mass
     'ion-mass': 1836,
+    
+    ## Plasma shaping mode: lagacy or function(t, x, y) -> density weights.
+    ## t is the current time, x(y) is the position of the plasma particles.   
+    ## The density of weights must have the same shape as x.  
+    ## x = r, y = 0 in cylindrical geometry.  
+    'plasma-shape': 'legacy', 
+    
+    ## Transverse profile of plasma density settings.
+    ## Example https://lcode.info/site-files/manual.pdf p. 16 
+    'plasma-rshape': 'uniform',
+    'plasma-width': 1,
+    'plasma-width-2': 0,
+    'plasma-density-2': 0.5,
+
+    ## Longitudinal profile of the plasma density. For 3d only. 
+    ## Example https://lcode.info/site-files/manual.pdf p. 17
+    ## Only linear increase/decrease are available. 
+    'plasma-zshape': '''
+        ''',
 
     ## Declustering of plasma electrons
     'declustering-enabled': False,
@@ -43,13 +62,6 @@ default_config_values = {
     'declustering-force': 0.3,
     'declustering-damping': 0.1,
     'declustering-limit': 1e-3,
-    
-    
-    ## Longitudinal profile of the plasma density. For 3d only. 
-    ## Example https://lcode.info/site-files/manual.pdf p. 17
-    ## Only linear increase/decrease are available. 
-    'plasma-zshape': '''
-        ''',
 
     # Parameters of beam model:
     'beam-substepping-energy': 2,
@@ -62,12 +74,6 @@ default_config_values = {
     # Plasma:
     ## External Bz amplitude, 2D only.
     'magnetic-field': 0,
-    
-    ## Plasma transverse profile settings, 2d only.
-    'plasma-profile': 1,
-    'plasma-width': 2,
-    'plasma-width-2': 1,
-    'plasma-density-2': 0.5,
     
     ## Plasma substepping for xi, 2d only
     'substepping-depth': 3,
