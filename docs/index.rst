@@ -26,9 +26,10 @@ http://lcode.info/.
    section#installation,
    section#usage,
    section#overview,
-   section#advanced_use /* {
+   section#advanced-usage,
+   section#underlying-physics{
        display:none;
-   }*/
+   }
    </style>
    
 
@@ -66,20 +67,20 @@ Usage
    usage/examples
 
 
-Advanced usege
+Advanced usage
 -----------------
 .. toctree::
-   :caption: ADVANCED USEGE
+   :caption: ADVANCED USAGE
    :maxdepth: 1
    :hidden: 
 
    advanced_usege/noisereductor
 
 
-Underling physics
------------------
+Underlying physics
+--------------------
 .. toctree::
-   :caption: UNDERLING PHYSICS
+   :caption: UNDERLYING PHYSICS
    :maxdepth: 3
    :hidden: 
 

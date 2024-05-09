@@ -40,12 +40,12 @@ class Simulation:
             config : Dict, optional
                     The set of base parameters to perform the simulation.
 
-                    Default : default_config_values from lcode.config.default_config_values
+                    Default : default_config_values from lcode.config.default_config_values.
 
             beam_parametrs : Dict, optional
                     Configuration of the charge beam.
 
-                    The beam desibled by default.      
+                    The beam disabled by default.      
 
             diagnostics : List, optional
                     Collection of diagnostics that should be run.
