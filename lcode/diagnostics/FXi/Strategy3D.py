@@ -14,7 +14,7 @@ class _3D_FXi:
 
     def __process_probe_lines(self, probe_lines):
         steps = self.__config.getint('window-width-steps')
-        grid_step_size = self.__config.getfloat('window-width-step-size')
+        grid_step_size = self.__config.getfloat('transverse-step')
 
         if probe_lines is None:
             self.__ax_x = 0

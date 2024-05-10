@@ -20,19 +20,19 @@ class _CIRC_FXi:
         self.__process_probe_lines(diagnostic._probe_lines)
 
     def __process_probe_lines(self, probe_lines):
-        grid_step_size = self.__config.getfloat('window-width-step-size')
+        grid_step_size = self.__config.getfloat('transverse-step')
 
         if probe_lines is None:
             self.__ax_r = 0
-        
-        if type(probe_lines) == list or type(probe_lines) == np.ndarray:
-            probe_lines = np.array(probe_lines)
-        if probe_lines.ndim < 1 or probe_lines.ndim > 2:
-            raise ValueError('probe_lines must be 1D or 2D')
-        if probe_lines.ndim == 1:
-            self.__ax_r = probe_lines
-        else: # ndim == 2
-            self.__ax_r = np.sqrt(probe_lines[0]**2 + probe_lines[1]**2)
+        else: 
+            if type(probe_lines) == list or type(probe_lines) == np.ndarray:
+                probe_lines = np.array(probe_lines)
+            if probe_lines.ndim < 1 or probe_lines.ndim > 2:
+                raise ValueError('probe_lines must be 1D or 2D')
+            if probe_lines.ndim == 1:
+                self.__ax_r = probe_lines
+            else: # ndim == 2
+                self.__ax_r = np.sqrt(probe_lines[0]**2 + probe_lines[1]**2)
 
         self.__ax_r = (np.round(self.__ax_r / grid_step_size)).astype(int)
 

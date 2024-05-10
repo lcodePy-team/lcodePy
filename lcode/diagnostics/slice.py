@@ -35,7 +35,7 @@ class SliceValue:
     ne = 0x80
     ni = 0x100
     n = ne | ni
-    rho = 0x200
+    rho_beam = 0x200
 
 class SliceDiag(Diagnostic):
     def __init__(self,  slice_type, slice_value, output_type,
@@ -75,7 +75,8 @@ class SliceDiag(Diagnostic):
         # select slicer
         geometry = config.get('geometry')
         if geometry == '3d':
-            if self._slice_type == SliceType.XI_X:
+            if (self._slice_type == SliceType.XI_X 
+                    or self._slice_type == SliceType.XI_R):
                 self._slicer = _3D_XI_X_Slicer(self)
             elif self._slice_type == SliceType.XI_Y:
                 self._slicer = _3D_XI_Y_Slicer(self)
@@ -85,7 +86,9 @@ class SliceDiag(Diagnostic):
                 raise NotImplementedError
 
         elif geometry == '2d':
-            if self._slice_type == SliceType.XI_R:
+            if (self._slice_type == SliceType.XI_R 
+                    or self._slice_type ==  SliceType.XI_X 
+                    or self._slice_type ==  SliceType.XI_Y):
                 self._slicer = _2D_XI_R_Slicer(self)
             elif self._slice_type == SliceType.X_Y:
                 raise NotImplementedError
@@ -128,7 +131,7 @@ class _3D_XI_X_Slicer:
         xi_step = diag._config.getfloat('xi-step')
         x_steps = diag._config.getint('window-width-steps')
         window_width = diag._config.getfloat('window-width')
-        grid_step_size = diag._config.getfloat('window-width-step-size')
+        grid_step_size = diag._config.getfloat('transverse-step')
         limits = diag._limits
         if limits is None:
             from_1 = 0
@@ -202,7 +205,7 @@ class _3D_XI_Y_Slicer:
         xi_step = diag._config.getfloat('xi-step')
         x_steps = diag._config.getint('window-width-steps')
         window_width = diag._config.getfloat('window-width')
-        grid_step_size = diag._config.getfloat('window-width-step-size')
+        grid_step_size = diag._config.getfloat('transverse-step')
         limits = diag._limits
         if limits is None:
             from_1 = 0
@@ -272,7 +275,7 @@ class _3D_X_Y_Slicer:
         xi_steps = window_length // xi_step
         x_steps = diag._config.getint('window-width-steps')
         window_width = diag._config.getfloat('window-width')
-        grid_step_size = diag._config.getfloat('window-width-step-size')
+        grid_step_size = diag._config.getfloat('transverse-step')
         limits = diag._limits
         if limits is None:
             from_1 = -window_width / 2
@@ -349,7 +352,7 @@ class _2D_XI_R_Slicer:
         window_length = diag._config.getfloat('window-length')
         xi_step = diag._config.getfloat('xi-step')
         window_width = diag._config.getfloat('window-width')
-        grid_step_size = diag._config.getfloat('window-width-step-size')
+        grid_step_size = diag._config.getfloat('transverse-step')
         x_steps = window_width//grid_step_size + 1
         limits = diag._limits
         if limits is None:
@@ -398,12 +401,12 @@ class _2D_XI_R_Slicer:
             val = getattr(plasma_fields, 'B_z')[self.from_2:self.to_2]
             self._diag._data['Bz'].append(get(val))
         if self._diag._slice_value & SliceValue.ne:
-            val = plasma_currents.ro[0, self.from_2:self.to_2]
+            val = plasma_currents.rho[0, self.from_2:self.to_2]
             self._diag._data['ne'].append(get(val))
         if self._diag._slice_value & SliceValue.ni:
-            val = plasma_currents.ro[1, self.from_2:self.to_2]
+            val = plasma_currents.rho[1, self.from_2:self.to_2]
             self._diag._data['ni'].append(get(val))
-        if self._diag._slice_value & SliceValue.rho:
+        if self._diag._slice_value & SliceValue.rho_beam:
             val = rho_beam[self.from_2:self.to_2]
             self._diag._data['rho_beam'].append(get(val))
         if self._diag._slice_value & SliceValue.Phi:
