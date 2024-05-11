@@ -47,6 +47,7 @@ class SliceDiag(Diagnostic):
         self._offset = offset
         self._output_period = output_period
         self._saving_xi_period = saving_xi_period
+        self.__first_step = True
 
         if directory_name is None:
             self._directory = Path('diagnostics')
@@ -105,24 +106,26 @@ class SliceDiag(Diagnostic):
     def dump(self, current_time, xi_plasma_layer,
              plasma_particles, plasma_fields, plasma_currents,
              beam_drain):
-            
-        if self.condition_check(current_time, self._output_period, self._time_step_size):
-            Path(self._directory).mkdir(parents=True, exist_ok=True)
-            dirname = self._directory / f'slice_{current_time:08.2f}.npz'
+        
+        if not self.__first_step and not self.condition_check(current_time, self._output_period, self._time_step_size): 
+            return
+        Path(self._directory).mkdir(parents=True, exist_ok=True)
+        dirname = self._directory / f'slice_{current_time:08.2f}.npz'
 
-            for name in self._data.keys():
-                self._data[name] = np.array(self._data[name])
+        for name in self._data.keys():
+            self._data[name] = np.array(self._data[name])
 
-            if self._output_type & OutputType.NUMBERS:
-                np.savez(dirname, **self._data)
-            
-            # if self._output_type & OutputType.PICTURES:
-            #     for name, data in self._data.items():
-            #         if name == 'xi':
-            #             continue
-            #         self.__make_picture(current_time, self._data['xi'], name, data)
+        if self._output_type & OutputType.NUMBERS:
+            np.savez(dirname, **self._data, x = self._slicer._grid)
+        
+        # if self._output_type & OutputType.PICTURES:
+        #     for name, data in self._data.items():
+        #         if name == 'xi':
+        #             continue
+        #         self.__make_picture(current_time, self._data['xi'], name, data)
 
-            self._data = defaultdict(list)
+        self._data = defaultdict(list)
+        self.__first_step = False
         
 class _3D_XI_X_Slicer:
     def __init__(self, diag: SliceDiag):
@@ -155,17 +158,20 @@ class _3D_XI_X_Slicer:
         self.from_1 = from_1
         self.to_1 = to_1
 
-        self.from_2 = int(np.clip(from_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
-        self.to_2 = int(np.clip(to_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
+        self.from_2 = int(np.clip(np.round(from_2 / grid_step_size) + x_steps // 2 , 0, x_steps))
+        self.to_2 = int(np.clip(np.round(to_2 / grid_step_size) + x_steps // 2, 0, x_steps))
+        
+        self._grid = (np.arange(self.from_2, self.to_2) - x_steps // 2) * grid_step_size
 
-        self.offset = int(np.clip(x_steps // 2 + diag._offset // grid_step_size, 0, x_steps - 1))
+        self.offset = int(np.clip(x_steps // 2 + diag._offset // grid_step_size, 0, x_steps))
     def process(self, current_time, xi_plasma_layer,
                 plasma_particles, plasma_fields, plasma_currents,
                 rho_beam):
         
         if xi_plasma_layer < self.to_1 or xi_plasma_layer > self.from_1:
             return
-
+        
+        self._diag._data['xi'].append(xi_plasma_layer)
         if self._diag._slice_value & SliceValue.Ex:
             val = getattr(plasma_fields, 'Ex')[self.from_2:self.to_2, self.offset]
             self._diag._data['Ex'].append(get(val))
@@ -186,11 +192,12 @@ class _3D_XI_X_Slicer:
             self._diag._data['Bz'].append(get(val))
         if self._diag._slice_value & SliceValue.ne:
             val = plasma_currents.ro[0, self.from_2:self.to_2, self.offset]
+
             self._diag._data['ne'].append(get(val))
         if self._diag._slice_value & SliceValue.ni:
             val = plasma_currents.ro[1, self.from_2:self.to_2, self.offset]
             self._diag._data['ni'].append(get(val))
-        if self._diag._slice_value & SliceValue.rho:
+        if self._diag._slice_value & SliceValue.rho_beam:
             val = rho_beam[self.from_2:self.to_2, self.offset]
             self._diag._data['rho_beam'].append(get(val))
         if self._diag._slice_value & SliceValue.Phi:
@@ -227,8 +234,10 @@ class _3D_XI_Y_Slicer:
         self.from_1 = from_1
         self.to_1 = to_1
 
-        self.from_2 = int(np.clip(from_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
-        self.to_2 = int(np.clip(to_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
+        self.from_2 = int(np.clip(np.round(from_2 / grid_step_size) + x_steps // 2 , 0, x_steps))
+        self.to_2 = int(np.clip(np.round(to_2 / grid_step_size) + x_steps // 2, 0, x_steps))
+        
+        self._grid = (np.arange(self.from_2, self.to_2) - x_steps // 2) * grid_step_size
 
         self.offset = int(np.clip(x_steps // 2 + diag._offset // grid_step_size, 0, x_steps - 1))
     def process(self, current_time, xi_plasma_layer,
@@ -236,6 +245,7 @@ class _3D_XI_Y_Slicer:
                 rho_beam):
         if xi_plasma_layer < self.to_1 or xi_plasma_layer > self.from_1:
             return
+        self._diag._data['xi'].append(xi_plasma_layer)
         if self._diag._slice_value & SliceValue.Ex:
             val = getattr(plasma_fields, 'Ex')[self.offset, self.from_2:self.to_2]
             self._diag._data['Ex'].append(get(val))
@@ -260,7 +270,7 @@ class _3D_XI_Y_Slicer:
         if self._diag._slice_value & SliceValue.ni:
             val = plasma_currents.ro[1, self.offset, self.from_2:self.to_2]
             self._diag._data['ni'].append(get(val))
-        if self._diag._slice_value & SliceValue.rho:
+        if self._diag._slice_value & SliceValue.rho_beam:
             val = rho_beam[self.offset, self.from_2:self.to_2]
             self._diag._data['rho_beam'].append(get(val))
         if self._diag._slice_value & SliceValue.Phi:
@@ -294,12 +304,15 @@ class _3D_X_Y_Slicer:
             from_2 = limits[1, 0]
             to_2 = limits[1, 1]
         
-        self.from_1 = int(np.clip(from_1 // grid_step_size + x_steps // 2, 0, x_steps - 1))
-        self.to_1 = int(np.clip(to_1 // grid_step_size + x_steps // 2, 0, x_steps - 1))
+        self.from_1 = int(np.clip(np.round(from_1 / grid_step_size) + x_steps // 2, 0, x_steps - 1))
+        self.to_1 = int(np.clip(np.round(to_1 / grid_step_size) + x_steps // 2, 0, x_steps - 1))
 
-        self.from_2 = int(np.clip(from_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
-        self.to_2 = int(np.clip(to_2 // grid_step_size + x_steps // 2, 0, x_steps - 1))
+        self.from_2 = int(np.clip(np.round(from_2 / grid_step_size) + x_steps // 2, 0, x_steps - 1))
+        self.to_2 = int(np.clip(np.round(to_2 / grid_step_size) + x_steps // 2, 0, x_steps - 1))
 
+        self._grid_x = (np.arange(self.from_1, self.to_1) - x_steps // 2) * grid_step_size
+        self._grid_y = (np.arange(self.from_2, self.to_2) - x_steps // 2) * grid_step_size
+        self._grid = np.vstack((self._grid_x, self._grid_y))
         # self.offset = int(np.clip(x_steps // 2 + diag._offset // grid_step_size, 0, xi_steps - 1))
     
     def conditions_check(self, current_time, xi_plasma_layer):
@@ -314,6 +327,7 @@ class _3D_X_Y_Slicer:
                 rho_beam):
         if not self.conditions_check(current_time, xi_plasma_layer):
             return
+        self._diag._data['xi'].append(xi_plasma_layer)
         if self._diag._slice_value & SliceValue.Ex:
             val = getattr(plasma_fields, 'Ex')[self.from_1:self.to_1, self.from_2:self.to_2]
             self._diag._data['Ex'].append(get(val))
@@ -338,7 +352,7 @@ class _3D_X_Y_Slicer:
         if self._diag._slice_value & SliceValue.ni:
             val = plasma_currents.ro[1, self.from_1:self.to_1, self.from_2:self.to_2]
             self._diag._data['ni'].append(get(val))
-        if self._diag._slice_value & SliceValue.rho:
+        if self._diag._slice_value & SliceValue.rho_beam:
             val = rho_beam[self.from_1:self.to_1, self.from_2:self.to_2]
             self._diag._data['rho_beam'].append(get(val))
         if self._diag._slice_value & SliceValue.Phi:
@@ -374,8 +388,13 @@ class _2D_XI_R_Slicer:
         
         self.from_1 = from_1
         self.to_1 = to_1
-        self.from_2 = int(np.clip(from_2 // grid_step_size, 0, x_steps - 1))
-        self.to_2 = int(np.clip(to_2 // grid_step_size, 0, x_steps - 1))
+        self.from_2 = int(np.clip(np.round(from_2 / grid_step_size), 0, x_steps))
+        self.to_2 = int(np.clip(np.round(to_2 / grid_step_size), 0, x_steps))
+        
+        # self.from_2 = int(np.clip(np.round(from_2 // grid_step_size) + x_steps // 2 , 0, x_steps))
+        # self.to_2 = int(np.clip(np.round(to_2 / grid_step_size) + x_steps // 2, 0, x_steps))
+        
+        self._grid = np.arange(self.from_2, self.to_2) * grid_step_size
 
     def process(self, current_time, xi_plasma_layer,
                 plasma_particles, plasma_fields, plasma_currents,
@@ -383,6 +402,7 @@ class _2D_XI_R_Slicer:
         if xi_plasma_layer < self.to_1 or xi_plasma_layer > self.from_1:
             return
         # print('here', self.from_2, self.to_2)
+        self._diag._data['xi'].append(xi_plasma_layer)
         if self._diag._slice_value & SliceValue.Er:
             val = getattr(plasma_fields, 'E_r')[self.from_2:self.to_2]
             self._diag._data['Er'].append(get(val))
