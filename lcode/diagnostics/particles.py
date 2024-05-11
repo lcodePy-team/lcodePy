@@ -6,7 +6,7 @@ import numpy as np
 from lcode.config.config import Config
 from .utils import Diagnostic, absremainder, get
 
-class RunStateDiag(Diagnostic):
+class ParticlesDiag(Diagnostic):
 
     def __init__(self, 
                  save_beam:bool = False, 
@@ -54,6 +54,8 @@ class RunStateDiag(Diagnostic):
                 plasma_particles, plasma_fields, plasma_currents,
                 rho_beam):
         
+        if self.__saving_xi_period == inf:
+            return 
         if not self.conditions_check(current_time, xi_plasma_layer):
             return
         if not self.__save_plasma:
