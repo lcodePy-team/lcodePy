@@ -57,6 +57,7 @@ class FXiDiag(Diagnostic):
 
         self._data = defaultdict(list)
         self._data['xi'] = []
+        self.__is_first_step = True
 
 
     def pull_config(self, config: Config):
@@ -113,20 +114,22 @@ class FXiDiag(Diagnostic):
     def dump(self, current_time, xi_plasma_layer,
              plasma_particles, plasma_fields, plasma_currents,
              beam_drain):
-        if self.condition_check(current_time, self.__output_period, self.__time_step_size):
-            Path(self.__directory).mkdir(parents=True, exist_ok=True)
-            dirname = self.__directory / f'f_xi_{current_time:08.2f}.npz'
+        if not self.__is_first_step and not self.condition_check(current_time, self.__output_period, self.__time_step_size):
+            return
+        Path(self.__directory).mkdir(parents=True, exist_ok=True)
+        dirname = self.__directory / f'f_xi_{current_time:08.2f}.npz'
 
-            if self.__output_type & OutputType.NUMBERS:
-                self.xp.savez(dirname, **self._data)
-            
-            if self.__output_type & OutputType.PICTURES:
-                for name, data in self._data.items():
-                    if name == 'xi':
-                        continue
-                    self.__make_picture(current_time, self._data['xi'], name, data)
+        if self.__output_type & OutputType.NUMBERS:
+            self.xp.savez(dirname, **self._data)
+        
+        if self.__output_type & OutputType.PICTURES:
+            for name, data in self._data.items():
+                if name == 'xi':
+                    continue
+                self.__make_picture(current_time, self._data['xi'], name, data)
 
-            self._data = defaultdict(list)
+        self._data = defaultdict(list)
+        self.__is_first_step = False
 
     def __make_picture(self, current_time, xi, name, data):
 

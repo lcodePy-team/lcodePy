@@ -26,6 +26,8 @@ class ParticlesDiag(Diagnostic):
         else:
             self.__directory = Path('diagnostics') / directory_name
 
+        self.__is_first_step = True # TODO mb to pull_config
+
     def pull_config(self, config: Config):
         self.__geometry = config.get('geometry')
         self.__time_step_size = config.getfloat('time-step')
@@ -66,11 +68,20 @@ class ParticlesDiag(Diagnostic):
         e_filename = self.__directory / "snapshots" /f"plasma_electrons_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz"
         i_filename = self.__directory / "snapshots" / f"plasma_ions_{current_time:08.2f}_{xi_plasma_layer:+09.2f}.npz"
         
-        plasma_particles['electrons'].save(e_filename)
-        plasma_particles['ions'].save(i_filename)
+        try:
+            plasma_particles['electrons'].save(e_filename)
+        except KeyError:
+            pass
+
+        try:
+            plasma_particles['ions'].save(i_filename)
+        except KeyError:
+            pass
+        # plasma_particles['electrons'].save(e_filename)
+        # plasma_particles['ions'].save(i_filename)
 
     def dump(self, current_time, xi_plasma_layer, plasma_particles, plasma_fields, plasma_currents, beam_drain):
-        if absremainder(current_time, self.__output_period) > self.__time_step_size / 2:
+        if not self.__is_first_step and absremainder(current_time, self.__output_period) > self.__time_step_size / 2 :
             return
         
         Path(self.__directory).mkdir(parents=True, exist_ok=True)
@@ -84,5 +95,14 @@ class ParticlesDiag(Diagnostic):
             e_filename = self.__directory / f"plasma_electrons_{current_time:08.2f}.npz"
             i_filename = self.__directory / f"plasma_ions_{current_time:08.2f}.npz"
 
-            plasma_particles['electrons'].save(e_filename)
-            plasma_particles['ions'].save(i_filename)
+            try:
+                plasma_particles['electrons'].save(e_filename)
+            except KeyError:
+                pass
+
+            try:
+                plasma_particles['ions'].save(i_filename)
+            except KeyError:
+                pass
+            # plasma_particles['electrons'].save(e_filename)
+            # plasma_particles['ions'].save(i_filename)
