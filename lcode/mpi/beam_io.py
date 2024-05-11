@@ -63,6 +63,9 @@ class MPIBeamTransport(MPITransport):
         
         def push_beam_layer(self, beam_layer):
             self.beam_transport.push3d(beam_layer)
+
+        def save(self, *args, **kwargs):
+            self.beam_transport.final_drain.save(*args, **kwargs)
         
     
     class MPIBeamSource:

@@ -74,6 +74,9 @@ class BeamDrain:
     
     def beam_slice(self):
         return self.beam_buffer
+    
+    def save(self, *args, **kwargs):
+        self.beam_buffer.save(*args, **kwargs)
 
 
 # ----- Classes for a rigid beam -----

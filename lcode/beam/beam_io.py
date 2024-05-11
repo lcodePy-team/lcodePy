@@ -127,6 +127,10 @@ class MemoryBeamDrain(BeamDrain):
 
     def beam_slice(self):
         return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
+    
+    def save(self, *args, **kwargs):
+        slice = np.array(self.beam_slice(), dtype = particle_dtype)
+        np.savez_compressed(*args, **kwargs, xi = slice['xi'], r = slice['r'], pz = slice['p_z'], pr = slice['p_r'], M = slice['M'], q_m = slice['q_m'], q_norm = slice['q_norm'], id = slice['id'])
 
 
 class DebugSource(BeamSource):
