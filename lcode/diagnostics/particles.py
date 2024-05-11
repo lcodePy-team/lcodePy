@@ -83,7 +83,7 @@ class ParticlesDiag(Diagnostic):
     def dump(self, current_time, xi_plasma_layer, plasma_particles, plasma_fields, plasma_currents, beam_drain):
         if not self.__is_first_step and absremainder(current_time, self.__output_period) > self.__time_step_size / 2 :
             return
-        
+        self.__is_first_step = False
         Path(self.__directory).mkdir(parents=True, exist_ok=True)
 
         if self.__save_beam:
