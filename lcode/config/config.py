@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import re
 import lcode
@@ -94,8 +95,8 @@ class Config:
             n_lines = -1
         else:
             n_lines = 94
-        path_to_default = '/'.join(__file__.split('/')[:-1]) \
-                          + "/default_config_values.py"
+        
+        path_to_default = Path(__file__).parent / 'default_config_values.py'
         conf_file = open(path_to_default,'r').readlines()
         conf_file = ''.join(conf_file[3:n_lines]) + '}'
         conf_file = '"""\n' \
