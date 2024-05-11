@@ -5,7 +5,7 @@ from ..config.config import Config
 from .data import Arrays
 
 
-def get_caluculator_inhomoginity_cupy(config):
+def get_inhomogeneity_calculator_cupy(config):
     cp = config.xp
     calculate_inhomoginity_kernel = cp.RawKernel(r'''
         extern "C" __global__
