@@ -100,8 +100,12 @@ class SliceDiag(Diagnostic):
         # process limits
 
 
-    def after_step_dxi(self, *args, **kwargs):
-        self._slicer.process(*args, **kwargs)
+    def after_step_dxi(self, current_time, *args, **kwargs):
+
+        if self.__first_step or absremainder(current_time,
+                         self._output_period) <= self._time_step_size / 2:
+            
+            self._slicer.process(current_time, *args, **kwargs)
     
     def dump(self, current_time, xi_plasma_layer,
              plasma_particles, plasma_fields, plasma_currents,

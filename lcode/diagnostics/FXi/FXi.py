@@ -81,7 +81,7 @@ class FXiDiag(Diagnostic):
     def after_step_dxi(self, current_time, xi_plasma_layer,
                        plasma_particles, plasma_fields, plasma_currents,
                        rho_beam):
-        if self.condition_check(current_time, self.__output_period, self.__time_step_size):
+        if self.__is_first_step or self.condition_check(current_time, self.__output_period, self.__time_step_size):
             
             if self.__f_xi & FXiType.Ex:
                 self.strategy.process_field(plasma_fields, 'Ex')
