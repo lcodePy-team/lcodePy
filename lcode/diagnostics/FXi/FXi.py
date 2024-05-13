@@ -37,6 +37,12 @@ class FXiType:
 
     rho_beam = 0x200
 
+    Sf = 0x400
+    dx_chaotic = 0x800
+    dy_chaotic = 0x1000
+    dx_chaotic_perp = 0x2000
+    dy_chaotic_perp = 0x4000
+
 
 
 class FXiDiag(Diagnostic):
@@ -69,6 +75,7 @@ class FXiDiag(Diagnostic):
         
         self.strategy: _CIRC_FXi | _3D_FXi = Strategy(config, self)
     
+        self.__grid_step_size = config.getfloat('transverse-step')
         self.__time_step_size = config.getfloat('time-step')
         self.__xi_step_size   = config.getfloat('xi-step')
 
@@ -107,6 +114,18 @@ class FXiDiag(Diagnostic):
             
             if self.__f_xi & FXiType.Phi:
                 self.strategy.process_Phi(plasma_fields)
+
+            if self.__f_xi & FXiType.Sf:
+                self.strategy.process_Sf(self.__grid_step_size, plasma_particles, plasma_fields)
+            if self.__f_xi & FXiType.dx_chaotic:
+                self.strategy.process_chaotic('dx', plasma_particles)
+            if self.__f_xi & FXiType.dy_chaotic:
+                self.strategy.process_chaotic('dy', plasma_particles)
+            if self.__f_xi & FXiType.dx_chaotic_perp:
+                self.strategy.process_chaotic_perp('dx', plasma_particles)
+            if self.__f_xi & FXiType.dy_chaotic_perp:
+                self.strategy.process_chaotic_perp('dy', plasma_particles)
+
 
            
             self._data['xi'].append(xi_plasma_layer)

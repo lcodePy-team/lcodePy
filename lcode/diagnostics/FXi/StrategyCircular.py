@@ -57,3 +57,12 @@ class _CIRC_FXi:
     def process_rho(self, rho_beam):
         val = rho_beam[self.__ax_r]
         self.__diagnostic._data['rho_beam'].append(val)
+
+    def process_Sf(self, *args, **kwargs):
+        raise NotImplementedError("Not ready yet")
+
+    def process_chaotic(self, *args, **kwargs):
+        raise NotImplementedError("Not ready yet")
+    
+    def process_chaotic_perp(self, *args, **kwargs):
+        raise NotImplementedError("Not ready yet")

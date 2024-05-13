@@ -38,7 +38,7 @@ class SliceValue:
     rho_beam = 0x200
 
 class SliceDiag(Diagnostic):
-    def __init__(self,  slice_type, slice_value, output_type,
+    def __init__(self,  slice_type, slice_value=SliceValue.rho_beam, output_type = OutputType.NUMBERS,
                  limits = None, offset = 0, output_period = 100, saving_xi_period = 100, directory_name = None):
         self._slice_type = slice_type
         self._slice_value = slice_value

@@ -3,6 +3,26 @@ import numpy as np
 from ...config import Config
 from ..utils import get
 
+def calculate_energy_fluxes(grid_step_size,
+                            plasma_particles, plasma_fields):
+    # xp is either np (numpy) or cp (cupy):
+    xp = plasma_particles['electrons'].xp
+
+    # The perturbation to the flux density of the electromagnetic energy:
+    Se = (plasma_fields.Ez ** 2 + plasma_fields.Bz ** 2 +
+         (plasma_fields.Ex - plasma_fields.By) ** 2 +
+         (plasma_fields.Ey + plasma_fields.Bx) ** 2) * grid_step_size ** 2 / 2
+
+    # Additional array to calculate the motion energy of plasma particles:
+    plasma_particles = plasma_particles['electrons'] # TODO fix it
+    gamma_m = xp.sqrt(plasma_particles.m ** 2  + plasma_particles.px ** 2 +
+                      plasma_particles.py ** 2 + plasma_particles.pz ** 2)
+    motion_energy = gamma_m - plasma_particles.m
+
+    # Calculate integral total energy flux and return it:
+    psi_electromagnetic = xp.sum(Se)
+    psi_total = xp.sum(motion_energy) + psi_electromagnetic
+    return psi_total
 
 
 class _3D_FXi:
@@ -55,3 +75,22 @@ class _3D_FXi:
     def process_Phi(self, plasma_fields):
         val = plasma_fields.Phi[self.__ax_x, self.__ax_y]
         self.__diagnostic._data['Phi'].append(get(val))
+
+    def process_Sf(self, grid_step_size, plasma_particles, plasma_fields):
+        val = calculate_energy_fluxes(grid_step_size,
+                                      plasma_particles,
+                                      plasma_fields)
+        self.__diagnostic._data['Sf'].append(get(val))
+
+    def process_chaotic(self, name, plasma_particles):
+        xp = plasma_particles['electrons'].xp
+        val = xp.amax(xp.absolute(getattr(plasma_particles['electrons'], f"{name}_chaotic")))
+        self.__diagnostic._data[f"{name}_chaotic"].append(get(val))
+    
+    def process_chaotic_perp(self, name, plasma_particles):
+        xp = plasma_particles['electrons'].xp
+        kvl_mass = getattr(plasma_particles['electrons'], f"{name}_chaotic")
+        a1 = int(xp.shape(kvl_mass)[0] / 6)
+        a2 = 5 * a1
+        val = xp.amax(xp.absolute(kvl_mass[a1:a2,a1:a2]))
+        self.__diagnostic._data[f"{name}_chaotic_perp"].append(get(val))
