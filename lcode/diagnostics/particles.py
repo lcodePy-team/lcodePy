@@ -2,9 +2,11 @@
 from math import inf
 from pathlib import Path
 import numpy as np
+from mpi4py import MPI
 
 from lcode.config.config import Config
 from .utils import Diagnostic, absremainder, get
+
 
 class ParticlesDiag(Diagnostic):
 
@@ -26,7 +28,7 @@ class ParticlesDiag(Diagnostic):
         else:
             self.__directory = Path('diagnostics') / directory_name
 
-        self.__is_first_step = True # TODO mb to pull_config
+        self.__is_first_step = MPI.COMM_WORLD.Get_rank() == 0 # TODO mb to pull_config
 
     def pull_config(self, config: Config):
         self.__geometry = config.get('geometry')

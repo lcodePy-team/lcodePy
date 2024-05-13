@@ -23,6 +23,7 @@ class MPIBeamTransport(MPITransport):
         if self.skip_first:
             self.skip_first = False
             return
+        self.final_drain.push_beam_slice(beam_slice)
         self.send(beam_slice.particles)
     
     def push3d(self, beam_layer):
@@ -33,7 +34,7 @@ class MPIBeamTransport(MPITransport):
         if self.skip_first:
             self.skip_first = False
             return
-
+        self.final_drain.push_beam_layer(beam_layer)
         self.send(beam_layer.particles)
 
     def pull(self, xi_max, xi_min) -> BeamParticles:
