@@ -108,9 +108,12 @@ class MPIBeamTransport(MPITransport):
                 self.send(particles.particles)
             self.final_drain = self.BeamDrain(self.cfg)
             return
+        
+        self.final_drain = self.BeamDrain(self.cfg)
         self.send(np.array([]))
 
         if self._rank == 0 and not is_last:
             particles = self.recv()
             self.initial_source = self.BeamSource(self.cfg, particles)
+            self.final_drain = self.BeamDrain(self.cfg)
             return
