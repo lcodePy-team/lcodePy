@@ -7,11 +7,11 @@ particle beam-driven plasma wakefield acceleration.
 LCODE is based on the quasistatic approximation, capable
 of simulation in 2D and 3D geometry, and can use GPUs and CPUs.
 
-For now, this is new and experimental software. This is
+For now, this under active development. This is
 a complete overhaul of the old C version in Python.
 
-You can also find a more mature 2D version of LCODE at
-http://lcode.info/.
+- **Website:** https://lcode.info
+- **Documentation:** https://lcode.info/docs
 
 ## Instalation 
 
@@ -52,6 +52,9 @@ pip install .
 
 
 ----------
+
+You can also find a more mature 2D version of LCODE at
+http://lcode.info/.
 
 Fill free to contact `team@lcode.info` for assistance with it.
 
