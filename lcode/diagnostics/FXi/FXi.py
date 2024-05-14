@@ -3,6 +3,7 @@ from pathlib import Path
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
+from mpi4py import MPI
 
 from ..utils import Diagnostic, OutputType
 from ...config.config import Config
@@ -63,7 +64,7 @@ class FXiDiag(Diagnostic):
 
         self._data = defaultdict(list)
         self._data['xi'] = []
-        self.__is_first_step = True
+        self.__is_first_step = MPI.COMM_WORLD.Get_rank() == 0
 
 
     def pull_config(self, config: Config):

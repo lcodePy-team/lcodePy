@@ -3,6 +3,7 @@ from ..config import Config
 from .utils import Diagnostic, OutputType, get, absremainder
 from pathlib import Path
 import numpy as np
+from mpi4py import MPI
 from collections import defaultdict
 # from math import remainder
 
@@ -47,7 +48,7 @@ class SliceDiag(Diagnostic):
         self._offset = offset
         self._output_period = output_period
         self._saving_xi_period = saving_xi_period
-        self.__first_step = True
+        self.__first_step = MPI.COMM_WORLD.Get_rank() == 0
 
         if directory_name is None:
             self._directory = Path('diagnostics')
