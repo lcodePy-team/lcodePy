@@ -7,42 +7,48 @@ from .data import Arrays
 
 def get_inhomogeneity_calculator_cupy(config):
     cp = config.xp
-    calculate_inhomoginity_kernel = cp.RawKernel(r'''
-        extern "C" __global__
-        void calculate_inhomoginity_kernel(const float* d_offt, float* d_inhom
-                                           int size){
-            int i = blockDim.x * blockIdx.x + threadIdx.x;
-            int j = blockDim.y * blockIdx.y + threadIdx.y;
-
-            if (j !=0 && j != size-1){
-                d_offt_01 = d_offt[i, j+1];
-                d_offt_00 = d_offt[i, j];
-                d_offt_02 = d_offt[i, j+2];
-                if (d_offt_00 && d_offt_01 && d_offt_02){
-                    d_inhom[i, j+1] = d_offt_01 - (d_offt_00 + d_offt_02) / 2;
+    calculate_inhomogeneity_kernel = cp.ElementwiseKernel(
+        in_params="""
+            int64 size, raw float64 d_offt 
+        """,
+        out_params="""
+            raw float64 d_inhom
+        """,
+        operation=""" 
+            if (((i) % size != 0) && ((i+1) % size != 0)){
+                if (d_offt[i-1] && d_offt[i] && d_offt[i+1]){
+                    d_inhom[i] = d_offt[i] - (d_offt[i-1] + d_offt[i+1]) / 2;
                 }
-            }
-        }
-        ''', 
-        'calculate_inhomoginity_kernel'
+            }else{
+                if(i % size == 0){
+                    if (d_offt[i] && d_offt[i+1] && d_offt[i+2]){
+                        d_inhom[i] = d_offt[i] - 2*d_offt[i+1] + d_offt[i+2];
+                   }
+                }else{
+                    if (d_offt[i] && d_offt[i-1] && d_offt[i-2]){
+                        d_inhom[i] = d_offt[i] - 2*d_offt[i-1] + d_offt[i-2];
+                    }
+                } 
+            } 
+        """,
+        name='calculate_inhomogeneity_kernel'
     )
 
-    def calculate_inhomoginity_cupy(d_offt, axis):
+    def calculate_inhomogeneity_cupy(d_offt, axis):
         if axis: d_offt = d_offt.T
-        d_inhom = cp.zeros_like(d_offt)
-        size = d_inhom.shape[0]
-        calculate_inhomoginity_kernel(d_offt, d_inhom, size)
-        mask = (d_offt[:, 0] != 0) * (d_offt[:, 1] != 0) * (d_offt[:, 2] != 0)
-        d_inhom[mask, 0] = d_offt[mask, 0] - 2*d_offt[mask, 1] + d_offt[mask, 2]
         
-        mask = (d_offt[:, -1] != 0) * (d_offt[:, -2] != 0) * (d_offt[:, -3] != 0)
-        d_inhom[mask, -1] = d_offt[mask, -1] - 2*d_offt[mask, -2] + d_offt[mask, -3]
+        size = d_offt.shape[0]
+        d_offt = d_offt.ravel()
+        d_inhom = cp.zeros_like(d_offt)
+        
+        calculate_inhomogeneity_kernel(size, d_offt, d_inhom, size = size**2)
+        
+        d_inhom = d_inhom.reshape(size, size)
             
-
         if axis: d_inhom = d_inhom.T
         return d_inhom
+    return calculate_inhomogeneity_cupy
 
-    return calculate_inhomoginity_cupy
 
 
 @nb.njit(parallel=True)
@@ -59,15 +65,6 @@ def calculate_inhomogeneity_numba(d_offt, axis):
             d_offt_02 = d_offt[i, j+2]
             if d_offt_00 and d_offt_02:
                 d_inhom[i, j+1] = d_offt_01 - (d_offt_00 + d_offt_02) / 2
-                continue
-            d_offt_03 = d_offt[i, j+3]
-            if d_offt_03:
-                d_inhom[i, j+1] = d_offt_01 - 2*d_offt_02 + d_offt_03
-                continue
-            d_offt_00_1 = d_offt[i, j-1]
-            if d_offt_00_1:
-                d_inhom[i, j+1] = d_offt_01 - 2*d_offt_00 + d_offt_00_1
-                continue
     
     mask = (d_offt[:, 0] != 0) * (d_offt[:, 1] != 0) * (d_offt[:, 2] != 0)
     d_inhom[mask, 0] = d_offt[mask, 0] - 2*d_offt[mask, 1] + d_offt[mask, 2]
