@@ -1,4 +1,3 @@
-"""Top-level three-dimensional simulation class."""
 import copy
 
 # Imports config, diagnostics, alternative beam generator for 3d
@@ -7,7 +6,7 @@ from .config.default_config_values import default_config_values
 from .config.config import Config
 from .alt_beam_generator.beam_generator import generate_beam
 
-# Imports plasma nodule, 3d:
+# Imports plasma module, 3d:
 from .push_solvers.push_solver import PusherAndSolver3D
 from .plasma3d import init_plasma_3d, load_plasma_3d
 
@@ -15,6 +14,7 @@ from .plasma3d import init_plasma_3d, load_plasma_3d
 from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D, \
                     RigidBeamSource3D, RigidBeamDrain3D
 from .beam3d.data import particle_dtype3d
+
 # Imports plasma module, 2d:
 from .push_solvers.push_solver import PusherAndSolver2D
 from .plasma import init_plasma_2d, load_plasma_2d
@@ -31,25 +31,27 @@ class Simulation:
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config=default_config_values, beam_parameters={},
-                 diagnostics=[], runas_filename="runas.py"):
+                 diagnostics=[], runas_filename='runas.py'):
         """
             Initializes a simulation.
 
             Parametrs
             ---------
-            config : Dict, optional
-                    The set of base parameters to perform the simulation.
-                    Default : default_config_values from lcodePy2d/config/
-                    (TODO: Should we use Config class insted Dict by default?)
+            config : dict, optional
+                    The set of basic parameters to perform the simulation.
+                    Default : lcode.config.default_config_values.
 
-            beam_parametrs : Dict, otianal
-                    Configuration of the charge beam.
-                    The beam desibled by default.      
-                    (TODO: set default beam)
+            beam_parametrs : dict, otianal
+                    Configuration of the charged particle beam.
+                    The beam is disabled by default.
 
-            diagnostics : List, optianal
-                    Collection of diagnostics that should be run.
-                    By default, diagnostics are desibled.      
+            diagnostics : list, optianal
+                    A set of diagnostics to be activated.
+                    All diagnostics are disabled by default.
+            
+            runas_filename : str, optional
+                    File name for saving the submitted simulation parameters.
+                    Default : 'runas.py'.
         """
 
         self.config = copy.copy(config)
@@ -93,7 +95,7 @@ class Simulation:
         if self.__geometry is None:
             self.__geometry = self.__config.get('geometry').lower()
         elif self.__geometry != self.__config.get('geometry').lower():
-            raise Exception("Sorry, update geometry does not support now.")
+            raise Exception("Update geometry does not support now.")
             
         if self.__geometry == '3d':
             self.particle_dtype = particle_dtype3d
@@ -116,8 +118,8 @@ class Simulation:
             self.BeamParticles, self.BeamSource, self.BeamDrain = \
                 BeamParticles2D, BeamSource2D, BeamDrain2D
         else:
-            raise Exception("Sorry, you set a wrong type of geometry. " +
-                            "For now, we support only circ and 3d geometry.")
+            raise Exception("The specified geometry is not supported. " +
+                            "The following options are available: circ and 3d.")
             
 
         # Finally, we set the diagnostics.
@@ -178,7 +180,7 @@ class Simulation:
         ---------
 
         N_steps : int, optional
-                Number of time steps that will be done. 
+                Number of time steps that will be made. 
                 Default : N_steps = time_limit / time_step.
         """
         # 0. It analyzes config values:
