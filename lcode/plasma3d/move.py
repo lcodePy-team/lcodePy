@@ -314,7 +314,6 @@ def get_move_wo_fields_kernel_cupy():
 
 
 def get_plasma_particles_mover(config: Config):
-    xi_step_size     = config.getfloat('xi-step')
     grid_step_size   = config.getfloat('transverse-step')
     grid_steps       = config.getint('window-width-steps')
     bound_padding_steps = config.getint('bound-padding-steps')
@@ -328,7 +327,8 @@ def get_plasma_particles_mover(config: Config):
         move_wo_fields_kernel = get_move_wo_fields_kernel_cupy()
         move_smart_kernel = get_move_smart_kernel_cupy()
 
-    def move_particles_wo_fields(particles: dict, const_arrays: Arrays):
+    def move_particles_wo_fields(
+            xi_step_size, const_arrays: Arrays, particles: dict):
         """
         Move coarse plasma particles as if there were no fields.
         """
@@ -349,8 +349,8 @@ def get_plasma_particles_mover(config: Config):
         return particles_full
 
     def move_particles_smart(
-        fields: Arrays, particles_prev: dict, particles_full: dict,
-        const_arrays: Arrays):
+            xi_step_size, const_arrays: Arrays, fields: Arrays, 
+            particles_prev: dict, particles_full: dict):
         """
         Update plasma particle coordinates and momenta according to the
         field values interpolated halfway between the previous plasma
@@ -370,7 +370,6 @@ def get_plasma_particles_mover(config: Config):
                 particles_prev[sort].px, particles_prev[sort].py, 
                 particles_prev[sort].pz,
 
-                
                 particles_full[sort].m, particles_full[sort].q, 
                 particles_full[sort].x_offt, particles_full[sort].y_offt,
                 particles_full[sort].px, particles_full[sort].py, 

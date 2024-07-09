@@ -99,7 +99,7 @@ def get_noise_filter(config: Config):
 
 
     # A new noise mitigation method.
-    def noise_filter(particles: Arrays, particles_prev: Arrays):
+    def noise_filter(particles_prev: Arrays, particles: Arrays):
         # Zero step. We determine if we will use numpy or cupy as xp:
         xp = particles.xp
 

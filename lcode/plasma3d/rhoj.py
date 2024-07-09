@@ -8,7 +8,7 @@ def get_rhoj_computer(config: Config):
     deposit = get_deposit_plasma(config)
     ion_model = config.get("ion-model")
 
-    def compute_rhoj(particles: dict, const_arrays: Arrays):
+    def compute_rhoj(const_arrays: Arrays, particles: dict):
         ro, jx, jy, jz = deposit(particles, const_arrays)
 
         # Also add the background ion charge density.

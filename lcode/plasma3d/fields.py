@@ -5,6 +5,7 @@ from scipy.fftpack import dstn, dctn, dst, dct
 
 from ..config.config import Config
 from .data import Arrays
+from .initialization import mixed_matrix
 
 
 # Solving Laplace equation with Dirichlet boundary conditions (Ez and Phi) #
@@ -187,26 +188,53 @@ def calculate_Ex_Ey_Bx_By(
            minus the coarse plasma particle cloud width).
     """
     xp = fields.xp
+    
+    # correct subtraction_coeff
+    _prev_factor_multiplier = 3
+    _prev_factor_threshold = 5
+    prev_factor = xp.zeros_like(currents_full.ro)
+    ro_half = (currents_full.ro + currents_prev.ro) / 2
+    electron_density = ro_half - 1.0  # TODO: Use correct electron density
+    jz_half = (currents_full.jz + currents_prev.jz) / 2
+    jx_half = (currents_full.jx + currents_prev.jx) / 2
+    jy_half = (currents_full.jy + currents_prev.jy) / 2
+
+    mask = electron_density < -0.1
+    invgamma_sq = (1 
+                   - ((jx_half[mask]**2 + jy_half[mask]**2 + jz_half[mask]**2) 
+                      / electron_density[mask]**2)
+                  )
+    mask = invgamma_sq > 0
+    prev_factor = xp.max(_prev_factor_multiplier 
+                         * (1 / np.sqrt(invgamma_sq[mask]) - 1) 
+                         - _prev_factor_threshold)
+
+    if prev_factor < 0:
+        prev_factor = subtraction_coeff
+    else:
+        prev_factor += subtraction_coeff
 
     jx_prev, jy_prev = currents_prev.jx, currents_prev.jy
     jx_full, jy_full = currents_full.jx, currents_full.jy
 
-    ro_half = (currents_full.ro + ro_beam_full +
-               currents_prev.ro + ro_beam_prev) / 2
-    jz_half = (currents_full.jz + ro_beam_full +
-               currents_prev.jz + ro_beam_prev) / 2
+    ro_beam_half = (ro_beam_full + ro_beam_prev) / 2 
+    ro_half += ro_beam_half 
+    jz_half += ro_beam_half 
 
     # 0. Calculate gradients and RHS.
     dro_dx, dro_dy = dx_dy(xp, ro_half, grid_step_size)
     djz_dx, djz_dy = dx_dy(xp, jz_half, grid_step_size)
     djx_dxi = (jx_prev - jx_full) / xi_step_size  # - ?
     djy_dxi = (jy_prev - jy_full) / xi_step_size  # - ?
-
+    
+    # if prev_factor > subtraction_coeff:
+    #     print(prev_factor)
     # We are solving a Helmholtz equation
-    Ex_rhs = -(dro_dx - djx_dxi - subtraction_coeff * fields.Ex)  # -?
-    Ey_rhs = -(dro_dy - djy_dxi - subtraction_coeff * fields.Ey)
-    Bx_rhs = +(djz_dy - djy_dxi + subtraction_coeff * fields.Bx)
-    By_rhs = -(djz_dx - djx_dxi - subtraction_coeff * fields.By)
+    Ex_rhs = -(dro_dx - djx_dxi - prev_factor * fields.Ex)  # -?
+    Ey_rhs = -(dro_dy - djy_dxi - prev_factor * fields.Ey)
+    Bx_rhs = +(djz_dy - djy_dxi + prev_factor * fields.Bx)
+    By_rhs = -(djz_dx - djx_dxi - prev_factor * fields.By)
+    #print(f'{xp.max(Ex_rhs)} | {xp.min(Ex_rhs)}') 
 
     # Boundary conditions application (for future reference, ours are zero):
     # rhs[:, 0] -= bound_bottom[:] * (2 / grid_step_size)
@@ -216,7 +244,12 @@ def calculate_Ex_Ey_Bx_By(
     Ey_f = mix2d(Ey_rhs[1:-1, :])[1:-1, :]
 
     # 2. Multiply f by the magic matrix.
-    mix_mat = const.field_mixed_matrix
+    if prev_factor == subtraction_coeff:
+        mix_mat = const.field_mixed_matrix
+    else:
+        mix_mat = mixed_matrix(xp, fields.Ex.shape[0], 
+                               grid_step_size, prev_factor)
+
     Ey_f *= mix_mat
 
     # 3. Apply our mixed DCT-DST transform again.
@@ -268,16 +301,15 @@ def calculate_Bz(dct2d: dctn, grid_step_size, const: Arrays, currents: Arrays):
 
 def get_field_computer(config: Config):
     grid_step_size    = config.getfloat('transverse-step')
-    xi_step_size      = config.getfloat('xi-step')
     subtraction_coeff = config.getfloat('field-solver-subtraction-coefficient')
 
     dst2d, mix2d, dct2d = get_functions(config)
 
-    def compute_fields(
-        fields, fields_prev, const, rho_beam_full, rho_beam_prev,
-        _currents_prev, _currents_full
-    ):
-        # Looks terrible! TODO: rewrite this function entirely
+    def compute_fields(xi_step_size, const, fields_prev, fields,  
+                       rho_beam_prev, rho_beam_full,
+                       _currents_prev, _currents_full):
+
+        # TODO: rewrite this function entirely
         xp = _currents_full.xp
         currents_full = Arrays(xp=xp,
                                ro=xp.sum(_currents_full.ro, axis=0), 
@@ -289,7 +321,7 @@ def get_field_computer(config: Config):
                                ro=xp.sum(_currents_prev.ro, axis=0), 
                                jx=xp.sum(_currents_prev.jx, axis=0), 
                                jy=xp.sum(_currents_prev.jy, axis=0), 
-                               jz=xp.sum(_currents_prev.jz, axis=0),)
+                               jz=xp.sum(_currents_prev.jz, axis=0))
 
         Ex_half, Ey_half, Bx_half, By_half = calculate_Ex_Ey_Bx_By(
             mix2d, grid_step_size, xi_step_size, subtraction_coeff, const,
