@@ -157,7 +157,7 @@ class RigidBeamCalculator:
 
         grid = ((self.xp.arange(grid_steps) - grid_steps // 2)
                 * grid_step_size)
-        self.x_grid, self.y_grid = self.xp.meshgrid(grid, grid)
+        self.y_grid, self.x_grid = self.xp.meshgrid(grid, grid)
     
     def start_time_step(self):
         """A dummy function for the rigid-beam mode."""
