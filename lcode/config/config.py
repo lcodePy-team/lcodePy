@@ -258,13 +258,13 @@ def good_size(number):
             factors.count(11) + factors.count(13) < 2 and number % 2)
 
 def find(cfg, par):
-    ans = re.search('\s' + par + '\s?=\s?[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', cfg)
+    ans = re.search(r'\s' + par + r'\s?=\s?[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', cfg)
     return float(ans.group(0).replace(par,'').replace('=', ''))
 
 def find_char(cfg, par):
-    ans = re.search(par + '\s?=\s?[a-zA-Z][a-zA-Z]*', cfg)
+    ans = re.search(par + r'\s?=\s?[a-zA-Z][a-zA-Z]*', cfg)
     return ans.group(0).replace(par,'').replace('=', '').replace(' ','')
 
 def find_beam_profile(cfg):
-    ans = re.search('beam-profile\s?=\s?"""([^\>]*)"""', cfg)
+    ans = re.search(r'beam-profile\s?=\s?"""([^\>]*)"""', cfg)
     return ans.group(1)
