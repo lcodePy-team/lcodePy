@@ -98,6 +98,15 @@ class MemoryBeamSource(BeamSource):
 
     def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
         assert xi_min < xi_max
+        if (self._used_count == 0 and self._beam_slice.xi.size
+            and self._beam_slice.xi[0] > xi_max):
+            print('MemoryBeamSource: Part of the beam particles are skipped '
+                  + 'as they are in front of '
+                  + f'the first plasma slice (xi = {xi_max}).')
+            _, _, self._used_count, _ = find_sub_slice(self._beam_slice.xi,
+                                                       self._used_count,
+                                                       0, xi_max)
+
         start, end, self._used_count, flag = find_sub_slice(self._beam_slice.xi,
                                                             self._used_count,
                                                             xi_max, xi_min)

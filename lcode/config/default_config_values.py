@@ -35,7 +35,12 @@ default_config_values = {
     ## Mass of plasma ions in unita of electron mass
     'ion-mass': 1836,
     
-    ## Plasma shaping mode: lagacy or function(t, x, y) -> density weights.
+    ## Plasma substepping for xi
+    'substepping-depth': 3,
+    'substepping-sensitivity': 0.2,
+    
+    ## Plasma shaping mode: 
+    ## lagacy, from-file or function(t, x, y) -> density weights.
     ## t is the current time, x(y) is the position of the plasma particles.   
     ## The density of weights must have the same shape as x.  
     ## x = r, y = 0 in cylindrical geometry.  
@@ -53,6 +58,14 @@ default_config_values = {
     ## Only linear increase/decrease are available. 
     'plasma-zshape': '''
         ''',
+    
+    ## Path to the file or directory where the initial plasma states are stored.
+    'path-to-plasma-state': './plasma_states/',
+    
+    ## If a positive float number, the final plasma layer will be saved 
+    ## to “./plasma_states/” for each time step close to save-plasma-each-time 
+    ## multiplied by an integer number.
+    'save-plasma-each-time': 0,
 
     ## Declustering of plasma electrons
     'declustering-enabled': False,
@@ -74,10 +87,6 @@ default_config_values = {
     # Plasma:
     ## External Bz amplitude, 2D only.
     'magnetic-field': 0,
-    
-    ## Plasma substepping for xi, 2d only
-    'substepping-depth': 3,
-    'substepping-sensitivity': 0.2,
 
     ## Parameters of the area available for motion of plasma particles, 3d only.
     'bound-padding-steps': 10,

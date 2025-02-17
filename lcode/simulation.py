@@ -1,4 +1,6 @@
 import copy
+import os
+import glob
 
 # Imports config, diagnostics, alternative beam generator for 3d
 # (can be used for 2d too)
@@ -70,8 +72,8 @@ class Simulation:
         self.__beam_particles = None
 
         # We set that initially the code doesn't use an external plasma state:
-        self.external_plasmastate = False
-        self.path_to_plasmastate = 'plasmastate.npz'
+        self.external_plasma_state = False
+        self.path_to_plasma_state = 'plasma_state.npz'
 
         #set geometry is None before reading config
         self.__geometry = None
@@ -121,12 +123,34 @@ class Simulation:
             raise Exception("The specified geometry is not supported. " +
                             "The following options are available: circ and 3d.")
             
+        if self.__config.get('plasma-shape') == 'from-file': 
+            self.external_plasma_state = True
+            path_to_plasma_state = self.__config.get('path-to-plasma-state')
+            if os.path.isfile(path_to_plasma_state):
+                self.path_to_plasma_state = path_to_plasma_state
+                self.plasma_state_position = 0
+                self.further_plasma_states = []
+            elif os.path.isdir(path_to_plasma_state): 
+                files = glob.glob(path_to_plasma_state + '*.npz')
+                if not files:
+                    raise Exception("No plasma states were found in directory:" 
+                                    + f" {path_to_plasma_state}.")
+                self.further_plasma_states = [(float(f.split('/')[-1][:-4]), f)
+                                            for f in files]
+                self.further_plasma_states.sort(key=lambda x: x[0])
+                self.plasma_state_position, self.path_to_plasma_state = \
+                    self.further_plasma_states[0]
+                del self.further_plasma_states[0]
+            else:
+                raise ValueError(
+                    f"Wrong 'path-to-plasma-state': {path_to_plasma_state}.\n" 
+                    + 12 * " " + "Must be the path to a file or directory.")
+            
 
         # Finally, we set the diagnostics.
         for diagnostic in self.diagnostics_list:
             diagnostic.pull_config(config=self.__config)
 
-    
     ## TODO add update beam and diagnostics
     ## def update(self, config):
     ##    """
@@ -153,24 +177,24 @@ class Simulation:
     #     """
     #     pass
 
-    def __load_plasmastate(self):
-        # We use this function to load plasma only once and then use
-        # it while it is loaded into the device's memory (CPU or GPU).
-        self.__loaded_plasmastate =\
-            self.__load_plasma(self.__config, self.path_to_plasmastate)
-
-    def __init_plasmastate(self, current_time):
+    def __init_plasma_state(self, current_time):
         # In case of an external plasma state, we set values
         # as the loaded values:
-        if self.external_plasmastate:
-            return self.__loaded_plasmastate
+        if self.external_plasma_state:
+            while self.further_plasma_states:
+                if current_time < self.plasma_state_position:
+                    break
+                elif (current_time - self.plasma_state_position 
+                      > abs(current_time - self.further_plasma_states[0][0])):
+                    self.plasma_state_position, self.path_to_plasma_state = \
+                        self.further_plasma_states[0]
+                    del self.further_plasma_states[0]
+                else:
+                    break
+            return self.__load_plasma(self.__config, self.path_to_plasma_state)
         else:
             # Initializes a plasma state:
             return self.init_plasma(self.__config, current_time)
-            # The init_plasma function must be public so that a user
-            # can change it and generate a unique plasma.
-            # TODO: make the insides of init_plasma accessible for
-            #       modifications after copy-pasting.
 
     def step(self, N_steps=None):
         """
@@ -188,10 +212,6 @@ class Simulation:
         self.__pull_config()
         if self.runas_filename:
             self.__config.dump(self.runas_filename)
-
-        # 1. If we use an external plasma state, we load it:
-        if self.external_plasmastate:
-            self.__load_plasmastate()
 
         # t step function, makes N_steps time steps.
         if self.__rigid_beam:
@@ -250,11 +270,11 @@ class Simulation:
             self.beam_source, self.beam_drain = self.MPITransport.get_transports()
 
 
-            plasmastate = self.__init_plasmastate(self.current_time)
+            plasma_state = self.__init_plasma_state(self.current_time)
 
             # Calculates one time step:
             self.__push_solver.step_dt(
-                *plasmastate, self.beam_source, self.beam_drain,
+                *plasma_state, self.beam_source, self.beam_drain,
                 self.current_time, self.diagnostics_list
             )
 

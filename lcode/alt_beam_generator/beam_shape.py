@@ -25,7 +25,7 @@ class BeamShape:
     def get_segment(self, xi):
         segment_start = 0
         for segment in self.segments:
-            if 0 < segment_start - xi < segment.length:
+            if 0 <= segment_start - xi < segment.length:
                 return segment, segment_start
             segment_start -= segment.length
         return None, 0

@@ -134,10 +134,10 @@ def profile_initial_plasma(config, current_time, x_init, y_init, q, m):
         coef = xp.ones_like(x_init)
         mask = xp.ones_like(x_init, dtype=xp.bool_)
     if save_zshape:
-        with open('plasma_z_shape.dat', 'a') as f:
+        with open('plasma_z_shape.dat', 'a', encoding='utf-8') as f:
             pass
     if save_rshape:
-        with open('plasma_r_shape.dat', 'a') as f:
+        with open('plasma_r_shape.dat', 'a', encoding='utf-8') as f:
             pass
 
     # If the total length is too small, hence we finished the loop above,

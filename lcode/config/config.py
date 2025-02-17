@@ -90,14 +90,16 @@ class Config:
                         'plasma-shape',
                         'plasma-zshape', 
                         'plasma-rshape',
+                        'path-to-plasma-state',
                         ])
         if 'extra' in runas_name:
             n_lines = -1
         else:
-            n_lines = 94
+            n_lines = 103
         
         path_to_default = Path(__file__).parent / 'default_config_values.py'
-        conf_file = open(path_to_default,'r').readlines()
+        with open(path_to_default, 'r', encoding='utf-8') as f_in:
+            conf_file = f_in.readlines()
         conf_file = ''.join(conf_file[3:n_lines]) + '}'
         conf_file = '"""\n' \
             + 'Simulation preformed with following lcode settings.\n' \
@@ -143,7 +145,7 @@ class Config:
             new_line = fr"'{key}': {value}"
             conf_file = re.sub(old_line, new_line, conf_file)
         
-        with open(runas_name, 'w') as f_out:
+        with open(runas_name, 'w', encoding='utf-8') as f_out:
             f_out.write(conf_file)
         
 
@@ -158,7 +160,7 @@ class Config:
     def c_config(self, path:str = None) -> str:
         cfg = lcode_template.format(**self.config_values)
         if path:
-            with open(path, 'w') as cfg_f:
+            with open(path, 'w', encoding='utf-8') as cfg_f:
                 cfg_f.write(cfg)
         return cfg
 

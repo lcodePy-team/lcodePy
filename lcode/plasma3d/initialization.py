@@ -62,8 +62,10 @@ def neumann_matrix(xp: np, grid_steps, grid_step_size):
     k = xp.arange(0, grid_steps)
     lam = 4 / grid_step_size**2 * xp.sin(k * xp.pi / (2 * (grid_steps - 1)))**2
     lambda_i, lambda_j = lam[:, None], lam[None, :]
-    mul = 1 / (lambda_i + lambda_j)  # WARNING: zero division in mul[0, 0]!
-    mul[0, 0] = 0  # doesn't matter anyway, just defines constant shift
+    # hide "WARNING: zero division in mul[0, 0]!"
+    with np.errstate(divide='ignore', invalid='ignore'): 
+        mul = 1 / (lambda_i + lambda_j)
+    mul[0, 0] = 0 
     return mul / (2 * (grid_steps - 1))**2  # additional 2xDST normalization
 
 

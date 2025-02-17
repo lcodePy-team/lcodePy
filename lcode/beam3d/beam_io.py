@@ -33,8 +33,16 @@ class BeamSource:
         """
         xi_min = - self.xi_step_size * plasma_layer_idx
         xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
-
+        
+        if self.beam.xi.size and self.beam.xi[0] > xi_min:
+            print('MemoryBeamSource: Part of the beam particles are skipped '
+                  + 'as they are in front of '
+                  + f'the first plasma slice (xi = {xi_max}).')
+            layer_length = self.xp.sum(
+                (self.beam.xi > self.xp.asarray(xi_min)))
+            _, self.beam = self.beam.cut_beam_layer(layer_length)
         array_to_search = self.beam.xi
+
         # Here we find the length of a layer where requisite particles lay.
         if array_to_search.size != 0:
             layer_length = self.xp.sum(
