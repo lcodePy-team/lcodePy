@@ -11,14 +11,14 @@ If you want to work with a virtual environment, then you need to create and acti
 .. code-block:: shell
 
     # linux
-    python -m venv venv
-    source venv/bin/activate # linux
+    python -m venv lcode-env
+    source lcode-env/bin/activate # linux
 
 .. code-block:: powershell
     
     # Windows
-    python -m venv venv
-    .\venv\scripts\Activate
+    python -m venv lcode-env
+    .\lcode-env\scripts\Activate
 
 Then install lcode:
 

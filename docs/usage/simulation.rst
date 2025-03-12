@@ -1,17 +1,17 @@
 Simulation
 ===================================
 
-A typical modeling is organized using the Simulation class.  
+A typical simulation run is organized using the Simulation class.  
 It contains all information about plasma and beam parameters, 
 solver configuration and required diagnostics.   
 
 .. autoclass:: lcode.Simulation()
     
-    .. .. method:: __init__(config, beam_parameters, diagnostics)
+    .. .. method:: __init__(config, beam_parameters, diagnostics, runas_filename)
         
     ..     asd
 
-    .. automethod:: __init__(config, beam_parametrs, diagnostics)
+    .. automethod:: __init__(config, beam_parametrs, diagnostics, runas_filename)
     .. automethod:: step
 
 

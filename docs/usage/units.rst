@@ -15,7 +15,7 @@ All times are in units of
 plasma frequency, :math:`e` is the elementary charge, and :math:`m` is the electron mass. 
 All distances are in units of :math:`c/\omega_p`. The unit velocity is :math:`c`. 
 The notation used and units of measure for various quantities are given 
-in old `manual <https://lcode.info/site-files/manual.pdf>`_ p. 3.
+in old `manual <https://lcode.info/site-files/manual.pdf>`_, p. 3.
 
 
 .. raw:: html

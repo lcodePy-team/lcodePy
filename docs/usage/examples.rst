@@ -7,10 +7,12 @@ You can load the code launcher (*filename.py*), run the code (*python filename.p
 .. toctree::
     :maxdepth: 1
 
-    examples/ssm
     examples/wavebreaking
     examples/default-c
+    examples/original-ssm
+    examples/high-R
 ..    examples/test1-2d
+      examples/ssm
 
 For details of the startup parameters, see sections 
 :ref:`simulation`, :ref:`configuration`, :ref:`beam`, and

@@ -140,7 +140,7 @@ def get_deposit_beam_cupy():
 
 def get_deposit_beam(config: Config):
     xi_step_size = config.getfloat('xi-step')
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     grid_steps = config.getint('window-width-steps')
 
     pu_type = config.get('processing-unit-type').lower()

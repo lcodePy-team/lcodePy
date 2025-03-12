@@ -6,7 +6,7 @@ To start running your first simulation using lcode, all you need to do is run th
 .. code-block:: shell
 
     pip install lcode
-    python -m lcode get ssm
+    python -m lcode get original-ssm
     python run.py
 
 
@@ -20,14 +20,14 @@ If you want to work with a virtual environment, then you need to create and acti
 .. code-block:: shell
 
     # linux
-    python -m venv venv
-    source venv/bin/activate # linux
+    python -m venv lcode-env
+    source lcode-env/bin/activate # linux
 
 .. code-block:: powershell
     
     # Windows
-    python -m venv venv
-    .\venv\scripts\Activate
+    python -m venv lcode-env
+    .\lcode-env\scripts\Activate
 
 Then install lcode:
 
@@ -35,13 +35,13 @@ Then install lcode:
 
     pip install lcode
 
-`lcode` provides a tool for generating example files for running simulations. The `ssm` file provides the raw data for the simulation described in the article. The following command generates a `run.py` file that specifies all the simulation data:
+`lcode` provides a tool for generating a few example files for running simulations. The `ssm` file provides the raw data for the simulation described in the article. The following command generates a `run.py` file that specifies all the simulation data:
 
 .. code-block:: shell
 
-    python -m lcode get ssm
+    python -m lcode get original-ssm
 
-After generation, we can change the simulation parameters in the run.py file. More details about the parameters are written in the corresponding sections:
+After generation, you can change the simulation parameters in the run.py file. More information about the parameters is given in the corresponding sections:
 
 - :doc:`../usage/configuration` - About general simulation settings
 - :doc:`../usage/beam` - About beam settings

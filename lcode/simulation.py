@@ -1,4 +1,3 @@
-"""Top-level three-dimensional simulation class."""
 import copy
 
 # Imports config, diagnostics, alternative beam generator for 3d
@@ -7,7 +6,7 @@ from .config.default_config_values import default_config_values
 from .config.config import Config
 from .alt_beam_generator.beam_generator import generate_beam
 
-# Imports plasma nodule, 3d:
+# Imports plasma module, 3d:
 from .push_solvers.push_solver import PusherAndSolver3D
 from .plasma3d import init_plasma_3d, load_plasma_3d
 
@@ -15,6 +14,7 @@ from .plasma3d import init_plasma_3d, load_plasma_3d
 from .beam3d import BeamParticles3D, BeamSource3D, BeamDrain3D, \
                     RigidBeamSource3D, RigidBeamDrain3D
 from .beam3d.data import particle_dtype3d
+
 # Imports plasma module, 2d:
 from .push_solvers.push_solver import PusherAndSolver2D
 from .plasma import init_plasma_2d, load_plasma_2d
@@ -31,32 +31,37 @@ class Simulation:
     This class contains configuration of simulation and controls diagnostics.
     """
     def __init__(self, config=default_config_values, beam_parameters={},
-                 diagnostics=[]):
+                 diagnostics=[], runas_filename='runas.py'):
         """
             Initializes a simulation.
 
             Parametrs
             ---------
-            config : Dict, optional
-                    The set of base parameters to perform the simulation.
+            config : dict, optional
+                    The set of basic parameters to perform the simulation.
 
-                    Default : default_config_values from lcode.config.default_config_values.
+                    Default : lcode.config.default_config_values.
 
-            beam_parametrs : Dict, optional
-                    Configuration of the charge beam.
+            beam_parametrs : dict, otianal
+                    Configuration of the charged particle beam.
+                    
+                    The beam is disabled by default.
 
-                    The beam disabled by default.      
+            diagnostics : list, optianal
+                    A set of diagnostics to be activated.
 
-            diagnostics : List, optional
-                    Collection of diagnostics that should be run.
+                    All diagnostics are disabled by default.
+            
+            runas_filename : str, optional
+                    File name for saving the submitted simulation parameters.
 
-                    By default, diagnostics are disabled.      
+                    Default : 'runas.py'.
         """
 
-        # (TODO: set default beam)
         self.config = copy.copy(config)
         self.beam_parameters = copy.copy(beam_parameters)
         self.diagnostics_list = copy.copy(diagnostics)
+        self.runas_filename = runas_filename
 
         # We use this time as a general time value:
         self.current_time = 0.
@@ -65,6 +70,8 @@ class Simulation:
         # We initialize a beam source and a beam drain:
         self.beam_source = None
         self.beam_drain = None
+        # To save particles from a load for MPIBeamTransport
+        self.__beam_particles = None
 
         # We set that initially the code doesn't use an external plasma state:
         self.external_plasmastate = False
@@ -92,10 +99,11 @@ class Simulation:
         if self.__geometry is None:
             self.__geometry = self.__config.get('geometry').lower()
         elif self.__geometry != self.__config.get('geometry').lower():
-            raise Exception("Sorry, update geometry does not support now.")
+            raise Exception("Update geometry does not support now.")
             
         if self.__geometry == '3d':
             self.particle_dtype = particle_dtype3d
+            self.__config._adjust_config_values_3d()
             self.__push_solver = PusherAndSolver3D(config=self.__config)
             self.init_plasma, self.__load_plasma = \
                 init_plasma_3d, load_plasma_3d
@@ -114,8 +122,8 @@ class Simulation:
             self.BeamParticles, self.BeamSource, self.BeamDrain = \
                 BeamParticles2D, BeamSource2D, BeamDrain2D
         else:
-            raise Exception("Sorry, you set a wrong type of geometry. " +
-                            "For now, we support only 2d and 3d geometry.")
+            raise Exception("The specified geometry is not supported. " +
+                            "The following options are available: circ and 3d.")
             
 
         # Finally, we set the diagnostics.
@@ -134,12 +142,15 @@ class Simulation:
     def load_beamfile(self, path_to_beamfile='beamfile.npz'):
         if self.__rigid_beam:
             raise Exception("We cannot load a beam in the case of a rigid beam.")
-
-        beam_particles = self.BeamParticles(self.__config.xp)
+        if self.__geometry == '3d':
+            beam_particles = self.BeamParticles(self.__config.xp)
+        else:
+            beam_particles = self.BeamParticles()
         beam_particles.load(path_to_beamfile)
+        self.__beam_particles = beam_particles
 
-        self.beam_source = self.BeamSource(self.__config, beam_particles)
-        self.beam_drain  = self.BeamDrain(self.__config)
+       # self.beam_source = self.BeamSource(self.__config, beam_particles)
+       # self.beam_drain  = self.BeamDrain(self.__config)
 
     # def add_beamfile(self, path_to_beamfile='new_beamfile.npz'):
     #     """Add a new beam that is loaded from 'path_to_beamfile' to the beam source.
@@ -173,12 +184,14 @@ class Simulation:
         ---------
 
         N_steps : int, optional
-                Number of time steps that will be done. 
+                Number of time steps that will be made. 
                 Default : N_steps = time_limit / time_step.
         """
         # 0. It analyzes config values:
         #TODO: explicit config update. If we change xi-step we must change beam.
         self.__pull_config()
+        if self.runas_filename:
+            self.__config.dump(self.runas_filename)
 
         # 1. If we use an external plasma state, we load it:
         if self.external_plasmastate:
@@ -201,72 +214,62 @@ class Simulation:
                   f"the code will simulate till time limit = {self.__time_limit},",
                   f"with a time step size = {self.__time_step_size}.")
 
-        # 2. Checks for plasma continuation mode:
-        if self.__cont_mode == 'n' or self.__cont_mode == 'no':
-            # 3. If a beam source is empty (None), we generate
-            #    a new beam according to set parameters:
+        # Check for a beam being rigid:
+        if self.__rigid_beam:
+            # For now, beam_parameters is just a function representing
+            # the charge distribution of a rigid beam. In the future,
+            # we want to use the same beam_parameters as for a non-rigid
+            # beam in both cases.
+            beam_particles = self.beam_parameters
 
-            # Check for a beam being rigid:
-            if self.__rigid_beam:
-                # For now, beam_parameters is just a function representing
-                # the charge distribution of a rigid beam. In the future,
-                # we want to use the same beam_parameters as for a non-rigid
-                # beam in both cases.
-                beam_particles = self.beam_parameters
+            self.beam_source = self.BeamSource(self.__config,
+                                               beam_particles)
+            self.beam_drain  = self.BeamDrain(self.__config)
 
-                self.beam_source = self.BeamSource(self.__config,
-                                                   beam_particles)
-                self.beam_drain  = self.BeamDrain(self.__config)
+            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                                 beam_particles, self.particle_dtype,
+                                                 self.BeamSource, self.BeamDrain)
 
-                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                                     beam_particles, self.particle_dtype,
-                                                     self.BeamSource, self.BeamDrain)
-
-            if self.beam_source is None:
-                # Generate all parameters for a beam:
+        if self.beam_source is None:
+            # Generate all parameters for a beam:
+            if self.__beam_particles is None:
                 beam_particles = generate_beam(self.__config,
                                                self.beam_parameters)
+            else: 
+                beam_particles = self.__beam_particles
 
-                # Here we create a beam source and a beam drain:
-                self.beam_source = self.BeamSource(self.__config,
-                                                   beam_particles)
-                self.beam_drain  = self.BeamDrain(self.__config)
+            # Here we create a beam source and a beam drain:
+            self.beam_source = self.BeamSource(self.__config,
+                                               beam_particles)
+            self.beam_drain  = self.BeamDrain(self.__config)
 
-                self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                                beam_particles, self.particle_dtype,
-                                                self.BeamSource, self.BeamDrain)
-            
-            self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
+            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
+                                            beam_particles, self.particle_dtype,
+                                            self.BeamSource, self.BeamDrain)
+        
+        self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
 
-            # 4. A loop that calculates N time steps:
-            for t_i in range(self.MPITransport.steps_per_node):
+        # 4. A loop that calculates N time steps:
+        for t_i in range(self.MPITransport.steps_per_node):
+            self.beam_source, self.beam_drain = self.MPITransport.get_transports()
 
-                self.beam_source, self.beam_drain = self.MPITransport.get_transports()
 
+            plasmastate = self.__init_plasmastate(self.current_time)
 
-                plasmastate = self.__init_plasmastate(self.current_time)
+            # Calculates one time step:
+            self.__push_solver.step_dt(
+                *plasmastate, self.beam_source, self.beam_drain,
+                self.current_time, self.diagnostics_list
+            )
 
-                # Calculates one time step:
-                self.__push_solver.step_dt(
-                    *plasmastate, self.beam_source, self.beam_drain,
-                    self.current_time, self.diagnostics_list
-                )
+            # Here we transfer beam particles from beam_buffer to
+            # beam_source for the next time step. And create a new beam
+            # drain that is empty.
+            self.MPITransport.next_step()
 
-                # Here we transfer beam particles from beam_buffer to
-                # beam_source for the next time step. And create a new beam
-                # drain that is empty.
-                self.MPITransport.next_step()
-
-                self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
-            # 4. As in lcode2d, we save the beam state on reaching the time limit:
-            # self.beam_source.beam.save('beamfile') # Do we need it?
-            # TODO: Make checkpoints where all simulation information,
-            #       including beam and current time, is saved.
-            print('The work is done!')
-
-        # Other plasma continuation mode has not been implemented yet.
-        # If you are writing these modes, just change where you put
-        # init_plasma(...) and generate_beam(...)
-        else:
-            raise Exception("Sorry, for now, only 'no' mode of plasma" +
-                            "continuation is supported.")
+            self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
+        # 4. As in lcode2d, we save the beam state on reaching the time limit:
+        # self.beam_source.beam.save('beamfile') # Do we need it?
+        # TODO: Make checkpoints where all simulation information,
+        #       including beam and current time, is saved.
+        print('The work is done!')

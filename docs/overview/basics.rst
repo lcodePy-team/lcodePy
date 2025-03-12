@@ -49,7 +49,7 @@ Various details of LCODE and its underlying physics are described in the followi
 
 #. A.P. Sosedkin, K.V. Lotov, *LCODE: A parallel quasistatic code for computationally heavy problems of plasma wakefield acceleration.* `Nuclear Instr. Methods A <http://dx.doi.org/10.1016/j.nima.2015.12.032>`_ **829**, 350 (2016). --- **Parallelization.**
 
-#. P.V. Tuev, R.I. Spitsyn, K.V. Lotov, *Advanced Quasistatic Approximation.* `Plasma Physics Reports <https://doi.org/10.1134/S1063780X22601249>`_ **49**, 229 (2023). [`arviv <https://doi.org/10.48550/arXiv.2205.04390>`_][`in Russian <https://sciencejournals.ru/cgi/getPDF.pl?jid=fizplaz&year=2023&vol=49&iss=2&file=FizPlaz2260143Tuev.pdf>`_] --- **Advantages of quasistatic approximation, its applicability area and possible extensions.**
+#. P.V. Tuev, R.I. Spitsyn, K.V. Lotov, *Advanced Quasistatic Approximation.* `Plasma Physics Reports <https://doi.org/10.1134/S1063780X22601249>`_ **49**, 229 (2023). [`arxiv <https://doi.org/10.48550/arXiv.2205.04390>`_][`in Russian <https://sciencejournals.ru/cgi/getPDF.pl?jid=fizplaz&year=2023&vol=49&iss=2&file=FizPlaz2260143Tuev.pdf>`_] --- **Advantages of quasistatic approximation, its applicability area and possible extensions.**
 
 #. R.N. Spitsyn, *Numerical realization of quasistatic model of laser driver for plasma wakefield acceleration* (in Russian). `Master theses <https://star.inp.nsk.su/~dep_plasma/dip/Spitsyn_m.pdf>`_, Novosibirsk State University (2016). --- **2d laser solver.**
 

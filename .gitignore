@@ -9,5 +9,7 @@ lcode.egg-info/
 *.prof
 diagnostics/
 # *.ipynb
-
+build/
+!docs/**/*.png
+!docs/**/*.jpg
 docs/_build

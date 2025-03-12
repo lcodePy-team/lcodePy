@@ -53,7 +53,7 @@ class BeamCalculator:
         # Get main calculation parameters.
         self.xp = config.xp
 
-        self.grid_step_size = config.getfloat('window-width-step-size')
+        self.grid_step_size = config.getfloat('transverse-step')
         self.grid_steps = config.getint('window-width-steps')
         self.time_step = config.getfloat('time-step')
         self.substep_energy = config.getfloat('beam-substepping-energy')
@@ -153,7 +153,7 @@ class RigidBeamCalculator:
         
         # Creates a transversal grid
         grid_steps     = config.getint('window-width-steps')
-        grid_step_size = config.getfloat('window-width-step-size')
+        grid_step_size = config.getfloat('transverse-step')
 
         grid = ((self.xp.arange(grid_steps) - grid_steps // 2)
                 * grid_step_size)

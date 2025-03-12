@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 from ..config.config import Config
 
@@ -33,7 +34,7 @@ class PusherAndSolver():
         self.grid_steps = config.getint('window-width-steps') 
         if not self.grid_steps:
             max_radius = config.getfloat('window-width')
-            r_step = config.getfloat('window-width-step-size')
+            r_step = config.getfloat('transverse-step')
             self.grid_steps = int(max_radius / r_step) + 1
         window_length = config.getfloat('window-length')
         self.xi_steps = int(window_length / self.dxi)
@@ -52,7 +53,7 @@ class PusherAndSolver():
         pass
 
     def step_dt(self, pl_fields, pl_particles,
-                pl_currents, pl_const_arrays,
+                pl_currents, pl_const_arrays, xi_plasma_layer_start, 
                 beam_source, beam_drain,
                 current_time, diagnostics_list=[]):
         """
@@ -93,8 +94,8 @@ class PusherAndSolver():
         #       with a saved beamfile.
         #       Do we need array here?
         rho_beam_prev = self._set_rho_beam_array(xp, self.grid_steps)
-
-        for xi_i in np.arange(self.xi_steps + 1):
+        xi_i_plasma_layer_start = round(-xi_plasma_layer_start / self.dxi) + 1
+        for xi_i in range(xi_i_plasma_layer_start, self.xi_steps + 1, 1):
             # Get beam particles with xi in [dxi*{xi_i + 1}, dxi*{xi_i})
             # This use to finish rho_beam[xi_i]
             beam_layer_to_layout = self._get_beam_layer(beam_source, xi_i)
@@ -124,18 +125,25 @@ class PusherAndSolver():
             beam_layer_to_move = \
                 beam_layer_to_layout.append(fell_to_next_layer)
             fell_size = fell_to_next_layer.id.size
-
             # Send moved beam particles to next time step 
             beam_drain.push_beam_slice(moved)
             # beam_drain.finish_layer(xi_i * -self.dxi)
             
+            xi_plasma_layer = - xi_i * self.dxi
             # Every xi step diagnostics
             for diagnostic in diagnostics_list:
-                diagnostic.process(
-                    self.config, current_time, xi_i, 
-                    pl_particles, pl_fields, rho_beam, moved)
+                # diagnostic.process(
+                #     self.config, current_time, xi_i, 
+                #     pl_particles, pl_fields, rho_beam, moved)
+                diagnostic.after_step_dxi(
+                    current_time, xi_plasma_layer, pl_particles,
+                    pl_fields, pl_currents, rho_beam)
             if xi_i % 10 == 0:
                 self._simple_diag(current_time, xi_i, pl_fields)
+
+        for diagnostic in diagnostics_list:
+            diagnostic.dump(current_time, xi_plasma_layer, pl_particles,
+                            pl_fields, pl_currents, beam_drain)
         self._plasmastate = (pl_particles, pl_fields, pl_currents)
 
 

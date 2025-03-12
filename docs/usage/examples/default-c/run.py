@@ -1,49 +1,47 @@
-import warnings
-warnings.filterwarnings('ignore', '.*Grid size.*', )
-
-# Import required modules
-from lcode2dPy.simulation import Simulation
-from lcode2dPy import DiagnosticsFXi, SaveRunState, DiagnosticsColormaps
+from lcode.simulation import Simulation
+from lcode.diagnostics import FXiDiag, FXiType, OutputType, ParticlesDiag
+from lcode.diagnostics import SliceDiag, SliceType, SliceValue
 
 # Set some parameters of the config:
 config = {
     'geometry': '3d',
     'processing-unit-type': 'cpu',
-    'window-width-step-size': 0.05,
-    'window-width': 10,
 
+    'window-width': 5,
+    'transverse-step': 0.05,
     'window-length': 15,
     'xi-step': 0.05,
-
     'time-limit': 200,
     'time-step': 25,
     
     'plasma-particles-per-cell': 9,
-
-    'enable-noise-filter': False,
-
-    'beam-substepping-energy': 2
+    'ion-model': 'background'
 }
 
-# Set beam parameters
-from math import pi
-
-beam_parameters = {
-    'current': 0.1, 'particles_in_layer': 200,
-    'beam': {'xishape':'c', 'ampl': 1., 'length': 2*pi, 'rshape':'g', 'radius': 1,
+# Set beam parametrs
+beam = {
+    'current': 0.1, 
+    'particles_in_layer': 200,
+    'beam': {'xishape':'c', 'ampl': 1., 'length': 1, 'rshape':'g', 'radius': 1,
              'angshape':'l', 'angspread':1e-5, 'energy':1000, 'eshape':'m',
              'espread':0, 'mass_charge_ratio':1}
 }
 
 # Set diagnostics
-diag = [DiagnosticsFXi(
-            output_period=0,
-            f_xi='Ez',
-            f_xi_type='numbers'),
-        DiagnosticsColormaps(output_period=100, colormaps='rho'),
-        SaveRunState(output_period=0, save_beam=True)]
+diag = [FXiDiag(output_type=OutputType.NUMBERS,
+            output_period=100, 
+            f_xi=FXiType.Ez),
+        SliceDiag(
+            SliceType.XI_X,
+            output_period=100, 
+            output_type=OutputType.NUMBERS,
+            slice_value = SliceValue.ne),
+        ParticlesDiag(
+            save_beam=True,
+            output_period=25)
+       ]
 
 sim = Simulation(config=config, diagnostics=diag,
-                 beam_parameters=beam_parameters)
+                 beam_parameters=beam)
 
 sim.step()

@@ -41,6 +41,8 @@ def deposit_plasma_numba(grid_steps, grid_step_size, x_h, y_h, px, py, pz, q, m,
     x_h, y_h, m, q = x_h.ravel(), y_h.ravel(), m.ravel(), q.ravel()
     px, py, pz = px.ravel(), py.ravel(), pz.ravel()
     for k in range(size):
+        if q[k] == 0:
+            continue
         # Deposit the resulting fine particle on ro/j grids.
         gamma_m = sqrt(m[k]**2 + px[k]**2 + py[k]**2 + pz[k]**2)
         dro = q[k] / (1 - pz[k] / gamma_m)
@@ -156,6 +158,9 @@ def get_deposit_plasma_cupy():
         """,
         out_params='raw T out_ro, raw T out_jx, raw T out_jy, raw T out_jz',
         operation="""
+        if (q[i] == 0){
+            continue;
+        }
         const T gamma_m = sqrt(
             m[i]*m[i] + px[i]*px[i] + py[i]*py[i] + pz[i]*pz[i]);
         const T dro = q[i] / (1 - pz[i] / gamma_m);
@@ -190,7 +195,7 @@ def get_deposit_plasma(config: Config):
     Check if a user set dual-plasma-approach to True or False and return
     the deposition function for the set approach.
     """
-    grid_step_size = config.getfloat('window-width-step-size')
+    grid_step_size = config.getfloat('transverse-step')
     grid_steps = config.getint('window-width-steps')
     plasma_fineness = config.getint('plasma-fineness')
     dual_plasma_approach = config.getbool('dual-plasma-approach')
@@ -241,31 +246,41 @@ def get_deposit_plasma(config: Config):
             return (x_h, y_h, px_fine, py_fine, pz_fine,
                     q_fine, m_fine, fine_grid_size**2)
 
-    def deposit_plasma(particles: Arrays, const_arrays: Arrays):
+    def deposit_plasma(all_particles: Arrays, const_arrays: Arrays):
         """
         Deposit plasma particles onto the charge density and current
         grids.
         """
         xp = const_arrays.xp
+        ro = xp.zeros((2, grid_steps, grid_steps), dtype=xp.float64)
+        jx = xp.zeros((2, grid_steps, grid_steps), dtype=xp.float64)
+        jy = xp.zeros((2, grid_steps, grid_steps), dtype=xp.float64)
+        jz = xp.zeros((2, grid_steps, grid_steps), dtype=xp.float64)
 
         if dual_plasma_approach and pu_type == 'gpu':
             (x_h, y_h, px, py, pz, q, m, arrays_size) =\
                 coarse_to_fine(particles, const_arrays)
-        else:
+            deposit_plasma_kernel(grid_steps, grid_step_size, x_h, y_h, 
+                                  px, py, pz, q, m, 
+                                  ro[0,:,:], jx[0,:,:], jy[0,:,:], jz[0,:,:], 
+                                  size=arrays_size)
+            return ro, jx, jy, jz
+        
+        for sort, column in const_arrays.sorts.items():
+            particles = all_particles[sort]
             x_h = xp.array(
                 (particles.x_init + particles.x_offt) / grid_step_size + 0.5)
             y_h = xp.array(
                 (particles.y_init + particles.y_offt) / grid_step_size + 0.5)
             px, py, pz = particles.px, particles.py, particles.pz
             q, m, arrays_size = particles.q, particles.m, particles.m.size
+            deposit_plasma_kernel(grid_steps, grid_step_size, x_h, y_h, 
+                                  px, py, pz, q, m, 
+                                  ro[column,:,:], jx[column,:,:], 
+                                  jy[column,:,:], jz[column,:,:], 
+                                  size=arrays_size)
 
-        ro = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-        jx = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-        jy = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
-        jz = xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
 
-        deposit_plasma_kernel(grid_steps, grid_step_size, x_h, y_h, px, py, pz,
-                                q, m, ro, jx, jy, jz, size=arrays_size)
 
         return ro, jx, jy, jz
 

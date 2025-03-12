@@ -1,7 +1,6 @@
 """Module for setting classes for Fields, Currents and Partciles data types."""
 import numpy as np
 
-
 # Grouping CPU/GPU arrays, with optional transparent RAM<->GPU copying #
 
 class Arrays:
@@ -28,3 +27,8 @@ class Arrays:
         Create an indentical copy of the group of `cupy` arrays.
         """
         return Arrays(**self.__dict__)
+    
+    def save(self, *args, **kwargs):
+        data = self.__dict__.copy()
+        data.pop('xp')
+        self.xp.savez_compressed(*args, **kwargs, **data)

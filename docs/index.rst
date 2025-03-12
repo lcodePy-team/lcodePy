@@ -3,8 +3,8 @@ Welcome to LCODE's documentation!
 
 LCODE is a free software for numerical simulation of
 particle beam-driven plasma wakefield acceleration.
-LCODE is based on the quasistatic approximation, capable
-of simulation in 2D and 3D geometry, and can use GPUs and CPUs.
+LCODE is based on the quasistatic approximation, is capable
+of simulating in 2D and 3D geometries, and can use GPUs and CPUs.
 
 For now, this is new and experimental software. This is
 a complete overhaul of the old C version in Python.
@@ -26,7 +26,6 @@ http://lcode.info/.
    section#installation,
    section#usage,
    section#overview,
-   section#advanced-usage,
    section#underlying-physics{
        display:none;
    }
@@ -59,23 +58,12 @@ Usage
    :maxdepth: 1
    :hidden:
 
+   usage/units
    usage/simulation
    usage/configuration
    usage/beam
    usage/diagnostics
-   usage/units
    usage/examples
-
-
-Advanced usage
------------------
-.. toctree::
-   :caption: ADVANCED USAGE
-   :maxdepth: 1
-   :hidden: 
-
-   advanced_usege/noisereductor
-
 
 Underlying physics
 --------------------
