@@ -13,3 +13,7 @@ diagnostics/
 !lcode/diagnostics/
 
 # *.ipynb
+build/
+!docs/**/*.png
+!docs/**/*.jpg
+docs/_build
