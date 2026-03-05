@@ -165,7 +165,7 @@ class Simulation:
         if self.__geometry == '3d':
             beam_particles = self.BeamParticles(self.__config.xp)
         else:
-            beam_particles = self.BeamParticles()
+            beam_particles = self.BeamParticles(self.__config.xp)
         beam_particles.load(path_to_beamfile)
         self.__beam_particles = beam_particles
 

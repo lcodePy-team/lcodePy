@@ -65,7 +65,7 @@ def test_beam_pusher(path_to_data, extra_conf, get_evol_config_2D):
         conf.set(key, extra_conf[key])
     data = np.load(path_to_data)
     beam_layer = data["init_layer"]
-    beam_layer = lcode.beam.data.BeamParticles(beam_layer.size, beam_layer)
+    beam_layer = lcode.beam.data.BeamParticles(beam_array = beam_layer)
     beam_layer.remaining_steps = data["init_remaining_steps"]
     beam_layer.dt = data["init_dt"]
     beam_calc = lcode.beam.beam_calculate.BeamCalculator2D(conf)
@@ -87,12 +87,13 @@ def test_beam_pusher(path_to_data, extra_conf, get_evol_config_2D):
     lost, moved, fell = beam_calc.move_beam_layer(beam_layer, 
                                                fell_size, xi_i, prev_pl_fields, 
                                                pl_fields)
+
     for attr in ("xi", "r", "p_r", "M", "p_z", "id"):
-        assert np.allclose(lost.particles[attr], data["lost"][attr], 
+        assert np.allclose(np.sort(lost[attr]), np.sort(data["lost"][attr]), 
                            rtol=5e-16, atol=1e-125)
     for attr in ("xi", "r", "p_r", "M", "p_z", "id"):
-        assert np.allclose(moved.particles[attr], data["moved"][attr], 
+        assert np.allclose(np.sort(moved[attr]), np.sort(data["moved"][attr]), 
                            rtol=5e-16, atol=1e-125)
     for attr in ("xi", "r", "p_r", "M", "p_z", "id"):
-        assert np.allclose(fell.particles[attr], data["fell"][attr], 
+        assert np.allclose(np.sort(fell[attr]), np.sort(data["fell"][attr]), 
                            rtol=5e-16, atol=1e-125)

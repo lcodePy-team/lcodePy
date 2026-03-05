@@ -3,3 +3,4 @@ numpy
 scipy
 matplotlib
 mpi4py
+typing_extensions

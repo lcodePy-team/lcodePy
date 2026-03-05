@@ -127,9 +127,9 @@ class BeamCalculator:
                 beam_layer_idx, beam_layer, fields_after_layer,
                 fields_before_layer, lost_idxes, moved_idxes, fell_idxes)
 
-        lost  = beam_layer.get_layer(lost_idxes)
-        moved = beam_layer.get_layer(moved_idxes)
-        fell  = beam_layer.get_layer(fell_idxes)
+        lost  = beam_layer[lost_idxes]
+        moved = beam_layer[moved_idxes]
+        fell  = beam_layer[fell_idxes]
 
         return lost, moved, fell
     

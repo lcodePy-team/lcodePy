@@ -18,12 +18,11 @@ class BeamSource:
 
         # Get the whole beam or a beam layer:
         if type(beam_particles) == np.ndarray:
-            beam = BeamParticles(self.xp)
-            beam.init_generated(beam_particles)
+            beam = BeamParticles(self.xp, beam_particles)
         else:
             beam = beam_particles
 
-        beam.xi_sorted()
+        beam.sort_by_xi()
         self.beam = beam
 
     def get_beam_layer_to_layout(self, plasma_layer_idx):

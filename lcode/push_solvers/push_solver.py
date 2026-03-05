@@ -188,7 +188,7 @@ class PusherAndSolver2D(PusherAndSolver):
         self.currents_components = ('rho', 'j_r', 'j_f', 'j_z')
     
     def _set_beam_particles(self, xp):
-        return BeamParticles2D(0)
+        return BeamParticles2D(xp)
 
     def _set_rho_beam_array(self, xp, grid_steps):
         return xp.zeros(grid_steps, dtype=xp.float64)

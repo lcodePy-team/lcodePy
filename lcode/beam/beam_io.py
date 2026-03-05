@@ -82,16 +82,16 @@ def find_sub_slice(beam_slice_xi, used_count, xi_max, xi_min):
 class MemoryBeamSource(BeamSource):
     def __init__(self, config: Config, beam_slice):
         if type(beam_slice) == np.ndarray:
-            beam_slice = BeamParticles(beam_slice.size, beam_slice)
+            beam_slice = BeamParticles(beam_array = beam_slice)
 
         self._beam_slice = beam_slice
         self._used_count = 0
-        if beam_slice.particles.size == 0:
+        if beam_slice.size == 0:
             return
-        self._beam_slice.sort()
+        self._beam_slice.sort_by_xi()
         # Remove stub particle for compatibility (xi = -100000)
         if (self._beam_slice.xi[-1] + 100000) < 1:
-            self._beam_slice.particles = self._beam_slice.particles[:-1]
+            self._beam_slice = self._beam_slice[:-1]
         self._beam_slice.dt.fill(0.0)
         self._beam_slice.remaining_steps.fill(1.0)
         
@@ -113,7 +113,7 @@ class MemoryBeamSource(BeamSource):
         if flag:
             logging.debug(f'Wrong order of the particles')
         logging.debug(f'MemoryBeamSource: sourced {end - start} particles')
-        return BeamParticles(end - start, particles=self._beam_slice.particles[start:end])
+        return self._beam_slice[start:end]
 
 
 class MemoryBeamDrain(BeamDrain):
@@ -135,7 +135,7 @@ class MemoryBeamDrain(BeamDrain):
             self._beam_buffer_lost.append(beam_slice)
 
     def beam_slice(self):
-        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
+        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
     
     def save(self, *args, **kwargs):
         slice = np.array(self.beam_slice(), dtype = particle_dtype)
@@ -149,11 +149,11 @@ class DebugSource(BeamSource):
 
     def get_beam_slice(self, xi_start, xi_end) -> BeamParticles:
         slice = self._source.get_beam_slice(xi_start, xi_end)
-        self._beam_buffer.append(BeamParticles(slice.size, particles=np.copy(slice.particles)))
+        self._beam_buffer.append(BeamParticles(beam_array = np.copy(slice.as_array())))
         return slice
 
     def get_debug_slice(self):
-        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer])
+        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer])
 
 
 class DebugDrain(BeamDrain):
@@ -174,4 +174,4 @@ class DebugDrain(BeamDrain):
             self._beam_buffer_lost.append(beam_slice)
 
     def get_beam_slice(self):
-        return np.concatenate([beam_slice.particles for beam_slice in self._beam_buffer])
+        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer])

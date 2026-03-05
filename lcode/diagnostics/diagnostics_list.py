@@ -49,6 +49,6 @@ class BeamDiagnostics(TDiagnostics):
                 particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
                            ('q_norm', 'f8'), ('id', 'i8')])
                 self.data[t] = np.array([],dtype=particle_dtype)
-            self.data[t] = np.append(self.data[t], beam_slice.particles)
-            #self.lost[t] = np.append(self.data[t], lost_slice.particles)
+            self.data[t] = np.append(self.data[t], beam_slice.as_array())
+            #self.lost[t] = np.append(self.data[t], lost_slice.as_array())
             #self.test[t].append(rho_beam.tolist())

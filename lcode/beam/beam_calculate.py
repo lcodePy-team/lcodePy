@@ -349,7 +349,6 @@ def get_beam_slice_mover(config):
                     fields_before_slice.E_z, fields_before_slice.B_f,
                     fields_before_slice.B_z
                 )
-        beam_slice.nlost += nlost
 
     return move_beam_slice
 
@@ -467,24 +466,13 @@ class BeamCalculator2D():
             layers : tuple of arrays
                 [lost, move, ramain] beam particles. 
         """
-        sorted_idxes = np.argsort(beam_slice.lost)[::-1]                                           
-        beam_slice.particles = beam_slice.particles[sorted_idxes]                                  
-        beam_slice.dt = beam_slice.dt[sorted_idxes]                                                
-        beam_slice.remaining_steps = beam_slice.remaining_steps[sorted_idxes]                      
-        beam_slice.lost = beam_slice.lost[sorted_idxes]                                            
-        lost_count = np.sum(beam_slice.lost)
-        lost_slice = beam_slice.get_subslice(0, lost_count)
-        
-        beam_slice = beam_slice.get_subslice(lost_count, beam_slice.size)
+
+        lost_slice = beam_slice[beam_slice.lost]
+        beam_slice = beam_slice[~beam_slice.lost]
+
         moving_mask = np.logical_or(beam_slice.remaining_steps > 0, beam_slice.xi < xi_end)
-        stable_count = moving_mask.size - np.sum(moving_mask)
-        sorted_idxes = np.argsort(moving_mask)
-        beam_slice.particles = beam_slice.particles[sorted_idxes]
-        beam_slice.dt = beam_slice.dt[sorted_idxes]
-        beam_slice.remaining_steps = beam_slice.remaining_steps[sorted_idxes]
-        beam_slice.lost = beam_slice.lost[sorted_idxes]
-        stable_slice = beam_slice.get_subslice(0, stable_count)
-        moving_slice = beam_slice.get_subslice(stable_count, beam_slice.size)
+        moving_slice = beam_slice[moving_mask]
+        stable_slice = beam_slice[~moving_mask]
 
         return lost_slice, stable_slice, moving_slice
 
