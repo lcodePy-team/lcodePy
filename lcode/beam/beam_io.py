@@ -102,7 +102,7 @@ class MemoryBeamSource(BeamSource):
             and self._beam_slice.xi[0] > xi_max):
             print('MemoryBeamSource: Part of the beam particles are skipped '
                   + 'as they are in front of '
-                  + f'the first plasma slice (xi = {xi_max}).')
+                  + f'the first plasma slice (xi = {round(xi_min, 7)}).')
             _, _, self._used_count, _ = find_sub_slice(self._beam_slice.xi,
                                                        self._used_count,
                                                        0, xi_max)

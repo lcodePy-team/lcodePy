@@ -99,7 +99,10 @@ default_config_values = {
     # Beam:
     ## Works for 3d with an unusual beam configuration.
     'rigid-beam': False, 
-    ####
+
+    ## Set the beam particle integrator, see docs for details.
+    ## Works for 3d
+    'beam-pusher': 'higuera-cary',
 
 # Developer settings
     
@@ -109,5 +112,5 @@ default_config_values = {
     ## Only 2d
     ## Plasma:
     'trapped-path-limit': 0,
-    'correctotransverse-steps': 2, # Can we even change this???
+    'correctotransverse-steps': 2, 
 }

@@ -114,8 +114,8 @@ class PusherAndSolver():
             # This use to finish rho_beam[xi_i]
             beam_layer_to_layout = self._get_beam_layer(beam_source, xi_i)
 
-            rho_beam = self.beam_calc.layout_beam_layer(beam_layer_to_layout,
-                                                        xi_i)
+            rho_beam = self.beam_calc.deposit_beam_layer(beam_layer_to_layout,
+                                                         xi_i)
 
             # Save fields from xi_i - 1 step for beam pusher 
             prev_pl_fields = pl_fields.copy()
@@ -128,7 +128,7 @@ class PusherAndSolver():
 
             # Now we can move beam with xi in [dxi*{xi_i - 1}, dxi*{xi_i})
             lost, moved, fell_to_next_layer = \
-                self.beam_calc.move_beam_layer(beam_layer_to_move, 
+                self.beam_calc.push_beam_layer(beam_layer_to_move, 
                                                fell_size, xi_i, prev_pl_fields, 
                                                pl_fields)
 
@@ -140,7 +140,7 @@ class PusherAndSolver():
                 beam_layer_to_layout.append(fell_to_next_layer)
             fell_size = fell_to_next_layer.id.size
             # Send moved beam particles to next time step 
-            self._push_beam_layer(beam_drain, moved) 
+            self._push_beam_layer(beam_drain, moved)
             
             xi_plasma_layer = -xi_i * self.dxi
             # Every xi step diagnostics

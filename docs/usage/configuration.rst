@@ -261,6 +261,43 @@ Parameters of beam model
     This feature is particularly useful if low energy beam particles are present in the
     system, which otherwise would require undesirable reduction of the main **'time-step'**. 
 
+* ``'beam-pusher': 'higuera-cary'`` (`multiple choice`)
+    The integration method to be used for calculating beam particle properties.
+    Works only with 3D geometry.
+    
+    * **higuera-cary**: pusher proposed by A.V. Higuera and J.R. Cary
+        (https://doi.org/10.1063/1.4979989).
+
+    * **runge-kutta**: 4-order Runge-Kutta method.
+
+    * **boris**: pusher proposed by J.P. Boris with approximate rotation.
+        Relativistic plasma simulation-optimization 
+        of a hybrid code, in: Proceedings of 4th Conference on Numerical Simulation 
+        of Plasmas, Naval  Research Laboratory, Washington D.C., 1970, pp. 3–67
+
+    * **boris-tg**: pusher proposed by J.P. Boris with exact rotation.
+        Relativistic plasma simulation-optimization 
+        of a hybrid code, in: Proceedings of 4th Conference on Numerical Simulation 
+        of Plasmas, Naval  Research Laboratory, Washington D.C., 1970, pp. 3–67
+
+    * **exact-gyration**: pusher proposed by S. Zenitani and T. Umeda
+        (https://doi.org/10.1063/1.5051077).
+
+    * **vd1**: pusher proposed by K.V. Vshivkov, E.S. Voropaeva and A.A. Efimova
+        (https://doi.org/10.25743/ICT.2023.282.004).
+
+    * **umeda-ozaki**: pusher oroginaly proposed by T. Umeda
+        (https://doi.org/10.1016/j.jcp.2022.111694). In the cos/sin from 
+        proposed by T. Umeda and R. Ozaki with Gamma = gamma_m from Boris pusher
+        (https://doi.org/10.1186/s40623-023-01902-8).
+
+    * **vay**: pusher proposed by J.-L. Vay
+        (https://doi.org/10.1063/1.2837054).
+
+    * **lapenta-markidis**: integrator for the Lapenta–Markidis momentum update 
+    from paper http://dx.doi.org/10.1063/1.3602216. Explicit solution 
+    from paper https://doi.org/10.3847/1538-4365/acefba 
+    with numerical solution of gamma equation. (*Experimental*)
 
 
 Advanced features

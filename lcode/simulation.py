@@ -207,9 +207,6 @@ class Simulation:
                 Number of time steps that will be made. 
                 Default : N_steps = time_limit / time_step.
         """
-        # 0. It analyzes config values:
-        #TODO: explicit config update. If we change xi-step we must change beam.
-        self.__pull_config()
         if self.runas_filename:
             self.__config.dump(self.runas_filename)
 

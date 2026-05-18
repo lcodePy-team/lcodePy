@@ -22,27 +22,23 @@ def weight4(x, place):
     and 24 surrounding cells.
     The weights correspond to ...
     """
-    # TODO: Change to switch statement (match and case) when Python 3.10 is
-    #       supported by Anaconda.
     if place == -2:
-        return (1 / 2 - x) ** 4 / 24
+        return (1 / 2 - x)**4 / 24
     elif place == -1:
-        return 19/96 - 11/24 * x + x ** 2 / 4 + x ** 3 / 6 - x ** 4 / 6
+        return 19/96 - 11/24 * x + x**2 / 4 + x**3 / 6 - x**4 / 6
     elif place == 0:
-        return 115/192 - x ** 2 * 5/8 + x ** 4 / 4
+        return 115/192 - x**2 * 5/8 + x**4 / 4
     elif place == 1:
-        return 19/96 + 11/24 * x + x ** 2 / 4 - x ** 3 / 6 - x ** 4 / 6
+        return 19/96 + 11/24 * x + x**2 / 4 - x**3 / 6 - x**4 / 6
     elif place == 2:
-        return (1 / 2 + x) ** 4 / 24
+        return (1 / 2 + x)**4 / 24
 
 
-# Deposition and field interpolation # TODO: make it parallel
+# A function that performs gridding of beam particles onto
+# the charge density grid, for CPU #
 @nb.njit #(parallel=True)
 def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
-                       out_ro0, out_ro1, size):
-    """
-    Deposit beam particles onto the charge density grids.
-    """
+                       rho_beam, rho_beam_next, size):
     x_h, y_h = x_h.ravel(), y_h.ravel()
     xi_loc, q_norm = xi_loc.ravel(), q_norm.ravel()
 
@@ -60,8 +56,8 @@ def deposit_beam_numba(grid_steps, x_h, y_h, xi_loc, q_norm,
                 w1 = w * weight1(xi_loc[k], 1)
                 index_x, index_y = ix + kx, iy + ky
 
-                out_ro0[index_x, index_y] += q_norm[k] * w0
-                out_ro1[index_x, index_y] += q_norm[k] * w1
+                rho_beam[index_x, index_y] += q_norm[k] * w0
+                rho_beam_next[index_x, index_y] += q_norm[k] * w1
     
 
 
@@ -84,17 +80,11 @@ __device__ inline T weight4(T x, int place) {
     if (place == -2)
         return (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) * (1 / 2. - x) / 24.;
     else if (place == -1)
-        return (
-            19 / 96. - 11 / 24. * x + x * x / 4. + x * x * x / 6. -
-            x * x * x * x / 6.
-        );
+        return 19./96. - 11./24.*x + x*x/4. + x*x*x/6. - x*x*x*x/6.;
     else if (place == 0)
-        return 115 / 192. - 5 / 8. * x * x + x * x * x * x / 4.;
+        return 115/192. - 5/8.*x*x + x*x*x*x/4.;
     else if (place == 1)
-        return (
-            19 / 96. + 11 / 24. * x + x * x / 4. - x * x * x / 6. -
-            x * x * x * x / 6.
-        );
+        return 19/96. + 11/24.*x + x*x/4. - x*x*x/6. - x*x*x*x/6.;
     else if (place == 2)
         return (1 / 2. + x) * (1 / 2. + x) * (1 / 2. + x) * (1 / 2. + x) / 24.;
     else
@@ -104,7 +94,6 @@ __device__ inline T weight4(T x, int place) {
 
 # A function that performs gridding of beam particles onto
 # the charge density grid, for GPU #
-
 def get_deposit_beam_cupy():
     import cupy as cp
 
@@ -113,7 +102,7 @@ def get_deposit_beam_cupy():
         float64 grid_steps, raw T x_h, raw T y_h, raw T xi_loc,
         raw T q
         """,
-        out_params='raw T out_ro0, raw T out_ro1',
+        out_params='raw T out_rho_beam, raw T out_rho_beam_next',
         operation="""
         const T x_loc = x_h[i] - floor(x_h[i]) - 0.5;
         const T y_loc = y_h[i] - floor(y_h[i]) - 0.5;
@@ -128,8 +117,8 @@ def get_deposit_beam_cupy():
                 const T w1 = w  * weight1(xi_loc[i], 1);
                 const int idx = (iy + ky) + (int) grid_steps * (ix + kx);
 
-                atomicAdd(&out_ro0[idx], q[i] * w0);
-                atomicAdd(&out_ro1[idx], q[i] * w1);
+                atomicAdd(&out_rho_beam[idx], q[i] * w0);
+                atomicAdd(&out_rho_beam_next[idx], q[i] * w1);
             }
         }
         """,
@@ -138,7 +127,10 @@ def get_deposit_beam_cupy():
     )
 
 
-def get_deposit_beam(config: Config):
+def get_beam_deposition_function(config: Config):
+    """
+    Returns a function for deposition of beam particles on a density grid.
+    """
     xi_step_size = config.getfloat('xi-step')
     grid_step_size = config.getfloat('transverse-step')
     grid_steps = config.getint('window-width-steps')
@@ -149,17 +141,14 @@ def get_deposit_beam(config: Config):
     elif pu_type == 'gpu':
         deposit_beam_kernel = get_deposit_beam_cupy()
 
-    def deposit_beam(plasma_layer_idx, x, y, xi, q_norm,
-                     out_ro0, out_ro1):
-        """
-        Deposit beam particles onto the charge density grid.
-        """
-        xi_plasma_layer = - xi_step_size * plasma_layer_idx
-        xi_loc = (xi_plasma_layer - xi) / xi_step_size
-        x_h, y_h = x / grid_step_size + 0.5, y / grid_step_size + 0.5
+    def deposit_beam(plasma_slice_idx, x, y, xi, q_norm,
+                     rho_beam, rho_beam_next):
+        plasma_slice_xi = -xi_step_size * (plasma_slice_idx + 1)
+        xi_loc = (xi - plasma_slice_xi) / xi_step_size
+        x_h = x / grid_step_size + 0.5
+        y_h = y / grid_step_size + 0.5
 
-        deposit_beam_kernel(
-            grid_steps, x_h, y_h, xi_loc, q_norm, out_ro0, out_ro1,
-            size=q_norm.size)
+        deposit_beam_kernel(grid_steps, x_h, y_h, xi_loc, q_norm,
+                            rho_beam, rho_beam_next, size=q_norm.size)
 
     return deposit_beam

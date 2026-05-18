@@ -19,6 +19,7 @@ class BeamSegmentShape:
         self.espread = beam_segment_params['espread']
         self.eshape: EShape = EShape.get_shape(beam_segment_params['eshape'])
         self.mass_charge_ratio = beam_segment_params['mass_charge_ratio'] # m/q in manual
+        self.q = beam_segment_params['q'] 
 
     def set_beam_shape(self, beam_shape):
         """

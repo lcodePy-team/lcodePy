@@ -36,7 +36,7 @@ class BeamSource:
         if self.beam.xi.size and self.beam.xi[0] > xi_min:
             print('MemoryBeamSource: Part of the beam particles are skipped '
                   + 'as they are in front of '
-                  + f'the first plasma slice (xi = {xi_max}).')
+                  + f'the first plasma slice (xi = {round(xi_min, 7)}).')
             layer_length = self.xp.sum(
                 (self.beam.xi > self.xp.asarray(xi_min)))
             _, self.beam = self.beam.cut_beam_layer(layer_length)
@@ -97,7 +97,7 @@ class RigidBeamSource:
         self.beam_charge_distribution_function =\
              beam_charge_distribution_function
 
-    def get_beam_layer_to_layout(self, plasma_layer_idx):
+    def get_beam_layer_to_deposit(self, plasma_layer_idx):
         return self.beam_charge_distribution_function
 
 class RigidBeamDrain:

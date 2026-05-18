@@ -3,54 +3,94 @@ import numpy as np
 
 from ..config.config import Config
 from .data import BeamParticles
-from .weights import get_deposit_beam
-from .move import get_move_beam_particles
+from .weights import get_beam_deposition_function
+from .push_cpu import get_beam_pusher_numba
+from .push_gpu import get_beam_pusher_cupy
 
 
-# Helper function #
+def get_beam_pusher(config: Config):
+    xi_step_size = config.getfloat('xi-step')
+    grid_step_size = config.getfloat('transverse-step')
+    grid_steps = config.getint('window-width-steps')
 
-# NOTE: We have to write these functions separately and we don't merge them,
-#       because other implementation options (including from old commits) led
-#       to an illegal memory access when computing on a GPU. The problem is
-#       probably in the internals of the cupy library. The specific simulation
-#       settings will still create the problem, but in different places.
+    # Calculate the radius that marks that a particle is lost.
+    max_radius = grid_step_size * grid_steps / 2
+    lost_radius = max(0.9 * max_radius, max_radius - 1)
 
-@nb.njit
-def beam_substepping_step_numba(q_m, pz, substepping_energy):
-    dt = np.ones_like(q_m, dtype=np.float64)
-    max_dt = np.sqrt(np.sqrt(1 / q_m ** 2 + pz ** 2) / substepping_energy)
-    for i in range(len(q_m)):
-        while dt[i] > max_dt[i]:
-            dt[i] /= 2.0
-    return dt
+    pu_type = config.get('processing-unit-type').lower()
+    integration_method = config.get('beam-pusher').lower()
+    if pu_type == 'cpu':
+        _push_beam_particles = get_beam_pusher_numba(integration_method)
+    if pu_type == 'gpu':
+        _push_beam_particles = get_beam_pusher_cupy(integration_method)
+
+    def push_beam_particles(plasma_slice_idx, beam_layer: BeamParticles,
+                            fields_prev, fields,
+                            lost_idxes, moved_idxes, fell_idxes):
+        _push_beam_particles(
+            xi_step_size, lost_radius, plasma_slice_idx, 
+            grid_step_size, grid_steps, 
+            fields_prev.Ex, fields_prev.Ey, fields_prev.Ez,
+            fields_prev.Bx, fields_prev.By, fields_prev.Bz,
+            fields.Ex, fields.Ey, fields.Ez,
+            fields.Bx, fields.By, fields.Bz,
+
+            beam_layer.q_m, beam_layer.dt,
+            beam_layer.remaining_steps, beam_layer.id,
+            beam_layer.x, beam_layer.y, beam_layer.xi,
+            beam_layer.ux, beam_layer.uy, beam_layer.uz,
+            lost_idxes, moved_idxes, fell_idxes,
+
+            size=beam_layer.id.size)
+
+    return push_beam_particles
 
 
-def get_beam_substepping_step_cupy():
-    import cupy as cp
+def get_beam_t_step_calculator(config):
+    """
+    Generation of a function to calculate the correct time step
+    for beam particles according to 'beam-substepping-energy'.
+    """
+    pu_type = config.get('processing-unit-type').lower()
+    if pu_type == 'cpu':
+        @nb.njit
+        def calc_beam_t_step_numba(q_m, uz, substepping_energy):
+            dt = np.ones_like(q_m, dtype=np.float64)
+            max_dt = np.sqrt(np.sqrt(1 + uz**2) / substepping_energy / np.abs(q_m))
+            for i in range(len(q_m)):
+                while dt[i] > max_dt[i]:
+                    dt[i] /= 2.0
+            return dt
+        return calc_beam_t_step_numba
 
-    calculate_substepping_step = cp.ElementwiseKernel(
-        in_params="T q_m, T pz, float64 substepping_energy",
-        out_params="T dt",
-        operation="""
-        T max_dt = sqrt(sqrt(1 / (q_m*q_m) + pz*pz) / substepping_energy);
-        while (dt > max_dt){
-            dt /= 2;
-        }
-        """)
+    if pu_type == 'gpu':
+        import cupy as cp
 
-    def beam_substepping_step(q_m, pz, substepping_energy):
-        dt = cp.ones_like(q_m, dtype=cp.float64)
-        calculate_substepping_step(q_m, pz, substepping_energy, dt)
-        return dt
+        calc_beam_t_step_cupy_kernel = cp.ElementwiseKernel(
+            in_params="T q_m, T uz, float64 substepping_energy",
+            out_params="T dt",
+            operation="""
+            T max_dt = sqrt(sqrt(1 + uz*uz) / substepping_energy / abs(q_m));
+            while (dt > max_dt){
+                dt /= 2;
+            }
+            """)
 
-    return beam_substepping_step
+        def calc_beam_t_step_cupy(q_m, uz, substepping_energy):
+            dt = cp.ones_like(q_m, dtype=cp.float64)
+            calc_beam_t_step_cupy_kernel(q_m, uz, substepping_energy, dt)
+            return dt
+
+        return calc_beam_t_step_cupy
 
 
 # ----- A class for a beam consisting of macroparticles -----
 
 class BeamCalculator:
+    """
+    The main class for performing operations with a beam in 3d.
+    """
     def __init__(self, config: Config):
-        # Get main calculation parameters.
         self.xp = config.xp
 
         self.grid_step_size = config.getfloat('transverse-step')
@@ -58,89 +98,93 @@ class BeamCalculator:
         self.time_step = config.getfloat('time-step')
         self.substep_energy = config.getfloat('beam-substepping-energy')
 
-        self.deposit = get_deposit_beam(config)
-        self.move_particles = get_move_beam_particles(config)
+        self._deposit = get_beam_deposition_function(config)
+        self._push_particles = get_beam_pusher(config)
+        self._calc_beam_t_step = get_beam_t_step_calculator(config)
 
-        pu_type = config.get('processing-unit-type').lower()
-        if pu_type == 'cpu':
-            self.beam_substepping_step = beam_substepping_step_numba
-        if pu_type == 'gpu':
-            self.beam_substepping_step = get_beam_substepping_step_cupy()
-
-    # Helper functions for one time step cicle:
 
     def start_time_step(self):
         """
         Perform necessary operations before starting the time step.
         """
-        # Get a grid for beam rho density
-        self.rho_layout = self.xp.zeros((self.grid_steps, self.grid_steps),
-                                        dtype=self.xp.float64)
+        # Get a grid for beam density
+        self.rho_beam_next = self.xp.zeros((self.grid_steps, self.grid_steps),
+                                           dtype=self.xp.float64)
 
-    # Helper functions for depositing beam particles of a layer:
+    def deposit_beam_layer(self, beam_layer: BeamParticles, plasma_slice_idx):
+        """
+        Perform deposition of the beam layer on the density grid.
 
-    def layout_beam_layer(self, beam_layer: BeamParticles, plasma_layer_idx):
-        rho_layout = self.xp.zeros_like(self.rho_layout)
+        Parameters
+        ----------
+        beam_layer : BeamParticles
+            Beam particles to be deposited at the current xi-step.
+        plasma_layer_idx : int
+            The xi-step number, which is calculated next.
+
+        Returns
+        -------
+        rho_beam : np.ndarray
+            Beam density for xi = -dxi * plasma_layer_idx.
+        """
+        rho_beam = self.rho_beam_next
+        self.rho_beam_next = self.xp.zeros_like(rho_beam)
 
         if beam_layer.id.size != 0:
-            self.deposit(plasma_layer_idx, beam_layer.x, beam_layer.y,
-                         beam_layer.xi, beam_layer.q_norm,
-                         self.rho_layout, rho_layout)
+            self._deposit(plasma_slice_idx, beam_layer.x, beam_layer.y,
+                          beam_layer.xi, beam_layer.q_norm,
+                          rho_beam, self.rho_beam_next)
 
-        self.rho_layout, rho_layout = rho_layout, self.rho_layout
-        rho_layout /= self.grid_step_size ** 2
+        rho_beam /= self.grid_step_size**2
 
-        return rho_layout
+        return rho_beam
 
-    # Helper functions for moving beam particles of a layer:
-
-    def start_moving_layer(self, beam_layer: BeamParticles, fell_size):
+    def push_beam_layer(self, beam_layer: BeamParticles, fell_size,
+                        plasma_slice_idx,
+                        fields_prev, fields):
         """
-        Perform necessary operations before moving a beam layer.
+        Integrate beam particles.
+
+        Parameters
+        ----------
+        beam_layer : BeamParticles
+            Beam particles to be pushed at the current xi-step.
+        plasma_layer_idx : int
+            The xi-step number, which have been calculated.
+        fields_prev : Array
+            Fields at (plasma_slice_idx - 1) step.
+        fields : Array
+            Fields at (plasma_slice_idx) step.
+
+        Returns
+        -------
+        (lost, moved, fell) : tuple of BeamParticles
+            lost - particles have left the simulation domain.
+            moved - particles have completed the current time step.
+            fell - particles should be integrated at the next xi-step.
         """
-        # TODO: Do we need to set dt and remaining_steps only for particles
-        #       that have dt == 0?
-        # mask = beam_layer.id[beam_layer.dt == 0] and idxes -> mask ???
-
-        # NOTE: We perform the following callculations only for the particles
-        #       that haven't fallen from the previous level. Because these
-        #       particles have been appended (concatenated) to the end of the
-        #       beam_layer, we get unfallen particles using [:size] with size:
-        size = beam_layer.id.size - fell_size
-
-        dt = self.beam_substepping_step(
-            beam_layer.q_m[:size], beam_layer.pz[:size], self.substep_energy)
-        beam_layer.dt[:size] = dt * self.time_step
-        beam_layer.remaining_steps[:size] = (1. / dt).astype(self.xp.int_)
-
-    def move_beam_layer(self, beam_layer: BeamParticles, fell_size,
-                        pl_layer_idx, fields_after_layer, fields_before_layer):
         lost_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
         moved_idxes = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
         fell_idxes  = self.xp.zeros(beam_layer.id.size, dtype=self.xp.bool_)
 
         if beam_layer.id.size != 0:
-            self.start_moving_layer(beam_layer, fell_size)
-            beam_layer_idx = pl_layer_idx - 1
+            # Initialization of substepping for new particles.
+            size = beam_layer.id.size - fell_size
+            dt = self._calc_beam_t_step(beam_layer.q_m[:size],
+                                        beam_layer.uz[:size],
+                                        self.substep_energy)
+            beam_layer.dt[:size] = dt * self.time_step
+            beam_layer.remaining_steps[:size] = (1. / dt).astype(self.xp.int_)
 
-            self.move_particles(
-                beam_layer_idx, beam_layer, fields_after_layer,
-                fields_before_layer, lost_idxes, moved_idxes, fell_idxes)
+            self._push_particles(plasma_slice_idx, beam_layer,
+                                 fields_prev, fields,
+                                 lost_idxes, moved_idxes, fell_idxes)
 
         lost  = beam_layer[lost_idxes]
         moved = beam_layer[moved_idxes]
         fell  = beam_layer[fell_idxes]
 
         return lost, moved, fell
-    
-    def create_next_layer(self, beam_layer_to_layout: BeamParticles,
-                          fell_to_next_layer: BeamParticles,
-                          ro_beam_full: np.ndarray):
-        beam_layer_to_move = beam_layer_to_layout.append(fell_to_next_layer)
-        fell_size = fell_to_next_layer.id.size
-        ro_beam_prev = ro_beam_full.copy()
-
-        return beam_layer_to_move, fell_size, ro_beam_prev
 
 
 # ----- A class for a rigid rigid beam -----
@@ -173,9 +217,3 @@ class RigidBeamCalculator:
                         pl_layer_idx, fields_after_layer, fields_before_layer):
         """A dummy function for the rigid-beam mode."""
         return None, None, None
-
-    def create_next_layer(self, beam_layer_to_layout,
-                          fell_to_next_layer, ro_beam_full: np.ndarray):
-        """A half-dummy function for the rigid-beam mode."""
-        ro_beam_prev = ro_beam_full.copy()
-        return None, None, ro_beam_prev

@@ -13,7 +13,7 @@ particle_dtype2d = np.dtype([('xi', 'f8'), ('r', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 particle_dtype3d = np.dtype([('xi', 'f8'), ('x', 'f8'), ('y', 'f8'),
-                             ('px', 'f8'), ('py', 'f8'), ('pz', 'f8'),
+                             ('ux', 'f8'), ('uy', 'f8'), ('uz', 'f8'),
                              ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
 
 
@@ -41,7 +41,7 @@ def generate_beam(config=default_config, beam_parameters: dict=None):
         'length': 5.01, 'ampl': 1., 'xishape': 'cos', 'radius': 1.,
         'energy': 1000., 'xshift': 0, 'yshift': 0, 'rshape': 'g',
         'angspread': 1e-5, 'angshape': 'l', 'espread': 0, 'eshape': 'm',
-        'mass_charge_ratio': 1
+        'mass_charge_ratio': 1, 'q': 1,
     }
 
     if beam_parameters is not None:
@@ -124,11 +124,8 @@ def generate_beam_array(config: Config, beam_shape: BeamShape):
         particles_in_layer = particles_in_layers[layer_idx]
         # Precalculate common particle properties of this layer
 
-        # TODO: q_m is broken! Use ux, uy, uz instead of px, py, pz
         q_m = (1 / segment.mass_charge_ratio) * (1 if current[layer_idx] > 0
                                                  else -1)
-        
-        # TODO: q_norm is broken and doesn't work for 3d correctly.
         q_norm = elem_charge * (1 if beam_shape.current >= 0 else -1)
         start_idx = part_idx
         end_idx = part_idx + particles_in_layer
@@ -141,10 +138,11 @@ def generate_beam_array(config: Config, beam_shape: BeamShape):
                                                     particles_in_layer)
             beam['x'][start_idx:end_idx] = x
             beam['y'][start_idx:end_idx] = y
-            beam['px'][start_idx:end_idx] = p_x
-            beam['py'][start_idx:end_idx] = p_y
-            beam['pz'][start_idx:end_idx] = segment.get_pz(rng, dxi,
-                                                        particles_in_layer)
+            m = segment.mass_charge_ratio * segment.q 
+            beam['ux'][start_idx:end_idx] = p_x / m
+            beam['uy'][start_idx:end_idx] = p_y / m
+            beam['uz'][start_idx:end_idx] = segment.get_pz(rng, dxi,
+                                                        particles_in_layer) / m
         else:
             r_b, p_br, M_b = segment.get_r_values2d(rng, dxi, max_radius,
                                                     particles_in_layer)

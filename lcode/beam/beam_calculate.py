@@ -377,7 +377,7 @@ class BeamCalculator2D():
         """
         self.rho_layout = np.zeros(self.grid_steps)
 
-    def layout_beam_layer(self, beam_layer, xi_i):
+    def deposit_beam_layer(self, beam_layer, xi_i):
         """
         Calculate beam density on the grid. 
 
@@ -411,7 +411,7 @@ class BeamCalculator2D():
         current_rho_layout[1:] /= np.arange(1, self.grid_steps)
         return current_rho_layout
 
-    def move_beam_layer(self, beam_partickles_to_move, fell_size, 
+    def push_beam_layer(self, beam_partickles_to_move, fell_size, 
                         xi_i, prev_pl_fields, pl_fields):
         """
         Calculate the evolution of beam particles 

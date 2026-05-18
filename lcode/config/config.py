@@ -91,11 +91,12 @@ class Config:
                         'plasma-zshape', 
                         'plasma-rshape',
                         'path-to-plasma-state',
+                        'beam-pusher',
                         ])
         if 'extra' in runas_name:
             n_lines = -1
         else:
-            n_lines = 103
+            n_lines = 105
         
         path_to_default = Path(__file__).parent / 'default_config_values.py'
         with open(path_to_default, 'r', encoding='utf-8') as f_in:

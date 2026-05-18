@@ -19,21 +19,34 @@ For this, information about the macroparticles should be written
 to the file `beamfile.npz` by a user script (the file name can be any). 
 
 This file contains information about beam macroparticles. 
-The state of each macroparticle is defined by 8 values in cylindrical geometry 
-and 9 values in 3D geometry:
+The state of each macroparticle is defined by 8 values in cylindrical geometry:
 
   * Longitudinal position, ``'xi'``.
 
-  * Transverse position, ``'r'`` (cylindrical geometry) 
-    or ``'x'`` and ``'y'`` (3d geometry).
+  * Transverse position, ``'r'``.
 
   * Longitudinal momentum, ``'p_z'``.
 
-  * Transverse momentum, ``'p_r'`` (cylindrical geometry) 
-    or ``'p_x'`` (3d geometry).
+  * Transverse momentum, ``'p_r'``.
 
-  * Angular momentum ``'M'`` (cylindrical geometry) 
-    or third momentum component ``'p_y'`` (3d geometry).
+  * Angular momentum ``'M'``.
+
+  * Absolute value of the charge to mass ratio, compared to electron, ``'q_m'``.
+
+  * Charge carried by the macro-particle, ``'q'``. 
+    The charge unit is :math:`\Delta\xi mc^2/(2 e)`.
+
+  * Identifier  of the macro-particle, ``'id'`` (`int`).
+ 
+9 values in 3D geometry:
+
+  * Longitudinal position, ``'xi'``.
+
+  * Transverse position ``'x'`` and ``'y'``.
+
+  * Longitudinal momentum divided by the mass, ``'u_z'``.
+
+  * Transverse momentum divided by the mass, ``'u_x'`` and ``'u_y'``.
 
   * Absolute value of the charge to mass ratio, compared to electron, ``'q_m'``.
 
@@ -42,10 +55,10 @@ and 9 values in 3D geometry:
 
   * Identifier  of the macro-particle, ``'id'`` (`int`).
 
-As follows from the data format, the actual beam charge depends on the dimensionless 
-longitudinal grid step **xi-step** ( :math:`\Delta\xi` ). Also see :ref:`units`.
-Using a beam generated for some **xi-step** in a run with different **xi-step** requires
-scaling the parameter **q**. 
+As follows from the data format, the actual beam charge depends 
+on the dimensionless longitudinal grid step **xi-step** ( :math:`\Delta\xi` ). 
+Also see :ref:`units`. Using a beam generated for some **xi-step** 
+in a run with different **xi-step** requires scaling the parameter **q**. 
 
 The beam file can be written in the following way:
 
@@ -331,3 +344,6 @@ Individual segment parameters
 
 * ``'mass_charge_ratio': 1`` (`float`)
     Absolute value of mass to charge ratio, compared to the electron.
+
+* ``'mass': 1`` (`float`)
+    Absolute value of mass, compared to the electron. Only needed for 3D.
