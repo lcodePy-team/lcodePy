@@ -345,5 +345,5 @@ Individual segment parameters
 * ``'mass_charge_ratio': 1`` (`float`)
     Absolute value of mass to charge ratio, compared to the electron.
 
-* ``'mass': 1`` (`float`)
-    Absolute value of mass, compared to the electron. Only needed for 3D.
+* ``'q': 1`` (`float`)
+    Absolute value of charge, compared to the electron. Only needed for 3D.
