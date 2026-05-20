@@ -86,6 +86,7 @@ class Config:
     def dump(self, runas_name):
         str_keys = set(['processing-unit-type',
                         'geometry',
+                        'mpi-transport',
                         'ion-model',
                         'plasma-shape',
                         'plasma-zshape', 

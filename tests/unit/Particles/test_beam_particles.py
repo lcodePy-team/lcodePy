@@ -94,7 +94,7 @@ class TestBeamParticles3D:
         beam = BeamParticles3D()
         assert beam.size == 0
         beam.xi, beam.x, beam.y
-        beam.px, beam.py, beam.pz
+        beam.ux, beam.uy, beam.uz
         beam.q_m, beam.q_norm, beam.id
         beam.dt, beam.remaining_steps
     

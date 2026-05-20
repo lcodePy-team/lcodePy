@@ -1,7 +1,10 @@
 """Default values for a lcodePy config"""
 
 default_config_values = {
-    'geometry': 'circ', # 'circ' or '3d' 
+    'geometry': 'circ', # 'circ' or '3d'
+
+    # MPI inter-process transport: 'memory' (fast, requires RAM) or 'disk' (slower, saves RAM).
+    'mpi-transport': 'memory',
 
     # Here we set the type of processing unit: 'cpu' or 'gpu'.
     # For now, GPU can be used only for 3d simulations.

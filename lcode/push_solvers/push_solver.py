@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import os
+import time
 
 from ..config.config import Config
 
@@ -57,9 +58,55 @@ class PusherAndSolver():
         pass
     def _simple_diag(self, current_time, xi_i, pl_fields):
         pass
-    def _save_plasma_state(self, current_time, xi, 
+    def _save_plasma_state(self, current_time, xi,
                            particles, fields, currents, const_arrays):
         pass
+
+    def _warmup_beam(self, xp):
+        """Return a single fake particle to trigger beam-pusher JIT compilation."""
+        return self._set_beam_particles(xp)  # overridden in 2D/3D subclasses
+
+    def warmup(self, plasma_state, rank: int = 0):
+        """Pre-compile all numba kernels by running two xi steps.
+
+        All MPI ranks call this simultaneously before entering the pipeline,
+        so JIT compilation happens in parallel rather than cascading rank-by-rank.
+
+        Two steps are needed: the first step places the fake particle into
+        beam_layer_to_move; the second step pushes it, triggering beam-pusher
+        compilation (init_substepping, push_particles, etc.).
+        """
+        pl_fields, pl_particles, pl_currents, pl_const_arrays, _ = plasma_state
+
+        xp = pl_const_arrays.xp
+        solver = self
+        first_call = [True]
+
+        class _Source:
+            def pull(self, layer_index):
+                if first_call[0]:
+                    first_call[0] = False
+                    return solver._warmup_beam(xp)
+                return solver._set_beam_particles(xp)
+
+        class _Drain:
+            def push(self, layer_index, data): pass
+            def push_lost(self, layer_index, data): pass
+
+        # Two xi steps: step 1 loads the fake particle, step 2 pushes it.
+        xi_warmup = -(self.xi_steps - 2) * self.dxi
+        _orig_diag = self._simple_diag
+        self._simple_diag = lambda *a, **kw: None
+        t0 = time.perf_counter()
+        try:
+            self.step_dt(
+                pl_fields, pl_particles, pl_currents, pl_const_arrays,
+                xi_warmup, _Source(), _Drain(), current_time=0.0,
+            )
+        finally:
+            self._simple_diag = _orig_diag
+        elapsed = time.perf_counter() - t0
+        print(f'Rank {rank}: numba kernels compiled in {elapsed:.1f}s.', flush=True)
 
     def step_dt(self, pl_fields, pl_particles,
                 pl_currents, pl_const_arrays, xi_plasma_layer_start, 
@@ -139,8 +186,8 @@ class PusherAndSolver():
             beam_layer_to_move = \
                 beam_layer_to_layout.append(fell_to_next_layer)
             fell_size = fell_to_next_layer.id.size
-            # Send moved beam particles to next time step 
-            self._push_beam_layer(beam_drain, moved)
+            # Send moved beam particles to next time step
+            self._push_beam_layer(beam_drain, xi_i, moved)
             
             xi_plasma_layer = -xi_i * self.dxi
             # Every xi step diagnostics
@@ -190,17 +237,24 @@ class PusherAndSolver2D(PusherAndSolver):
     def _set_beam_particles(self, xp):
         return BeamParticles2D(xp)
 
+    def _warmup_beam(self, xp):
+        beam = BeamParticles2D(xp, size=1)
+        beam.remaining_steps[0] = 1
+        beam.r[0] = 1.0
+        beam.p_z[0] = 1000.0
+        beam.q_m[0] = -1.0
+        beam.q_norm[0] = -0.001
+        return beam
+
     def _set_rho_beam_array(self, xp, grid_steps):
         return xp.zeros(grid_steps, dtype=xp.float64)
-    
+
     def _get_beam_layer(self, beam_source, xi_i):
-        return beam_source.get_beam_slice(
-            xi_i * -self.dxi, (xi_i + 1) * -self.dxi,
-        )
-    
-    def _push_beam_layer(self, beam_drain, moved):
-        beam_drain.push_beam_slice(moved)
-    
+        return beam_source.pull(xi_i)
+
+    def _push_beam_layer(self, beam_drain, xi_i, moved):
+        beam_drain.push(xi_i, moved)
+
     def _simple_diag(self, current_time, xi_i, pl_fields):
             # Some diagnostics:
             Ez_00 = pl_fields.E_z[0]
@@ -279,14 +333,22 @@ class PusherAndSolver3D(PusherAndSolver):
     def _set_beam_particles(self, xp):
         return BeamParticles3D(xp)
 
+    def _warmup_beam(self, xp):
+        beam = BeamParticles3D(xp, size=1)
+        beam.remaining_steps[0] = 1
+        beam.uz[0] = 1000.0
+        beam.q_m[0] = -1.0
+        beam.q_norm[0] = -0.001
+        return beam
+
     def _set_rho_beam_array(self, xp, grid_steps):
         return xp.zeros((grid_steps, grid_steps), dtype=xp.float64)
     
     def _get_beam_layer(self, beam_source, xi_i):
-        return beam_source.get_beam_layer_to_layout(xi_i)
-    
-    def _push_beam_layer(self, beam_drain, moved):
-        beam_drain.push_beam_layer(moved)
+        return beam_source.pull(xi_i)
+
+    def _push_beam_layer(self, beam_drain, xi_i, moved):
+        beam_drain.push(xi_i, moved)
 
     
     def _simple_diag(self, current_time, xi_i, pl_fields):

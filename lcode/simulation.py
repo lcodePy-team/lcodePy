@@ -24,7 +24,10 @@ from .plasma import init_plasma_2d, load_plasma_2d
 # Imports beam module, 2d:
 from .beam import BeamParticles2D, BeamSource2D, BeamDrain2D
 from .beam.data import particle_dtype
-from .mpi import MPIBeamTransport
+
+# MPI transport
+from .mpi import LayerTransport, MPIContext
+from .mpi.beam_io import MPIBeamSource, MPIBeamDrain
 
 class Simulation:
     """
@@ -177,6 +180,59 @@ class Simulation:
     #     """
     #     pass
 
+    def _build_transport(self, ctx, N_steps, beam_particles, backend):
+        """Create LayerTransport for the beam, geometry-aware."""
+        cfg = self.__config
+        nf = len(self.particle_dtype)  # number of standard fields per particle
+
+        if self.__geometry == '2d':
+            from .beam.beam_io import MemoryBeamSource2D
+
+            def _make_source(data):
+                src = MemoryBeamSource2D(cfg, data.reshape(-1, nf))
+                return lambda li: src.pull(li).as_array().ravel()
+
+            initial = MemoryBeamSource2D(cfg, beam_particles)
+            initial_fn = lambda li: initial.pull(li).as_array().ravel()
+
+        elif self.__rigid_beam:
+            # Rigid beam: source is a charge distribution function, not particles.
+            initial_fn = lambda li: beam_particles
+            _make_source = lambda data: (lambda li: beam_particles)
+
+        else:  # 3d non-rigid
+            from .beam3d.beam_io import MemoryBeamSource3D
+
+            def _make_source(data):
+                src = MemoryBeamSource3D(cfg, data.reshape(-1, nf))
+                return lambda li: src.pull(li).as_array().ravel()
+
+            initial = MemoryBeamSource3D(cfg, beam_particles)
+            initial_fn = lambda li: initial.pull(li).as_array().ravel()
+
+        return LayerTransport(ctx, N_steps, 'beam', backend, initial_fn, _make_source)
+
+    def _make_reconstruct_fn(self, ctx):
+        """Return a function flat float64 array -> BeamParticles for the current geometry."""
+        cfg = self.__config
+        if self.__geometry == '2d':
+            n_fields = len(self.particle_dtype)
+            def reconstruct(arr):
+                if arr.size == 0:
+                    return BeamParticles2D(size=0)
+                return BeamParticles2D(beam_array=arr.reshape(-1, n_fields))
+        else:
+            xp = cfg.xp
+            n_fields = len(self.particle_dtype)
+            if self.__rigid_beam:
+                reconstruct = lambda arr: arr
+            else:
+                def reconstruct(arr):
+                    if arr.size == 0:
+                        return BeamParticles3D(xp)
+                    return BeamParticles3D(xp, arr.reshape(-1, n_fields))
+        return reconstruct
+
     def __init_plasma_state(self, current_time):
         # In case of an external plasma state, we set values
         # as the loaded values:
@@ -227,62 +283,38 @@ class Simulation:
                   f"the code will simulate till time limit = {self.__time_limit},",
                   f"with a time step size = {self.__time_step_size}.")
 
-        # Check for a beam being rigid:
+        ctx = MPIContext()
+        backend = self.__config.get('mpi-transport', 'memory')
+
         if self.__rigid_beam:
-            # For now, beam_parameters is just a function representing
-            # the charge distribution of a rigid beam. In the future,
-            # we want to use the same beam_parameters as for a non-rigid
-            # beam in both cases.
             beam_particles = self.beam_parameters
-
-            self.beam_source = self.BeamSource(self.__config,
-                                               beam_particles)
-            self.beam_drain  = self.BeamDrain(self.__config)
-
-            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                                 beam_particles, self.particle_dtype,
-                                                 self.BeamSource, self.BeamDrain)
-
-        if self.beam_source is None:
-            # Generate all parameters for a beam:
+        else:
             if self.__beam_particles is None:
-                beam_particles = generate_beam(self.__config,
-                                               self.beam_parameters)
-            else: 
+                beam_particles = generate_beam(self.__config, self.beam_parameters)
+            else:
                 beam_particles = self.__beam_particles
 
-            # Here we create a beam source and a beam drain:
-            self.beam_source = self.BeamSource(self.__config,
-                                               beam_particles)
-            self.beam_drain  = self.BeamDrain(self.__config)
+        transport = self._build_transport(ctx, N_steps, beam_particles, backend)
+        reconstruct_fn = self._make_reconstruct_fn(ctx)
 
-            self.MPITransport = MPIBeamTransport(self.__config, N_steps,
-                                            beam_particles, self.particle_dtype,
-                                            self.BeamSource, self.BeamDrain)
-        
-        self.current_time = self.__time_step_size * (self.MPITransport._rank + 1)
+        self.beam_source = MPIBeamSource(transport, reconstruct_fn)
+        self.beam_drain  = MPIBeamDrain(transport, reconstruct_fn)
 
-        # 4. A loop that calculates N time steps:
-        for t_i in range(self.MPITransport.steps_per_node):
-            self.beam_source, self.beam_drain = self.MPITransport.get_transports()
+        self.current_time = self.__time_step_size * (ctx.rank + 1)
 
+        warmup_plasma = self.init_plasma(self.__config, 0.0)
+        self.__push_solver.warmup(warmup_plasma, rank=ctx.rank)
 
+        for _ in range(transport.steps_per_node):
             plasma_state = self.__init_plasma_state(self.current_time)
 
-            # Calculates one time step:
             self.__push_solver.step_dt(
                 *plasma_state, self.beam_source, self.beam_drain,
                 self.current_time, self.diagnostics_list
             )
 
-            # Here we transfer beam particles from beam_buffer to
-            # beam_source for the next time step. And create a new beam
-            # drain that is empty.
-            self.MPITransport.next_step()
+            transport.next_step()
+            self.current_time += self.__time_step_size * ctx.size
 
-            self.current_time = self.current_time + self.__time_step_size * self.MPITransport._size
-        # 4. As in lcode2d, we save the beam state on reaching the time limit:
-        # self.beam_source.beam.save('beamfile') # Do we need it?
-        # TODO: Make checkpoints where all simulation information,
-        #       including beam and current time, is saved.
+        transport.close()
         print('The work is done!')

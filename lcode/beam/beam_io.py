@@ -1,6 +1,9 @@
-import logging
-from abc import ABC, abstractmethod
+"""Beam source/drain abstractions and in-memory 2D implementations."""
 
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+import logging
 import numpy as np
 import numba
 
@@ -8,70 +11,44 @@ from .data import BeamParticles
 from ..config.config import Config
 
 
+# ---------------------------------------------------------------------------
+# Abstract base classes
+# ---------------------------------------------------------------------------
+
 class BeamSource(ABC):
-    """
-    BeamSource abstracts source of beam particles.
-    """
-
     @abstractmethod
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
-        """
-        Returns slice from source.
-
-        BeamSource guarantees, that all particles in returned slice lie between xi_max and xi_min and are not lost yet.
-        xi_max should be bigger than xi_min.
-        """
-        pass
+    def pull(self, layer_index: int) -> BeamParticles:
+        """Return beam particles for the given xi layer."""
 
 
 class BeamDrain(ABC):
-    """
-    BeamDrain abstracts output of beam particles.
-    """
+    @abstractmethod
+    def push(self, layer_index: int, data: BeamParticles) -> None:
+        """Receive processed particles from the given xi layer."""
 
     @abstractmethod
-    def push_beam_slice(self, beam_slice: BeamParticles) -> None:
-        """
-        Write particles from beam slice to output.
+    def push_lost(self, layer_index: int, data: BeamParticles) -> None:
+        """Receive lost particles from the given xi layer."""
 
-        Particles in `beam_slice` must finish their movement in time step and must not be lost.
-        Writing particles with xi from finished layer are not written to output.
-        """
-        pass
-
-    @abstractmethod
     def finish_layer(self, xi: float) -> None:
-        """
-        Finish xi layer.
-
-        Particles written after finishing layer should have xi less than xi of finished layer.
-        """
-        pass
-
-    @abstractmethod
-    def push_lost(self, time: float, beam_slice: BeamParticles) -> None:
-        """
-        Write lost particles.
-        """
-        pass
+        """Optional hook called when a xi layer is fully processed."""
 
 
-particle_dtype = np.dtype([('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'), ('q_m', 'f8'),
-                           ('q_norm', 'f8'), ('id', 'i8')])
-
-lost_particle_dtype = np.dtype([('time', 'f8'), ('xi', 'f8'), ('r', 'f8'), ('p_z', 'f8'), ('p_r', 'f8'), ('M', 'f8'),
-                                ('q_m', 'f8'), ('q_norm', 'f8'), ('id', 'i8')])
+# ---------------------------------------------------------------------------
+# 2D in-memory implementations
+# ---------------------------------------------------------------------------
 
 @numba.njit
-def find_sub_slice(beam_slice_xi, used_count, xi_max, xi_min):
+def _find_sub_slice(xi_array, used_count, xi_max, xi_min):
+    """Find the slice of xi_array (sorted descending) with xi_min <= xi <= xi_max."""
     start = used_count
-    end = beam_slice_xi.size
+    end = xi_array.size
     flag = 0
     for i in np.arange(start, end):
-        if beam_slice_xi[i] - xi_min < 0:
+        if xi_array[i] - xi_min < 0:
             end = i
             break
-        if beam_slice_xi[i] - xi_max > 0:
+        if xi_array[i] - xi_max > 0:
             end = start
             flag = 1
             break
@@ -79,99 +56,118 @@ def find_sub_slice(beam_slice_xi, used_count, xi_max, xi_min):
     return start, end, used_count, flag
 
 
-class MemoryBeamSource(BeamSource):
-    def __init__(self, config: Config, beam_slice):
-        if type(beam_slice) == np.ndarray:
-            beam_slice = BeamParticles(beam_array = beam_slice)
+class MemoryBeamSource2D(BeamSource):
+    """Supplies 2D beam particles from an in-memory buffer, filtered by xi layer."""
 
-        self._beam_slice = beam_slice
-        self._used_count = 0
-        if beam_slice.size == 0:
+    def __init__(self, config: Config, beam_particles):
+        self._dxi = config.getfloat('xi-step')
+
+        if isinstance(beam_particles, np.ndarray):
+            beam = BeamParticles(beam_array=beam_particles)
+        else:
+            beam = beam_particles
+
+        if beam.size == 0:
+            self._beam = beam
+            self._used_count = 0
             return
-        self._beam_slice.sort_by_xi()
-        # Remove stub particle for compatibility (xi = -100000)
-        if (self._beam_slice.xi[-1] + 100000) < 1:
-            self._beam_slice = self._beam_slice[:-1]
-        self._beam_slice.dt.fill(0.0)
-        self._beam_slice.remaining_steps.fill(1.0)
-        
 
-    def get_beam_slice(self, xi_max: float, xi_min: float) -> BeamParticles:
-        assert xi_min < xi_max
-        if (self._used_count == 0 and self._beam_slice.xi.size
-            and self._beam_slice.xi[0] > xi_max):
-            print('MemoryBeamSource: Part of the beam particles are skipped '
-                  + 'as they are in front of '
-                  + f'the first plasma slice (xi = {round(xi_min, 7)}).')
-            _, _, self._used_count, _ = find_sub_slice(self._beam_slice.xi,
-                                                       self._used_count,
-                                                       0, xi_max)
+        beam.sort_by_xi()
+        # Remove legacy stub particle (xi = -100000).
+        if (beam.xi[-1] + 100000) < 1:
+            beam = beam[:-1]
+        beam.dt.fill(0.0)
+        beam.remaining_steps.fill(1.0)
+        self._beam = beam
+        self._used_count = 0
 
-        start, end, self._used_count, flag = find_sub_slice(self._beam_slice.xi,
-                                                            self._used_count,
-                                                            xi_max, xi_min)
+    def pull(self, layer_index: int) -> BeamParticles:
+        xi_max = -layer_index * self._dxi
+        xi_min = -(layer_index + 1) * self._dxi
+
+        if (self._used_count == 0
+                and self._beam.xi.size
+                and self._beam.xi[0] > xi_max):
+            logging.debug(
+                'MemoryBeamSource2D: particles skipped ahead of first plasma slice '
+                f'(xi = {round(xi_min, 7)})'
+            )
+            _, _, self._used_count, _ = _find_sub_slice(
+                self._beam.xi, self._used_count, 0, xi_max
+            )
+
+        start, end, self._used_count, flag = _find_sub_slice(
+            self._beam.xi, self._used_count, xi_max, xi_min
+        )
         if flag:
-            logging.debug(f'Wrong order of the particles')
-        logging.debug(f'MemoryBeamSource: sourced {end - start} particles')
-        return self._beam_slice[start:end]
+            logging.debug('MemoryBeamSource2D: wrong particle order detected')
+        logging.debug(f'MemoryBeamSource2D: sourced {end - start} particles')
+        return self._beam[start:end]
 
 
-class MemoryBeamDrain(BeamDrain):
-    def finish_layer(self, xi):
-        pass
+class MemoryBeamDrain2D(BeamDrain):
+    """Collects 2D beam particles in memory."""
 
     def __init__(self, config: Config):
-        self._beam_buffer = []
-        self._beam_buffer_lost = []
+        self._buffer: list[BeamParticles] = []
+        self._lost_buffer: list[BeamParticles] = []
 
-    def push_beam_slice(self, beam_slice: BeamParticles):
-        if beam_slice.size > 0:
-            logging.debug(f'MemoryBeamDrain: drained {beam_slice.size} particles')
-            self._beam_buffer.append(beam_slice)
+    def push(self, layer_index: int, data: BeamParticles) -> None:
+        if data.size > 0:
+            logging.debug(f'MemoryBeamDrain2D: drained {data.size} particles')
+            self._buffer.append(data)
 
-    def push_lost(self, time, beam_slice: BeamParticles):
-        if beam_slice.size > 0:
-            print(f'MemoryBeamDrain: lost {beam_slice.size} particles')
-            self._beam_buffer_lost.append(beam_slice)
+    def push_lost(self, layer_index: int, data: BeamParticles) -> None:
+        if data.size > 0:
+            self._lost_buffer.append(data)
 
-    def beam_slice(self):
-        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer]) if len(self._beam_buffer )> 0 else np.array([], dtype = particle_dtype)
-    
-    def save(self, *args, **kwargs):
-        slice = np.array(self.beam_slice(), dtype = particle_dtype)
-        np.savez_compressed(*args, **kwargs, xi = slice['xi'], r = slice['r'], pz = slice['p_z'], pr = slice['p_r'], M = slice['M'], q_m = slice['q_m'], q_norm = slice['q_norm'], id = slice['id'])
+    def finish_layer(self, xi: float) -> None:
+        pass
+
+    def beam_slice(self) -> BeamParticles:
+        if not self._buffer:
+            return BeamParticles(size=0)
+        result = BeamParticles(size=0)
+        for bp in self._buffer:
+            result.append(bp)
+        return result
+
+    def save(self, *args, **kwargs) -> None:
+        self.beam_slice().save(*args, **kwargs)
 
 
-class DebugSource(BeamSource):
-    def __init__(self, source):
+# ---------------------------------------------------------------------------
+# Debug wrappers
+# ---------------------------------------------------------------------------
+
+class DebugBeamSource(BeamSource):
+    def __init__(self, source: BeamSource):
         self._source = source
-        self._beam_buffer = []
+        self._log: list[BeamParticles] = []
 
-    def get_beam_slice(self, xi_start, xi_end) -> BeamParticles:
-        slice = self._source.get_beam_slice(xi_start, xi_end)
-        self._beam_buffer.append(BeamParticles(beam_array = np.copy(slice.as_array())))
-        return slice
+    def pull(self, layer_index: int) -> BeamParticles:
+        particles = self._source.pull(layer_index)
+        self._log.append(BeamParticles(beam_array=np.copy(particles.as_array())))
+        return particles
 
-    def get_debug_slice(self):
-        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer])
+    def get_debug_log(self) -> list:
+        return self._log
 
 
-class DebugDrain(BeamDrain):
+class DebugBeamDrain(BeamDrain):
+    def __init__(self, drain: BeamDrain):
+        self._drain = drain
+        self._log: list[BeamParticles] = []
+
+    def push(self, layer_index: int, data: BeamParticles) -> None:
+        self._log.append(data)
+        self._drain.push(layer_index, data)
+
+    def push_lost(self, layer_index: int, data: BeamParticles) -> None:
+        self._drain.push_lost(layer_index, data)
+
     def finish_layer(self, xi: float) -> None:
         self._drain.finish_layer(xi)
 
-    def __init__(self, drain):
-        self._drain = drain
-        self._beam_buffer = []
-        self._beam_buffer_lost = []
-
-    def push_beam_slice(self, beam_slice: BeamParticles):
-        self._beam_buffer.append(beam_slice)
-        self._drain.push_beam_slice(beam_slice)
-
-    def push_lost(self, time, beam_slice: BeamParticles):
-        if beam_slice.size > 0:
-            self._beam_buffer_lost.append(beam_slice)
-
-    def get_beam_slice(self):
-        return np.concatenate([beam_slice.as_array() for beam_slice in self._beam_buffer])
+    def get_debug_log(self) -> list:
+        return self._log

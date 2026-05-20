@@ -507,7 +507,7 @@ def get_beam_pusher_cupy(integration_method):
         T uz = out_uz[i];
 
         while (out_remaining_steps[i] > 0) {
-            // We use “synchronized” version of the leapfrog (DKD version).
+            // We use "synchronized" version of the leapfrog (DKD version).
             // See details in https://doi.org/10.1086/301102.
             // Calculate the position at the half time step.
             T gamma = sqrt(1. + ux*ux + uy*uy + uz*uz);

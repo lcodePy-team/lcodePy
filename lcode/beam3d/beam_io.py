@@ -1,114 +1,99 @@
+"""In-memory 3D beam source/drain implementations."""
+
+from __future__ import annotations
+
 import numpy as np
 
-from ..config.config import Config
 from .data import BeamParticles
+from ..beam.beam_io import BeamSource, BeamDrain
+from ..config.config import Config
 
 
-# ----- Classes for a beam consisting of macroparticles -----
+class MemoryBeamSource3D(BeamSource):
+    """Supplies 3D beam particles filtered by plasma layer index."""
 
-class BeamSource:
-    """
-    This class helps to extract a beam layer from beam particles array.
-    """
-    # Do we really need this class?
     def __init__(self, config: Config, beam_particles):
-        # From input parameters:
-        self.xp = config.xp
-        self.xi_step_size = config.getfloat('xi-step')
+        self._xp = config.xp
+        self._dxi = config.getfloat('xi-step')
 
-        # Get the whole beam or a beam layer:
-        if type(beam_particles) == np.ndarray:
-            beam = BeamParticles(self.xp, beam_particles)
+        if not isinstance(beam_particles, BeamParticles):
+            beam = BeamParticles(config.xp, beam_particles)
         else:
             beam = beam_particles
 
         beam.sort_by_xi()
-        self.beam = beam
+        self._beam = beam
 
-    def get_beam_layer_to_layout(self, plasma_layer_idx):
-        """
-        Find all beam particles between plasma_layer_idx and
-        plasma_layer_idx + 1, return them as a layer (class BeamParticles).
-        """
-        xi_min = - self.xi_step_size * plasma_layer_idx
-        xi_max = - self.xi_step_size * (plasma_layer_idx + 1)
-        
-        if self.beam.xi.size and self.beam.xi[0] > xi_min:
-            print('MemoryBeamSource: Part of the beam particles are skipped '
-                  + 'as they are in front of '
-                  + f'the first plasma slice (xi = {round(xi_min, 7)}).')
-            layer_length = self.xp.sum(
-                (self.beam.xi > self.xp.asarray(xi_min)))
-            _, self.beam = self.beam.cut_beam_layer(layer_length)
-        array_to_search = self.beam.xi
+    def pull(self, layer_index: int) -> BeamParticles:
+        xi_min = -self._dxi * layer_index
+        xi_max = -self._dxi * (layer_index + 1)
 
-        # Here we find the length of a layer where requisite particles lay.
-        if array_to_search.size != 0:
-            layer_length = self.xp.sum(
-                (self.xp.asarray(xi_max) <= array_to_search) *
-                (array_to_search < self.xp.asarray(xi_min)))
+        if self._beam.xi.size and self._beam.xi[0] > xi_min:
+            print(
+                'MemoryBeamSource3D: particles skipped ahead of first plasma slice '
+                f'(xi = {round(xi_min, 7)})'
+            )
+            layer_length = self._xp.sum(self._beam.xi > self._xp.asarray(xi_min))
+            _, self._beam = self._beam.cut_beam_layer(layer_length)
+
+        if self._beam.xi.size:
+            layer_length = int(self._xp.sum(
+                (self._xp.asarray(xi_max) <= self._beam.xi) &
+                (self._beam.xi < self._xp.asarray(xi_min))
+            ))
         else:
             layer_length = 0
 
-        beam_layer_to_layout, self.beam = self.beam.cut_beam_layer(layer_length)
-        return beam_layer_to_layout
+        layer, self._beam = self._beam.cut_beam_layer(layer_length)
+        return layer
 
 
-class BeamDrain:
-    """
-    This class is used to store beam particles when the calculation of their
-    movement ends.
-    """
+class MemoryBeamDrain3D(BeamDrain):
+    """Collects 3D beam particles in memory."""
+
     def __init__(self, config: Config):
-        # We create two empty BeamParticles classes. Don't really like how it
-        # is done. We need to change this procces.
-        self.beam_buffer = BeamParticles(config.xp)
-        self.lost_buffer = BeamParticles(config.xp)
+        self._xp = config.xp
+        self._beam = BeamParticles(config.xp)
+        self._lost = BeamParticles(config.xp)
 
-    def push_beam_layer(self, beam_layer: BeamParticles):
-        """
-        Add a beam layer that was moved to the beam buffer.
-        """
-        if beam_layer.id.size > 0:
-            self.beam_buffer.append(beam_layer)
+    def push(self, layer_index: int, data: BeamParticles) -> None:
+        if data.id.size > 0:
+            self._beam.append(data)
 
-    def push_beam_lost(self, lost_layer: BeamParticles):
-        """
-        Add lost beam particles to the buffer of lost particles.
-        """
-        if lost_layer.id.size > 0:
-            self.lost_buffer.append(lost_layer)
-    
-    def beam_slice(self):
-        return self.beam_buffer
-    
-    def save(self, *args, **kwargs):
-        self.beam_buffer.save(*args, **kwargs)
+    def push_lost(self, layer_index: int, data: BeamParticles) -> None:
+        if data.id.size > 0:
+            self._lost.append(data)
+
+    def finish_layer(self, xi: float) -> None:
+        pass
+
+    def beam_slice(self) -> BeamParticles:
+        return self._beam
+
+    def save(self, *args, **kwargs) -> None:
+        self._beam.save(*args, **kwargs)
 
 
-# ----- Classes for a rigid beam -----
+# ---------------------------------------------------------------------------
+# Rigid beam (no actual particle tracking needed)
+# ---------------------------------------------------------------------------
 
-class RigidBeamSource:
-    def __init__(self, config: Config, beam_charge_distribution_function):
-        # From input parameters:
-        self.xp = config.xp
-        self.xi_step_size = config.getfloat('xi-step')
+class RigidBeamSource3D(BeamSource):
+    def __init__(self, config: Config, charge_distribution_fn):
+        self._fn = charge_distribution_fn
 
-        self.beam_charge_distribution_function =\
-             beam_charge_distribution_function
+    def pull(self, layer_index: int):
+        return self._fn
 
-    def get_beam_layer_to_deposit(self, plasma_layer_idx):
-        return self.beam_charge_distribution_function
 
-class RigidBeamDrain:
-    """A dummy class for the rigid-beam mode."""
+class RigidBeamDrain3D(BeamDrain):
     def __init__(self, config: Config):
         pass
 
-    def push_beam_layer(self, beam_layer):
+    def push(self, layer_index: int, data) -> None:
         pass
 
-    def push_beam_lost(self, lost_layer):
+    def push_lost(self, layer_index: int, data) -> None:
         pass
 
     def beam_slice(self):
